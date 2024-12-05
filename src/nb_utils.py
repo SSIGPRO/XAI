@@ -1,7 +1,7 @@
 ### Imports 
 
 import sys
-sys.path.insert(0, '/home/saravorabbi/repos/peepholelib') # adapt
+sys.path.insert(0, '/home/liviamanovi/gitty/peepholelib') # adapt
 
 import ast
 import matplotlib.pyplot as plt
