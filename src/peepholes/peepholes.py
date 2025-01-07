@@ -97,9 +97,6 @@ class Peepholes:
     def get_scores(self, **kwargs):
         '''
         Compute scores (score_max and score_entropy) from precomputed peepholes.
-        
-        Args:
-        - dataloader (DataLoader): Dataloader containing data to be parsed with the parser function set on __init__() 
         '''
         self.check_uncontexted()
         
