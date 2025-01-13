@@ -142,7 +142,8 @@ if __name__ == "__main__":
 
         cv.normalize_corevectors(
                 wrt='train',
-                to_file=cvs_path/(cvs_name+'.normalization.pt'),
+                from_file=cvs_path/(cvs_name+'.normalization.pt'),
+                to_file=cvs_path/(cvs_name+'.normalization2.pt'),
                 verbose=verbose
                 )
         i = 0

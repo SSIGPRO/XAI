@@ -49,9 +49,9 @@ class CoreVectors():
         bs = kwargs['batch_size'] if 'batch_size' in kwargs else 64 
         from_file = Path(kwargs['from_file']) if 'from_file' in kwargs else None
         wrt = kwargs['wrt'] if 'wrt' in kwargs else None
-        to_file = Path(kwargs['to_file'])
+        to_file = Path(kwargs['to_file']) if 'to_file' in kwargs  else None
 
-        if wrt == None and norm_file == None:
+        if wrt == None and from_file == None:
             raise RuntimeError(f'Specify `wrt` or `from_file`.')
         
         if from_file != None:
@@ -68,8 +68,11 @@ class CoreVectors():
             
             for batch in tqdm(dl, disable=not verbose, total=len(dl)):
                 batch['coreVectors'] = (batch['coreVectors'] - means)/stds
+        
+        if to_file != None:
+            to_file.parent.mkdir(parents=True, exist_ok=True)
+            torch.save((means, stds), to_file)
 
-        torch.save((means, stds), to_file)
         self._norm_mean = means
         self._norm_std = stds
 
