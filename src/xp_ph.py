@@ -77,9 +77,9 @@ if __name__ == "__main__":
     target_layers = [
             'classifier.0',
             'classifier.3',
-            'features.7',
-            'features.14',
-            'features.28',
+            #'features.7',
+            #'features.14',
+            #'features.28',
             ]
     model.set_target_layers(target_layers=target_layers, verbose=verbose)
 
@@ -136,13 +136,14 @@ if __name__ == "__main__":
         i = 0
         print('\nPrinting some corevecs')
         for data in cv_dl['train']:
+            print(data['coreVectors']['classifier.0'].shape)
             print(data['coreVectors']['classifier.0'][34:56,:])
             i += 1
             if i == 3: break
 
         cv.normalize_corevectors(
                 wrt='train',
-                from_file=cvs_path/(cvs_name+'.normalization.pt'),
+                #from_file=cvs_path/(cvs_name+'.normalization.pt'),
                 to_file=cvs_path/(cvs_name+'.normalization2.pt'),
                 verbose=verbose
                 )

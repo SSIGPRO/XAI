@@ -112,6 +112,7 @@ class CoreVectors():
 
         verbose = kwargs['verbose'] if 'verbose' in kwargs else False
         loaders = kwargs['loaders']
+        norm_file = Path(kwargs['norm_file']) if 'norm_file' in kwargs else None 
 
         for ds_key in loaders:
             if verbose: print(f'\n ---- Getting data from {ds_key}\n')
@@ -123,18 +124,12 @@ class CoreVectors():
 
             self._n_samples[ds_key] = len(self._corevds[ds_key])
             if verbose: print('loaded n_samples: ', self._n_samples[ds_key])
-        
-        norm_file_path = self.path/(self.name.name+'.normalization')
-        if norm_file_path.exists():
+       
+        if norm_file != None:
             if verbose: print('Loading normalization info.')
-            # TODO: should save and load these as non-tensor within tensordict
-            means, stds, is_normed, wrt = torch.load(norm_file_path)
+            means, stds = torch.load(norm_file_path)
             self._norm_mean = means 
             self._norm_std = stds
-            self._is_normalized = is_normed
-            self._norm_wrt = wrt
-        else:
-            if verbose: print('No normalization info found')
 
         return
     
