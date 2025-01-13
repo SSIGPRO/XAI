@@ -10,6 +10,12 @@ import abc
 def ftd(data, key):
     return data[key]
 
+def fds(data,key):
+    if key == 'image':
+        return data[0]
+    if key == 'label':
+        return data[1]    
+
 class AttackBase(metaclass=abc.ABCMeta):
     
     def __init__(self, **kwargs):
