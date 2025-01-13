@@ -38,14 +38,14 @@ if __name__ == "__main__":
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
     
-    svds_name = 'svds' 
     svds_path = Path.cwd()/'../data'
+    svds_name = 'svds' 
     
-    cvs_name = 'corevectors'
     cvs_path = Path.cwd()/'../data/corevectors'
+    cvs_name = 'corevectors'
     
-    phs_name = 'peepholes'
     phs_path = Path.cwd()/'../data/peepholes'
+    phs_name = 'peepholes'
     
     verbose = True 
     
@@ -102,8 +102,8 @@ if __name__ == "__main__":
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    ds_loaders = ds.get_dataset_loaders()
-    #ds_loaders = trim_dataloaders(ds.get_dataset_loaders(), 0.05)
+    #ds_loaders = ds.get_dataset_loaders()
+    ds_loaders = trim_dataloaders(ds.get_dataset_loaders(), 0.05)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -142,6 +142,7 @@ if __name__ == "__main__":
 
         cv.normalize_corevectors(
                 wrt='train',
+                to_file=cvs_path/(cvs_name+'.normalization.pt'),
                 verbose=verbose
                 )
         i = 0
