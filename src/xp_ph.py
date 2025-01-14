@@ -4,15 +4,15 @@ from numpy.random import randint
 from time import time
 
 # Our stuff
-from datasets.cifar import Cifar
-from models.model_wrap import ModelWrap 
-from coreVectors.coreVectors import CoreVectors 
-from coreVectors.svd_coreVectors import reduct_matrices_from_svds as parser_fn
-from classifier.classifier_base import trim_corevectors
-from classifier.tkmeans import KMeans as tKMeans 
-from classifier.tgmm import GMM as tGMM 
-from peepholes.peepholes import Peepholes
-from utils.testing import trim_dataloaders
+from peepholelib.datasets.cifar import Cifar
+from peepholelib.models.model_wrap import ModelWrap 
+from peepholelib.coreVectors.coreVectors import CoreVectors 
+from peepholelib.coreVectors.svd_coreVectors import reduct_matrices_from_svds as parser_fn
+from peepholelib.classifier.classifier_base import trim_corevectors
+from peepholelib.classifier.tkmeans import KMeans as tKMeans 
+from peepholelib.classifier.tgmm import GMM as tGMM 
+from peepholelib.peepholes.peepholes import Peepholes
+from peepholelib.utils.testing import trim_dataloaders
 
 # torch stuff
 import torch
