@@ -50,6 +50,7 @@ class CoreVectors():
         from_file = Path(kwargs['from_file']) if 'from_file' in kwargs else None
         wrt = kwargs['wrt'] if 'wrt' in kwargs else None
         to_file = Path(kwargs['to_file']) if 'to_file' in kwargs  else None
+        target_layers = kwargs['target_layers'] if 'target_layers' in kwargs  else None
 
         if wrt == None and from_file == None:
             raise RuntimeError(f'Specify `wrt` or `from_file`.')
@@ -61,7 +62,11 @@ class CoreVectors():
             if verbose: print(f'Computing normalization from {wrt}')
             means = self._corevds[wrt]['coreVectors'].mean(dim=0)
             stds = self._corevds[wrt]['coreVectors'].std(dim=0)
-
+            
+        if target_list != None:
+            means = {key: means[key] for key in target_list}
+            stds = {key: stds[key] for key in target_list}
+            
         for ds_key in self._corevds:
             if verbose: print(f'\n ---- Normalizing core vectors for {ds_key}\n')
             dl = DataLoader(self._corevds[ds_key], batch_size=bs, collate_fn=lambda x: x)
