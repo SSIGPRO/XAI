@@ -97,7 +97,7 @@ if __name__ == "__main__":
     # SVDs 
     #--------------------------------
     print('target layers: ', model.get_target_layers()) 
-    model.get_svds(path=svds_path, name=svds_name, verbose=verbose)
+    model.get_svds(path=svds_path, name=svds_name, device=device, verbose=verbose)
     for k in model._svds.keys():
         for kk in model._svds[k].keys():
             print('svd shapes: ', k, kk, model._svds[k][kk].shape)
