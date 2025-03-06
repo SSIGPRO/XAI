@@ -15,12 +15,13 @@ from peepholelib.classifier.classifier_base import trim_corevectors
 from peepholelib.classifier.tkmeans import KMeans as tKMeans 
 from peepholelib.classifier.tgmm import GMM as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
-from peepholelib.utils.samplers import random_subsampling
+from peepholelib.utils.samplers import random_subsampling 
 
 # torch stuff
 import torch
 from torchvision.models import vgg16, VGG16_Weights
 from cuda_selector import auto_cuda
+
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -96,7 +97,7 @@ if __name__ == "__main__":
     # SVDs 
     #--------------------------------
     print('target layers: ', model.get_target_layers()) 
-    model.get_svds(path=svds_path, name=svds_name, device=device, verbose=verbose)
+    model.get_svds(path=svds_path, name=svds_name, verbose=verbose)
     for k in model._svds.keys():
         for kk in model._svds[k].keys():
             print('svd shapes: ', k, kk, model._svds[k][kk].shape)
@@ -142,7 +143,7 @@ if __name__ == "__main__":
             print(data['coreVectors']['classifier.0'][34:56,:])
             i += 1
             if i == 3: break
-
+        '''
         cv.normalize_corevectors(
                 wrt='train',
                 #from_file=cvs_path/(cvs_name+'.normalization.pt'),
@@ -155,23 +156,30 @@ if __name__ == "__main__":
             print(data['coreVectors']['classifier.0'][34:56,:])
             i += 1
             if i == 3: break
-    quit()
+        '''
     #--------------------------------
     # Peepholes
     #--------------------------------
     n_classes = 100
+    n_cluster = 100
     parser_cv = trim_corevectors
-    peep_layer = 'features.7'
-    parser_kwargs = {'layer': peep_layer, 'peep_size':100}
+    peep_layers = ['classifier.0', 'classifier.3']
+    
     cls_kwargs = {}#{'batch_size':256} 
-    cls = tGMM(
-            nl_classifier = 100,
-            nl_model = n_classes,
-            parser = parser_cv,
-            parser_kwargs = parser_kwargs,
-            cls_kwargs = cls_kwargs,
-            device = device
-            )
+    
+    cls_dict = {}
+
+    for peep_layer in peep_layers:
+        parser_kwargs = {'layer': peep_layer, 'peep_size':10}
+
+        cls_dict[peep_layer] = tGMM(
+                                nl_classifier = n_cluster,
+                                nl_model = n_classes,
+                                parser = parser_cv,
+                                parser_kwargs = parser_kwargs,
+                                cls_kwargs = cls_kwargs,
+                                device = device
+                                )
 
     corevecs = CoreVectors(
             path = cvs_path,
@@ -180,9 +188,9 @@ if __name__ == "__main__":
     
     peepholes = Peepholes(
             path = phs_path,
-            name = phs_name+'.'+peep_layer,
-            classifier = cls,
-            layer = peep_layer,
+            name = f'{phs_name}.ps_{parser_kwargs['peep_size']}.nc_{n_cluster}',
+            classifiers = cls_dict,
+            target_layers = peep_layers,
             device = device
             )
 
@@ -196,12 +204,12 @@ if __name__ == "__main__":
                 batch_size = bs,
                 verbose = True,
                 )
-    
-        t0 = time()
-        cls.fit(dataloader = cv_dl['train'], verbose=verbose)
-        print('Fitting time = ', time()-t0)
         
-        cls.compute_empirical_posteriors(verbose=verbose)
+        for cls in cls_dict.values():
+            t0 = time()
+            cls.fit(dataloader = cv_dl['train'], verbose=verbose)
+            print('Fitting time = ', time()-t0)
+            cls.compute_empirical_posteriors(verbose=verbose)
 
         ph.get_peepholes(
                 loaders = cv_dl,
