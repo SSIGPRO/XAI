@@ -15,13 +15,12 @@ from peepholelib.classifier.classifier_base import trim_corevectors
 from peepholelib.classifier.tkmeans import KMeans as tKMeans 
 from peepholelib.classifier.tgmm import GMM as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
-from peepholelib.utils.testing import trim_dataloaders
+from peepholelib.utils.samplers import random_subsampling
 
 # torch stuff
 import torch
 from torchvision.models import vgg16, VGG16_Weights
 from cuda_selector import auto_cuda
-
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -106,7 +105,7 @@ if __name__ == "__main__":
     # CoreVectors 
     #--------------------------------
     #ds_loaders = ds.get_dataset_loaders()
-    ds_loaders = trim_dataloaders(ds.get_dataset_loaders(), 0.05)
+    ds_loaders = random_subsampling(ds.get_dataset_loaders(), 0.05)
     
     corevecs = CoreVectors(
             path = cvs_path,
