@@ -5,14 +5,13 @@ sys.path.insert(0, '/home/lorenzo/repos/peepholelib')
 from pathlib import Path as Path
 from numpy.random import randint
 from time import time
+from functools import partial
 
 # Our stuff
 from peepholelib.datasets.cifar import Cifar
 from peepholelib.models.model_wrap import ModelWrap 
 from peepholelib.coreVectors.coreVectors import CoreVectors 
-# from peepholelib.coreVectors.svd_coreVectors import reduct_matrices_from_svds as parser_fn
-from peepholelib.coreVectors.SVD_compression import SVD_reduction as parser_cp
-from peepholelib.coreVectors.SVD_compression import SVD_size as parser_sz
+from peepholelib.coreVectors.dimReduction.svds import svd_Linear, svd_Linear_ViT, svd_Conv2D
 from peepholelib.classifier.classifier_base import trim_corevectors
 from peepholelib.classifier.tkmeans import KMeans as tKMeans 
 from peepholelib.classifier.tgmm import GMM as tGMM 
@@ -81,10 +80,10 @@ if __name__ == "__main__":
 
     target_layers = [
             'classifier.0',
-            'classifier.3',
+            # 'classifier.3',
             #'features.7',
             #'features.14',
-            #'features.28',
+            'features.28',
             ]
     model.set_target_layers(target_layers=target_layers, verbose=verbose)
 
@@ -126,23 +125,23 @@ if __name__ == "__main__":
 
         cv.get_activations(
                 batch_size = bs,
-                )
                 loaders = ds_loaders,
                 verbose = verbose
+                )
         
-        # per ogni layer, una funzione di riduzione di dimensionalita
-        reduction_fns = {}
-        for layer in target_layers:
-            reduction_fns[layer] = ....
+        # for each layer we define the function used to perform dimensionality reduction
+        reduction_fns = {'classifier.0': partial(svd_Linear, model._svd['classifier.0']['Vh']),
+                         'features.28': partial(svd_Conv2D, model._svd['features.28']['Vh'], model._target_layers['features.28']),
+                        }
+        
+        shapes = {'classifier.0': 4096,
+                  'features.28': 300,
+                  }
 
         cv.get_coreVectors(
                 batch_size = bs,
-                # reduct_matrices = model._svds,
-                # parser_cp = parser_cp,
-                # parser_sz = parser_sz,
-                #parser_kwargs = parser_kwargs,
                 reduction_fns = reductions_fns,
-                shapes = ....,
+                shapes = shapes,
                 verbose = verbose
                 )
 
