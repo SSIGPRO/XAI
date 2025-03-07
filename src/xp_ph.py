@@ -126,16 +126,23 @@ if __name__ == "__main__":
 
         cv.get_activations(
                 batch_size = bs,
+                )
                 loaders = ds_loaders,
                 verbose = verbose
-                )
+        
+        # per ogni layer, una funzione di riduzione di dimensionalita
+        reduction_fns = {}
+        for layer in target_layers:
+            reduction_fns[layer] = ....
 
         cv.get_coreVectors(
                 batch_size = bs,
                 # reduct_matrices = model._svds,
-                parser_cp = parser_cp,
-                parser_sz = parser_sz,
-                parser_kwargs = parser_kwargs,
+                # parser_cp = parser_cp,
+                # parser_sz = parser_sz,
+                #parser_kwargs = parser_kwargs,
+                reduction_fns = reductions_fns,
+                shapes = ....,
                 verbose = verbose
                 )
 
