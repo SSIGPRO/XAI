@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, '/home/leandro/repos/peepholelib')
+sys.path.insert(0, '/home/lorenzo/repos/peepholelib')
 
 # python stuff
 from pathlib import Path as Path
@@ -10,7 +10,9 @@ from time import time
 from peepholelib.datasets.cifar import Cifar
 from peepholelib.models.model_wrap import ModelWrap 
 from peepholelib.coreVectors.coreVectors import CoreVectors 
-from peepholelib.coreVectors.svd_coreVectors import reduct_matrices_from_svds as parser_fn
+# from peepholelib.coreVectors.svd_coreVectors import reduct_matrices_from_svds as parser_fn
+from peepholelib.coreVectors.SVD_compression import SVD_reduction as parser_cp
+from peepholelib.coreVectors.SVD_compression import SVD_size as parser_sz
 from peepholelib.classifier.classifier_base import trim_corevectors
 from peepholelib.classifier.tkmeans import KMeans as tKMeans 
 from peepholelib.classifier.tgmm import GMM as tGMM 
@@ -113,7 +115,8 @@ if __name__ == "__main__":
             name = cvs_name,
             model = model,
             )
-
+    parser_kwargs = {'SVD': model._svds}
+    
     with corevecs as cv: 
         # copy dataset to coreVect dataset
         cv.get_coreVec_dataset(
@@ -129,8 +132,10 @@ if __name__ == "__main__":
 
         cv.get_coreVectors(
                 batch_size = bs,
-                reduct_matrices = model._svds,
-                parser = parser_fn,
+                # reduct_matrices = model._svds,
+                parser_cp = parser_cp,
+                parser_sz = parser_sz,
+                parser_kwargs = parser_kwargs,
                 verbose = verbose
                 )
 
@@ -143,7 +148,7 @@ if __name__ == "__main__":
             print(data['coreVectors']['classifier.0'][34:56,:])
             i += 1
             if i == 3: break
-        '''
+        
         cv.normalize_corevectors(
                 wrt='train',
                 #from_file=cvs_path/(cvs_name+'.normalization.pt'),
@@ -156,7 +161,8 @@ if __name__ == "__main__":
             print(data['coreVectors']['classifier.0'][34:56,:])
             i += 1
             if i == 3: break
-        '''
+        
+        quit()
     #--------------------------------
     # Peepholes
     #--------------------------------
