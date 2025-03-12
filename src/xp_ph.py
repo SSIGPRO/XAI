@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     target_layers = [
             'classifier.0',
-            # 'classifier.3',
+            #'classifier.3',
             #'features.7',
             #'features.14',
             'features.28',
@@ -114,22 +114,18 @@ if __name__ == "__main__":
             name = cvs_name,
             model = model,
             )
-    # parser_kwargs = {'SVD': model._svds}
     
     with corevecs as cv: 
-        # copy dataset to coreVect dataset
-        cv.get_coreVec_dataset(
-                loaders = ds_loaders, 
-                verbose = verbose
-                ) 
+        # copy dataset to activatons file
 
         cv.get_activations(
                 batch_size = bs,
                 loaders = ds_loaders,
                 verbose = verbose
-                )
+                )        
         
         # for each layer we define the function used to perform dimensionality reduction
+
         reduction_fns = {'classifier.0': partial(svd_Linear, 
                                                  reduct_m=model._svds['classifier.0']['Vh'], 
                                                  device=device),
@@ -142,7 +138,9 @@ if __name__ == "__main__":
         shapes = {'classifier.0': 4096,
                   'features.28': 300,
                   }
-        print(help(svd_Linear))
+        
+        # defining the corevectors
+        
         cv.get_coreVectors(
                 batch_size = bs,
                 reduction_fns = reduction_fns,
@@ -155,21 +153,21 @@ if __name__ == "__main__":
         i = 0
         print('\nPrinting some corevecs')
         for data in cv_dl['train']:
-            print(data['coreVectors']['classifier.0'].shape)
-            print(data['coreVectors']['classifier.0'][34:56,:])
+            print(data['classifier.0'].shape)
+            print(data['classifier.0'][34:56,:])
             i += 1
             if i == 3: break
         
         cv.normalize_corevectors(
                 wrt='train',
                 #from_file=cvs_path/(cvs_name+'.normalization.pt'),
-                to_file=cvs_path/(cvs_name+'.normalization2.pt'),
+                to_file=cvs_path/(cvs_name+'.normalization.pt'),
                 verbose=verbose
                 )
         i = 0
         print('after norm')
         for data in cv_dl['train']:
-            print(data['coreVectors']['classifier.0'][34:56,:])
+            print(data['classifier.0'][34:56,:])
             i += 1
             if i == 3: break
         

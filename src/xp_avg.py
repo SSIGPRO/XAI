@@ -105,14 +105,9 @@ if __name__ == "__main__":
             name = cvs_name,
             model = model,
             )
-    # parser_kwargs = {'SVD': model._svds}
     
     with corevecs as cv: 
         # copy dataset to coreVect dataset
-        cv.get_coreVec_dataset(
-                loaders = ds_loaders, 
-                verbose = verbose
-                ) 
 
         cv.get_activations(
                 batch_size = bs,
@@ -141,8 +136,8 @@ if __name__ == "__main__":
         i = 0
         print('\nPrinting some corevecs')
         for data in cv_dl['train']:
-            print(data['coreVectors']['features.14'].shape)
-            print(data['coreVectors']['features.14'][34:56,:])
+            print(data['features.14'].shape)
+            print(data['features.14'][34:56,:])
             i += 1
             if i == 3: break
         
@@ -155,7 +150,7 @@ if __name__ == "__main__":
         i = 0
         print('after norm')
         for data in cv_dl['train']:
-            print(data['coreVectors']['features.14'][34:56,:])
+            print(data['features.14'][34:56,:])
             i += 1
             if i == 3: break
         
