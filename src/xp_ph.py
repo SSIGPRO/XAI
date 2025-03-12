@@ -47,6 +47,9 @@ if __name__ == "__main__":
     
     cvs_path = Path.cwd()/'../data/corevectors'
     cvs_name = 'corevectors'
+
+    act_path = Path.cwd()/'../data/corevectors'
+    act_name = 'activations'
     
     phs_path = Path.cwd()/'../data/peepholes'
     phs_name = 'peepholes'
@@ -153,8 +156,12 @@ if __name__ == "__main__":
         i = 0
         print('\nPrinting some corevecs')
         for data in cv_dl['train']:
+            print('\nclassifier.0')
             print(data['classifier.0'].shape)
             print(data['classifier.0'][34:56,:])
+            print('\nfeatures.28')
+            print(data['features.28'].shape)
+            print(data['features.28'][34:56,:])
             i += 1
             if i == 3: break
         
@@ -200,6 +207,11 @@ if __name__ == "__main__":
             name = cvs_name,
             )
     
+    activations = CoreVectors(
+                path = act_path,
+                name = act_name,
+                )
+    
     peepholes = Peepholes(
             path = phs_path,
             name = f'{phs_name}.ps_{parser_kwargs['peep_size']}.nc_{n_cluster}',
@@ -208,7 +220,7 @@ if __name__ == "__main__":
             device = device
             )
 
-    with corevecs as cv, peepholes as ph:
+    with corevecs as cv, activations as act, peepholes as ph:
         cv.load_only(
                 loaders = ['train', 'test', 'val'],
                 verbose = True
@@ -219,9 +231,19 @@ if __name__ == "__main__":
                 verbose = True,
                 )
         
+        act.load_only(
+                loaders = ['train', 'test', 'val'],
+                verbose = True
+                ) 
+
+        act_dl = act.get_dataloaders(
+                 batch_size = bs,
+                 verbose = True,
+                 )
+        
         for cls in cls_dict.values():
             t0 = time()
-            cls.fit(dataloader = cv_dl['train'], verbose=verbose)
+            cls.fit(cvs=cv_dl['train'], act=act_dl['train'], verbose=verbose)
             print('Fitting time = ', time()-t0)
             cls.compute_empirical_posteriors(verbose=verbose)
 
@@ -247,6 +269,6 @@ if __name__ == "__main__":
 
         ph.evaluate_dists(
                 score_type = 'max',
-                coreVectors = cv_dl,
+                activations = act_dl,
                 bins = 20
                 )
