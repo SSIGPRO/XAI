@@ -171,14 +171,13 @@ if __name__ == "__main__":
             i += 1
             if i == 3: break
         
-        quit()
     #--------------------------------
     # Peepholes
     #--------------------------------
     n_classes = 100
     n_cluster = 100
     parser_cv = trim_corevectors
-    peep_layers = ['classifier.0', 'classifier.3']
+    peep_layers = ['classifier.0', 'features.28']
     
     cls_kwargs = {}#{'batch_size':256} 
     
