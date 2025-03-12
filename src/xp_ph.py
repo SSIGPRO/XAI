@@ -159,11 +159,11 @@ if __name__ == "__main__":
             print('\nclassifier.0')
             print(data['classifier.0'].shape)
             print(data['classifier.0'][34:56,:])
-            print('\nfeatures.28')
-            print(data['features.28'].shape)
-            print(data['features.28'][34:56,:])
+        #     print('\nfeatures.28')
+        #     print(data['features.28'].shape)
+        #     print(data['features.28'][34:56,:])
             i += 1
-            if i == 3: break
+            if i == 1: break
         
         cv.normalize_corevectors(
                 wrt='train',
@@ -171,13 +171,14 @@ if __name__ == "__main__":
                 to_file=cvs_path/(cvs_name+'.normalization.pt'),
                 verbose=verbose
                 )
+        
         i = 0
         print('after norm')
         for data in cv_dl['train']:
             print(data['classifier.0'][34:56,:])
             i += 1
-            if i == 3: break
-        
+            if i == 1: break
+        quit()
     #--------------------------------
     # Peepholes
     #--------------------------------
