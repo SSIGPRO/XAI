@@ -11,7 +11,7 @@ from functools import partial
 from peepholelib.datasets.cifar import Cifar
 from peepholelib.models.model_wrap import ModelWrap 
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds import svd_Linear, svd_Conv2D
+from peepholelib.coreVectors.dimReduction.avgPooling import ChannelWiseMean_conv
 from peepholelib.classifier.classifier_base import trim_corevectors
 from peepholelib.classifier.tkmeans import KMeans as tKMeans 
 from peepholelib.classifier.tgmm import GMM as tGMM 
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     svds_name = 'svds' 
     
     cvs_path = Path.cwd()/'../data/corevectors'
-    cvs_name = 'corevectors'
+    cvs_name = 'coreavg'
     
     phs_path = Path.cwd()/'../data/peepholes'
     phs_name = 'peepholes'
@@ -79,10 +79,10 @@ if __name__ == "__main__":
     model.set_model(model=nn, path=model_dir, name=model_name, verbose=verbose)
 
     target_layers = [
-            'classifier.0',
+            # 'classifier.0',
             # 'classifier.3',
             #'features.7',
-            #'features.14',
+            'features.14',
             'features.28',
             ]
     model.set_target_layers(target_layers=target_layers, verbose=verbose)
@@ -93,15 +93,6 @@ if __name__ == "__main__":
     dry_img, _ = ds._train_ds.dataset[0]
     dry_img = dry_img.reshape((1,)+dry_img.shape)
     model.dry_run(x=dry_img)
-
-    #--------------------------------
-    # SVDs 
-    #--------------------------------
-    print('target layers: ', model.get_target_layers()) 
-    model.get_svds(path=svds_path, name=svds_name, verbose=verbose)
-    for k in model._svds.keys():
-        for kk in model._svds[k].keys():
-            print('svd shapes: ', k, kk, model._svds[k][kk].shape)
 
     #--------------------------------
     # CoreVectors 
@@ -130,19 +121,14 @@ if __name__ == "__main__":
                 )
         
         # for each layer we define the function used to perform dimensionality reduction
-        reduction_fns = {'classifier.0': partial(svd_Linear, 
-                                                 reduct_m=model._svds['classifier.0']['Vh'], 
-                                                 device=device),
-                         'features.28': partial(svd_Conv2D, 
-                                                reduct_m=model._svds['features.28']['Vh'], 
-                                                layer=model._target_layers['features.28'], 
-                                                device=device),
+        reduction_fns = {'features.14': ChannelWiseMean_conv,
+                         'features.28': ChannelWiseMean_conv,
                         }
         
-        shapes = {'classifier.0': 4096,
-                  'features.28': 300,
+        shapes = {'features.14': 256,
+                  'features.28': 512,
                   }
-        print(help(svd_Linear))
+        
         cv.get_coreVectors(
                 batch_size = bs,
                 reduction_fns = reduction_fns,
@@ -155,8 +141,8 @@ if __name__ == "__main__":
         i = 0
         print('\nPrinting some corevecs')
         for data in cv_dl['train']:
-            print(data['coreVectors']['classifier.0'].shape)
-            print(data['coreVectors']['classifier.0'][34:56,:])
+            print(data['coreVectors']['features.14'].shape)
+            print(data['coreVectors']['features.14'][34:56,:])
             i += 1
             if i == 3: break
         
@@ -169,7 +155,7 @@ if __name__ == "__main__":
         i = 0
         print('after norm')
         for data in cv_dl['train']:
-            print(data['coreVectors']['classifier.0'][34:56,:])
+            print(data['coreVectors']['features.14'][34:56,:])
             i += 1
             if i == 3: break
         
