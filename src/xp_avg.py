@@ -79,7 +79,7 @@ if __name__ == "__main__":
     model.set_model(model=nn, path=model_dir, name=model_name, verbose=verbose)
 
     target_layers = [
-            # 'classifier.0',
+            'classifier.0',
             # 'classifier.3',
             #'features.7',
             'features.14',
@@ -118,10 +118,12 @@ if __name__ == "__main__":
         # for each layer we define the function used to perform dimensionality reduction
         reduction_fns = {'features.14': ChannelWiseMean_conv,
                          'features.28': ChannelWiseMean_conv,
+                         'classifier.0': lambda x: x,
                         }
         
         shapes = {'features.14': 256,
                   'features.28': 512,
+                  'classifier.0': 25088,
                   }
         
         cv.get_coreVectors(
