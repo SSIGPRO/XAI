@@ -44,7 +44,7 @@ if __name__ == "__main__":
     dataset = 'CIFAR100'
     name_model = 'vgg16' 
     seed = 29
-    bs = 256 
+    bs = 64
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
     
@@ -146,7 +146,7 @@ if __name__ == "__main__":
             print(data['features.14'][34:56,:])
             i += 1
             if i == 3: break
-
+    quit()
     #--------------------------------
     # Peepholes
     #--------------------------------
