@@ -1,8 +1,8 @@
 import sys
-sys.path.insert(0, '/home/lorenzocapelli/repos/peepholelib')
+from pathlib import Path as Path
+sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
 # python stuff
-from pathlib import Path as Path
 from numpy.random import randint
 from time import time
 from functools import partial
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     direction = {'save_input':True, 'save_output':False}
     model.add_hooks(**direction, verbose=False) 
     
-    dry_img, _ = ds._train_ds.dataset[0]
+    dry_img, _ = ds._dss['train'][0]
     dry_img = dry_img.reshape((1,)+dry_img.shape)
     model.dry_run(x=dry_img)
 
@@ -109,8 +109,8 @@ if __name__ == "__main__":
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    #ds_loaders = ds.get_dataset_loaders()
-    ds_loaders = random_subsampling(ds.get_dataset_loaders(), 0.05)
+    #dss = ds._dss
+    dss = random_subsampling(ds._dss, 0.05)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -118,32 +118,31 @@ if __name__ == "__main__":
             model = model,
             )
     
+    # define a dimensionality reduction function for each layer
+    reduction_fns = {
+            'classifier.0': partial(svd_Linear,
+                                    reduct_m=model._svds['classifier.0']['Vh'], 
+                                    device=device),
+            'features.28': partial(svd_Conv2D, 
+                                    reduct_m=model._svds['features.28']['Vh'], 
+                                    layer=model._target_layers['features.28'], 
+                                    device=device),
+            }
+    
+    shapes = {
+            'classifier.0': 4096,
+            'features.28': 300,
+            }
+
     with corevecs as cv: 
         # copy dataset to activatons file
-
         cv.get_activations(
                 batch_size = bs,
-                loaders = ds_loaders,
+                datasets = dss,
                 verbose = verbose
                 )        
         
-        # for each layer we define the function used to perform dimensionality reduction
-
-        reduction_fns = {'classifier.0': partial(svd_Linear, 
-                                                 reduct_m=model._svds['classifier.0']['Vh'], 
-                                                 device=device),
-                         'features.28': partial(svd_Conv2D, 
-                                                reduct_m=model._svds['features.28']['Vh'], 
-                                                layer=model._target_layers['features.28'], 
-                                                device=device),
-                        }
-        
-        shapes = {'classifier.0': 4096,
-                  'features.28': 300,
-                  }
-        
         # defining the corevectors
-        
         cv.get_coreVectors(
                 batch_size = bs,
                 reduction_fns = reduction_fns,
@@ -155,13 +154,9 @@ if __name__ == "__main__":
     
         i = 0
         print('\nPrinting some corevecs')
-        for data in cv_dl['train']:
+        for data in cv_dl['test']:
             print('\nclassifier.0')
-            print(data['classifier.0'].shape)
             print(data['classifier.0'][34:56,:])
-        #     print('\nfeatures.28')
-        #     print(data['features.28'].shape)
-        #     print(data['features.28'][34:56,:])
             i += 1
             if i == 1: break
         
@@ -174,11 +169,11 @@ if __name__ == "__main__":
         
         i = 0
         print('after norm')
-        for data in cv_dl['train']:
+        for data in cv_dl['test']:
             print(data['classifier.0'][34:56,:])
             i += 1
             if i == 1: break
-        quit()
+
     #--------------------------------
     # Peepholes
     #--------------------------------
