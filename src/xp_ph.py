@@ -3,7 +3,6 @@ from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
 # python stuff
-from numpy.random import randint
 from time import time
 from functools import partial
 
