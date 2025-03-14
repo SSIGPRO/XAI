@@ -52,6 +52,9 @@ if __name__ == "__main__":
     
     phs_path = Path.cwd()/'../data/peepholes'
     phs_name = 'peepholes'
+
+    cls_path = Path.cwd()/'../data/classifier'
+    cls_name = 'clustering'
     
     verbose = True 
     
