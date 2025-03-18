@@ -50,6 +50,9 @@ if __name__ == "__main__":
     act_path = Path.cwd()/'../data/corevectors'
     act_name = 'activations'
     
+    cls_path = Path.cwd()/'../data/classifiers'
+    cls_name = 'classifier'
+
     phs_path = Path.cwd()/'../data/peepholes'
     phs_name = 'peepholes'
 
@@ -185,36 +188,34 @@ if __name__ == "__main__":
     # Peepholes
     #--------------------------------
     n_classes = 100
-    n_cluster = 100
+    n_cluster = 10
+    cv_dim = 10
     parser_cv = trim_corevectors
     peep_layers = ['classifier.0', 'features.28']
     
     cls_kwargs = {}#{'batch_size':256} 
-    
+
     cls_dict = {}
-
-    for peep_layer in peep_layers:
-        parser_kwargs = {'layer': peep_layer, 'peep_size':10}
-
-        cls_dict[peep_layer] = tGMM(
-                                nl_classifier = n_cluster,
-                                nl_model = n_classes,
-                                parser = parser_cv,
-                                parser_kwargs = parser_kwargs,
-                                cls_kwargs = cls_kwargs,
-                                device = device
-                                )
-
     corevecs = CoreVectors(
             path = cvs_path,
             name = cvs_name,
             )
-    
-    activations = CoreVectors(
-                path = act_path,
-                name = act_name,
-                )
-    
+
+    for peep_layer in peep_layers:
+        parser_kwargs = {'layer': peep_layer, 'peep_size':cv_dim}
+
+        cls_dict[peep_layer] = tKMeans(
+                                path = cls_path,
+                                name = peep_layer,
+                                nl_classifier = n_cluster,
+                                nl_model = n_classes,
+                                n_features = cv_dim,
+                                parser = parser_cv,
+                                parser_kwargs = parser_kwargs,
+                                batch_size = 256,
+                                device = device
+                                )
+
     peepholes = Peepholes(
             path = phs_path,
             name = f'{phs_name}.ps_{parser_kwargs['peep_size']}.nc_{n_cluster}',
@@ -222,36 +223,38 @@ if __name__ == "__main__":
             target_layers = peep_layers,
             device = device
             )
-
-    with corevecs as cv, activations as act, peepholes as ph:
+    
+    # fitting classifiers
+    with corevecs as cv:
         cv.load_only(
                 loaders = ['train', 'test', 'val'],
                 verbose = True
                 ) 
 
-        cv_dl = cv.get_dataloaders(
-                batch_size = bs,
-                verbose = True,
-                )
+        print(cls_dict.items()) 
+        for cls_key, cls in cls_dict.items():
+            if (cls_path/(cls._suffix+'.empp.pt')).exists():
+                print(f'Loading Classifier for {cls_key}') 
+                cls.load()
+            else:
+                t0 = time()
+                print(f'Fitting classifier for {cls_key} time = ', time()-t0)
+                cls.fit(corevectors = cv._corevds['train'], verbose=verbose)
+                cls.compute_empirical_posteriors(actds=cv._actds['train'], corevds=cv._corevds['train'], verbose=verbose)
         
-        act.load_only(
+                # save classifiers
+                print(f'Saving classifier for {cls_key}')
+                cls.save()
+
+    with corevecs as cv, peepholes as ph:
+        cv.load_only(
                 loaders = ['train', 'test', 'val'],
                 verbose = True
                 ) 
 
-        act_dl = act.get_dataloaders(
-                 batch_size = bs,
-                 verbose = True,
-                 )
-        
-        for cls in cls_dict.values():
-            t0 = time()
-            cls.fit(cvs=cv_dl['train'], act=act_dl['train'], verbose=verbose)
-            print('Fitting time = ', time()-t0)
-            cls.compute_empirical_posteriors(verbose=verbose)
-
         ph.get_peepholes(
-                loaders = cv_dl,
+                corevectors = corevecs,
+                batch_size = 256,
                 verbose = verbose
                 )
 
@@ -272,6 +275,6 @@ if __name__ == "__main__":
 
         ph.evaluate_dists(
                 score_type = 'max',
-                activations = act_dl,
+                activations = cv._actds,
                 bins = 20
                 )
