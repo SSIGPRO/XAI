@@ -85,10 +85,10 @@ if __name__ == "__main__":
 
     target_layers = [
             'classifier.0',
-            #'classifier.3',
+            'classifier.3',
             #'features.7',
             #'features.14',
-            'features.28',
+            #'features.28',
             ]
     model.set_target_layers(target_layers=target_layers, verbose=verbose)
 
@@ -111,8 +111,8 @@ if __name__ == "__main__":
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    #dss = ds._dss
-    dss = random_subsampling(ds._dss, 0.05)
+    dss = ds._dss
+    #dss = random_subsampling(ds._dss, 0.05)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -125,15 +125,19 @@ if __name__ == "__main__":
             'classifier.0': partial(svd_Linear,
                                     reduct_m=model._svds['classifier.0']['Vh'], 
                                     device=device),
-            'features.28': partial(svd_Conv2D, 
-                                    reduct_m=model._svds['features.28']['Vh'], 
-                                    layer=model._target_layers['features.28'], 
+            'classifier.3': partial(svd_Linear,
+                                    reduct_m=model._svds['classifier.3']['Vh'], 
                                     device=device),
+        #     'features.28': partial(svd_Conv2D, 
+        #                             reduct_m=model._svds['features.28']['Vh'], 
+        #                             layer=model._target_layers['features.28'], 
+        #                             device=device),
             }
     
     shapes = {
             'classifier.0': 4096,
-            'features.28': 300,
+            'classifier.3': 4096,
+            #'features.28': 300,
             }
 
     with corevecs as cv: 
@@ -175,6 +179,7 @@ if __name__ == "__main__":
             print(data['classifier.0'][34:56,:])
             i += 1
             if i == 1: break
+        quit()
 
     #--------------------------------
     # Peepholes
