@@ -9,12 +9,15 @@ from functools import partial
 # Our stuff
 from peepholelib.datasets.cifar import Cifar
 from peepholelib.models.model_wrap import ModelWrap 
+
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds import svd_Linear, svd_Conv2D
-from peepholelib.classifier.classifier_base import trim_corevectors
-from peepholelib.classifier.tkmeans import KMeans as tKMeans 
-from peepholelib.classifier.tgmm import GMM as tGMM 
+
+from peepholelib.peepholes.parsers import trim_corevectors
+from peepholelib.peepholes.classifiers.tkmeans import KMeans as tKMeans 
+from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
+
 from peepholelib.utils.samplers import random_subsampling 
 
 # torch stuff
@@ -38,6 +41,7 @@ if __name__ == "__main__":
     dataset = 'CIFAR100' 
     seed = 29
     bs = 512 
+
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
     
@@ -47,17 +51,11 @@ if __name__ == "__main__":
     cvs_path = Path.cwd()/'../data/corevectors'
     cvs_name = 'corevectors'
 
-    act_path = Path.cwd()/'../data/corevectors'
-    act_name = 'activations'
-    
-    cls_path = Path.cwd()/'../data/classifiers'
-    cls_name = 'classifier'
+    drill_path = Path.cwd()/'../data/drillers'
+    drill_name = 'classifier'
 
     phs_path = Path.cwd()/'../data/peepholes'
     phs_name = 'peepholes'
-
-    cls_path = Path.cwd()/'../data/classifier'
-    cls_name = 'clustering'
     
     verbose = True 
     
@@ -83,8 +81,13 @@ if __name__ == "__main__":
     in_features = 4096
     n_classes = len(ds.get_classes()) 
     nn.classifier[-1] = torch.nn.Linear(in_features, n_classes)
-    model = ModelWrap(device=device)
-    model.set_model(model=nn, path=model_dir, name=model_name, verbose=verbose)
+    model = ModelWrap(
+            model=nn,
+            path=model_dir,
+            name=model_name,
+            device=device
+            )
+    model.load_checkpoint(verbose=verbose)
 
     target_layers = [
             'classifier.0',
@@ -93,7 +96,7 @@ if __name__ == "__main__":
             #'features.14',
             #'features.28',
             ]
-    model.set_target_layers(target_layers=target_layers, verbose=verbose)
+    model.set_target_modules(target_modules=target_layers, verbose=verbose)
 
     direction = {'save_input':True, 'save_output':False}
     model.add_hooks(**direction, verbose=False) 
@@ -105,8 +108,14 @@ if __name__ == "__main__":
     #--------------------------------
     # SVDs 
     #--------------------------------
-    print('target layers: ', model.get_target_layers()) 
-    model.get_svds(path=svds_path, name=svds_name, verbose=verbose)
+    print('target layers: ', model.get_target_modules()) 
+    model.get_svds(
+            target_modules = target_layers,
+            path=svds_path,
+            name=svds_name,
+            verbose=verbose
+            )
+
     for k in model._svds.keys():
         for kk in model._svds[k].keys():
             print('svd shapes: ', k, kk, model._svds[k][kk].shape)
@@ -114,8 +123,8 @@ if __name__ == "__main__":
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    dss = ds._dss
-    #dss = random_subsampling(ds._dss, 0.05)
+    #dss = ds._dss
+    dss = random_subsampling(ds._dss, 0.1)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -125,16 +134,22 @@ if __name__ == "__main__":
     
     # define a dimensionality reduction function for each layer
     reduction_fns = {
-            'classifier.0': partial(svd_Linear,
-                                    reduct_m=model._svds['classifier.0']['Vh'], 
-                                    device=device),
-            'classifier.3': partial(svd_Linear,
-                                    reduct_m=model._svds['classifier.3']['Vh'], 
-                                    device=device),
-        #     'features.28': partial(svd_Conv2D, 
-        #                             reduct_m=model._svds['features.28']['Vh'], 
-        #                             layer=model._target_layers['features.28'], 
-        #                             device=device),
+            'classifier.0': partial(
+                svd_Linear,
+                reduct_m=model._svds['classifier.0']['Vh'], 
+                device=device
+                ),
+            'classifier.3': partial(
+                svd_Linear,
+                reduct_m=model._svds['classifier.3']['Vh'], 
+                device=device
+                ),
+            #'features.28': partial(
+            #    svd_Conv2D, 
+            #    reduct_m=model._svds['features.28']['Vh'], 
+            #    layer=model._target_layers['features.28'], 
+            #    device=device
+            #    ),
             }
     
     shapes = {
@@ -150,8 +165,8 @@ if __name__ == "__main__":
                 datasets = dss,
                 verbose = verbose
                 )        
-        
-        # defining the corevectors
+
+        # computing the corevectors
         cv.get_coreVectors(
                 batch_size = bs,
                 reduction_fns = reduction_fns,
@@ -182,7 +197,6 @@ if __name__ == "__main__":
             print(data['classifier.0'][34:56,:])
             i += 1
             if i == 1: break
-        quit()
 
     #--------------------------------
     # Peepholes
@@ -191,36 +205,35 @@ if __name__ == "__main__":
     n_cluster = 10
     cv_dim = 10
     parser_cv = trim_corevectors
-    peep_layers = ['classifier.0', 'features.28']
+    peep_layers = ['classifier.0', 'classifier.3']
     
-    cls_kwargs = {}#{'batch_size':256} 
+    cls_kwargs = {}#{'batch_size': bs} 
 
-    cls_dict = {}
     corevecs = CoreVectors(
             path = cvs_path,
             name = cvs_name,
             )
 
+    drillers = {}
     for peep_layer in peep_layers:
-        parser_kwargs = {'layer': peep_layer, 'peep_size':cv_dim}
+        parser_kwargs = {'module': peep_layer, 'cv_dim':cv_dim}
 
-        cls_dict[peep_layer] = tKMeans(
-                                path = cls_path,
-                                name = peep_layer,
-                                nl_classifier = n_cluster,
-                                nl_model = n_classes,
-                                n_features = cv_dim,
-                                parser = parser_cv,
-                                parser_kwargs = parser_kwargs,
-                                batch_size = 256,
-                                device = device
-                                )
+        drillers[peep_layer] = tGMM(
+                path = drill_path,
+                name = drill_name+'.'+peep_layer,
+                nl_classifier = n_cluster,
+                nl_model = n_classes,
+                n_features = cv_dim,
+                parser = parser_cv,
+                parser_kwargs = parser_kwargs,
+                device = device
+                )
 
     peepholes = Peepholes(
             path = phs_path,
-            name = f'{phs_name}.ps_{parser_kwargs['peep_size']}.nc_{n_cluster}',
-            classifiers = cls_dict,
-            target_layers = peep_layers,
+            name = phs_name,
+            driller = drillers,
+            target_modules = peep_layers,
             device = device
             )
     
@@ -231,20 +244,24 @@ if __name__ == "__main__":
                 verbose = True
                 ) 
 
-        print(cls_dict.items()) 
-        for cls_key, cls in cls_dict.items():
-            if (cls_path/(cls._suffix+'.empp.pt')).exists():
-                print(f'Loading Classifier for {cls_key}') 
-                cls.load()
+        for drill_key, driller in drillers.items():
+            if (drill_path/(driller._suffix+'.empp.pt')).exists():
+                print(f'Loading Classifier for {drill_key}') 
+                driller.load()
             else:
                 t0 = time()
-                print(f'Fitting classifier for {cls_key} time = ', time()-t0)
-                cls.fit(corevectors = cv._corevds['train'], verbose=verbose)
-                cls.compute_empirical_posteriors(actds=cv._actds['train'], corevds=cv._corevds['train'], verbose=verbose)
+                print(f'Fitting classifier for {drill_key} time = ', time()-t0)
+                driller.fit(corevectors = cv._corevds['train'], verbose=verbose)
+                driller.compute_empirical_posteriors(
+                        actds=cv._actds['train'],
+                        corevds=cv._corevds['train'],
+                        batch_size = bs,
+                        verbose=verbose
+                        )
         
                 # save classifiers
-                print(f'Saving classifier for {cls_key}')
-                cls.save()
+                print(f'Saving classifier for {drill_key}')
+                driller.save()
 
     with corevecs as cv, peepholes as ph:
         cv.load_only(
@@ -253,8 +270,8 @@ if __name__ == "__main__":
                 ) 
 
         ph.get_peepholes(
-                corevectors = corevecs,
-                batch_size = 256,
+                corevectors = cv,
+                batch_size = bs,
                 verbose = verbose
                 )
 
@@ -267,9 +284,9 @@ if __name__ == "__main__":
         print('\nPrinting some peeps')
         ph_dl = ph.get_dataloaders(verbose=verbose)
         for data in ph_dl['test']:
-            print('phs\n', data[peep_layer]['peepholes'])
-            print('max\n', data[peep_layer]['score_max'])
-            print('ent\n', data[peep_layer]['score_entropy'])
+            print('phs\n', data['classifier.0']['peepholes'])
+            print('max\n', data['classifier.0']['score_max'])
+            print('ent\n', data['classifier.0']['score_entropy'])
             i += 1
             if i == 3: break
 
