@@ -94,7 +94,7 @@ if __name__ == "__main__":
             'classifier.3',
             #'features.7',
             #'features.14',
-            #'features.28',
+            'features.28',
             ]
     model.set_target_modules(target_modules=target_layers, verbose=verbose)
 
@@ -144,18 +144,18 @@ if __name__ == "__main__":
                 reduct_m=model._svds['classifier.3']['Vh'], 
                 device=device
                 ),
-            #'features.28': partial(
-            #    svd_Conv2D, 
-            #    reduct_m=model._svds['features.28']['Vh'], 
-            #    layer=model._target_layers['features.28'], 
-            #    device=device
-            #    ),
+            'features.28': partial(
+                svd_Conv2D, 
+                reduct_m=model._svds['features.28']['Vh'], 
+                layer=model._target_layers['features.28'], 
+                device=device
+                ),
             }
     
     shapes = {
             'classifier.0': 4096,
             'classifier.3': 4096,
-            #'features.28': 300,
+            'features.28': 300,
             }
 
     with corevecs as cv: 
@@ -179,7 +179,7 @@ if __name__ == "__main__":
         i = 0
         print('\nPrinting some corevecs')
         for data in cv_dl['test']:
-            print('\nclassifier.0')
+            print('\nfeatures.28')
             print(data['classifier.0'][34:56,:])
             i += 1
             if i == 1: break
@@ -194,10 +194,10 @@ if __name__ == "__main__":
         i = 0
         print('after norm')
         for data in cv_dl['test']:
-            print(data['classifier.0'][34:56,:])
+            print(data['features.28'][34:56,:])
             i += 1
             if i == 1: break
-
+    quit()
     #--------------------------------
     # Peepholes
     #--------------------------------
