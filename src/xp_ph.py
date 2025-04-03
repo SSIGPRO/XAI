@@ -124,7 +124,7 @@ if __name__ == "__main__":
     # CoreVectors 
     #--------------------------------
     #dss = ds._dss
-    dss = random_subsampling(ds._dss, 0.1)
+    dss = random_subsampling(ds._dss, 0.05)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -147,7 +147,7 @@ if __name__ == "__main__":
             'features.28': partial(
                 svd_Conv2D, 
                 reduct_m=model._svds['features.28']['Vh'], 
-                layer=model._target_layers['features.28'], 
+                layer=model._target_modules['features.28'], 
                 device=device
                 ),
             }
@@ -179,13 +179,13 @@ if __name__ == "__main__":
         i = 0
         print('\nPrinting some corevecs')
         for data in cv_dl['test']:
-            print('\nfeatures.28')
+            print('\nclassifier.0')
             print(data['classifier.0'][34:56,:])
             i += 1
             if i == 1: break
         
         cv.normalize_corevectors(
-                wrt='train',
+                wrt='test',
                 #from_file=cvs_path/(cvs_name+'.normalization.pt'),
                 to_file=cvs_path/(cvs_name+'.normalization.pt'),
                 verbose=verbose
@@ -194,7 +194,7 @@ if __name__ == "__main__":
         i = 0
         print('after norm')
         for data in cv_dl['test']:
-            print(data['features.28'][34:56,:])
+            print(data['classifier.0'][34:56,:])
             i += 1
             if i == 1: break
     quit()
