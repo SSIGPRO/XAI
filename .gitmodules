@@ -1,6 +1,3 @@
 [submodule "Papers/vocab"]
 	path = Papers/vocab
 	url = https://git@git.overleaf.com/66dec1faf457465743ef2a25
-[submodule "Papers/TPAMI"]
-	path = Papers/TPAMI
-	url = https://git@git.overleaf.com/659ea3757abcda1b32cbb303
