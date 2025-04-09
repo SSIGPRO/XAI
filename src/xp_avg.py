@@ -49,7 +49,7 @@ if __name__ == "__main__":
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
     
     cvs_path = Path.cwd()/'../data/corevectors'
-    cvs_name = 'coreavg'
+    cvs_name = 'corevectors_avg'
 
     drill_path = Path.cwd()/'../data/drillers'
     drill_name = 'DMD'
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     # CoreVectors 
     #--------------------------------
     #dss = ds._dss
-    dss = random_subsampling(ds._dss, 0.05)
+    dss = random_subsampling(ds._dss, 0.025)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -118,19 +118,13 @@ if __name__ == "__main__":
             )
     
     # for each layer we define the function used to perform dimensionality reduction
-    reduction_fns = {'features.14': ChannelWiseMean_conv,
-                     'features.28': ChannelWiseMean_conv,
-                #      'classifier.0': lambda x: x,
-                     }
-    
-    shapes = {'features.14': 256,
-              'features.28': 512,
-        #       'classifier.0': 25088,
-              }
+    reduction_fns = {
+            'features.14': ChannelWiseMean_conv,
+            'features.28': ChannelWiseMean_conv,
+            }
     
     with corevecs as cv: 
         # copy dataset to coreVect dataset
-
         cv.get_activations(
                 batch_size = bs,
                 datasets = dss,
@@ -140,7 +134,6 @@ if __name__ == "__main__":
         cv.get_coreVectors(
                 batch_size = bs,
                 reduction_fns = reduction_fns,
-                shapes = shapes,
                 verbose = verbose
                 )
 
@@ -166,6 +159,11 @@ if __name__ == "__main__":
     n_classes = 100
     n_cluster = 10
     peep_layers = ['features.14','features.28']
+
+    feature_sizes = {
+            'features.14': 256,
+            'features.28': 512,
+            }
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -178,9 +176,8 @@ if __name__ == "__main__":
                 path = drill_path,
                 name = drill_name+'.'+peep_layer,
                 nl_model = n_classes,
-                n_features = shapes[peep_layer],
+                n_features = feature_sizes[peep_layer],
                 parser = get_images,
-                parser_kwargs = {},
                 model = model,
                 layer = peep_layer,
                 magnitude = 0.004,
