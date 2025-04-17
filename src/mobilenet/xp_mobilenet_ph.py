@@ -46,27 +46,27 @@ if __name__ == "__main__":
     pretrained = True
     dataset = 'CIFAR100' 
     seed = 29
-    bs = 512
+    bs = 64
     
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
 
-    svds_path = Path.cwd()/'../data'
+    svds_path = Path.cwd()/'data/data_200_150clusters'
     svds_name = 'svds' 
     
-    cvs_path = Path.cwd()/'../data/corevectors'
+    cvs_path = Path.cwd()/'data/data_200_200clusters/corevectors'
     cvs_name = 'corevectors'
 
-    act_path = Path.cwd()/'../data/corevectors'
+    act_path = Path.cwd()/'data/data_200_200clusters/corevectors'
     act_name = 'activations'
     
-    drill_path = Path.cwd()/'../data/drillers'
+    drill_path = Path.cwd()/'data/data_200_200clusters/drillers'
     drill_name = 'classifier'
 
-    phs_path = Path.cwd()/'../data/peepholes'
+    phs_path = Path.cwd()/'data/data_200_200clusters/peepholes'
     phs_name = 'peepholes'
 
-    cls_path = Path.cwd()/'../data/classifier'
+    cls_path = Path.cwd()/'data/data_200_200clusters/classifier'
     cls_name = 'clustering'
 
     verbose = False
@@ -104,13 +104,15 @@ if __name__ == "__main__":
     
     model.load_checkpoint(verbose=verbose)
     
-    target_layers = [ #'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0', 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
-               #'features.11.conv.1.0', 'features.12.conv.1.0',
-               'features.13.conv.1.0', 'features.14.conv.1.0', 
-               'features.15.conv.1.0', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0'
+    target_layers = [ 'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0',
+                     # 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
+            #    'features.11.conv.1.0', 'features.12.conv.1.0',
+            #    'features.13.conv.1.0', 'features.14.conv.1.0', 
+            #    'features.15.conv.1.0', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0',
+            #    'classifier.1'
                ]
     
-    model.set_target_modules(target_modules=target_layers, verbose=verbose)
+    model.set_target_modules(target_modules=target_layers, verbose=False)
 
 
     direction = {'save_input':True, 'save_output':True}
@@ -134,6 +136,9 @@ if __name__ == "__main__":
     for k in model._svds.keys():
         for kk in model._svds[k].keys():
             print('svd shapes: ', k, kk, model._svds[k][kk].shape)
+        
+
+    quit()
 
     #--------------------------------
     # CoreVectors 
@@ -208,6 +213,10 @@ if __name__ == "__main__":
                                    reduct_m=model._svds['features.17.conv.0.0']['Vh'], 
                                    layer = model._target_modules['features.17.conv.0.0'],
                                    device=device),
+            'classifier.1': partial(svd_Linear,
+                        reduct_m=model._svds['classifier.1']['Vh'], 
+                        device=device),  
+            
     }
 
     shapes = {
@@ -226,6 +235,7 @@ if __name__ == "__main__":
             'features.16.conv.1.0':300,
             'features.16.conv.2':300,
             'features.17.conv.0.0':300,
+            'classifier.1': 300,
             }
 
     with corevecs as cv: 
@@ -247,12 +257,12 @@ if __name__ == "__main__":
         cv_dl = cv.get_dataloaders(verbose=verbose)
 
         i = 0
-        print('\nPrinting some corevecs')
-        for data in cv_dl['test']:
-            print('\nfeatures.16.conv.1.0')
-            print(data['features.16.conv.1.0'][34:56,:])
-            i += 1
-            if i == 1: break
+        # print('\nPrinting some corevecs')
+        # for data in cv_dl['test']:
+        #     print('\nfeatures.16.conv.1.0')
+        #     print(data['features.16.conv.1.0'][34:56,:])
+        #     i += 1
+        #     if i == 1: break
         
         cv.normalize_corevectors(
                 wrt='train',
@@ -261,26 +271,30 @@ if __name__ == "__main__":
                 verbose=verbose
                 )
         
-        i = 0
-        print('after norm')
-        for data in cv_dl['test']:
-            print(data['features.16.conv.1.0'][34:56,:])
-            i += 1
-            if i == 1: break
-    #quit()
+        # i = 0
+        # print('after norm')
+        # for data in cv_dl['test']:
+        #     print(data['features.16.conv.1.0'][34:56,:])
+        #     i += 1
+        #     if i == 1: break
+    quit()
 
     #--------------------------------
     # Peepholes
     #--------------------------------
 
     n_classes = 100
-    n_cluster = 100
-    cv_dim = 10
+    n_cluster = 200
+    cv_dim = 200
     parser_cv = trim_corevectors
+
+
     peep_layers =[ #'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0', 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
                #'features.11.conv.1.0', 'features.12.conv.1.0', 
                'features.13.conv.1.0', 'features.14.conv.1.0', 
-               'features.15.conv.1.0', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0'
+               'features.15.conv.1.0', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0',
+                'classifier.1'
+        
                ]
     
 
@@ -291,19 +305,52 @@ if __name__ == "__main__":
         name = cvs_name,
         )
     
+    cv_parsers = {
+        'features.13.conv.1.0': partial(trim_corevectors,
+                          module = 'features.13.conv.1.0',
+                          cv_dim = cv_dim),
+        'features.14.conv.1.0': partial(trim_corevectors,
+                          module = 'features.14.conv.1.0',
+                          cv_dim = cv_dim),        
+        'features.15.conv.1.0': partial(trim_corevectors,
+                          module = 'features.15.conv.1.0',
+                          cv_dim = cv_dim),
+        'features.16.conv.1.0': partial(trim_corevectors,
+                          module = 'features.16.conv.1.0',
+                          cv_dim = cv_dim),
+        'features.16.conv.2': partial(trim_corevectors,
+                          module = 'features.16.conv.2',
+                          cv_dim = cv_dim),
+        'features.17.conv.0.0': partial(trim_corevectors,   
+                          module = 'features.17.conv.0.0',
+                          cv_dim = cv_dim),
+        'classifier.1': partial(trim_corevectors,
+                            module = 'classifier.1',
+                            cv_dim = cv_dim),
+    }
+
+    feature_sizes = {
+        'features.13.conv.1.0': cv_dim,
+        'features.14.conv.1.0': cv_dim,
+        'features.15.conv.1.0': cv_dim,
+        'features.16.conv.1.0': cv_dim,
+        'features.16.conv.2': cv_dim,
+        'features.17.conv.0.0': cv_dim,
+        'classifier.1': cv_dim,
+    }
+    
     drillers = {}
     for peep_layer in peep_layers:
-        parser_kwargs = {'module': peep_layer, 'cv_dim':cv_dim}
+        #parser_kwargs = {'module': peep_layer, 'cv_dim':cv_dim}
 
         drillers[peep_layer] = tGMM(
                 path = drill_path,
                 name = drill_name+'.'+peep_layer,
                 nl_classifier = n_cluster,
                 nl_model = n_classes,
-                n_features = cv_dim,
-                parser = parser_cv,
-                parser_kwargs = parser_kwargs,
-                device = device
+                n_features = feature_sizes[peep_layer],
+                parser = cv_parsers[peep_layer],
+                device = device,
                 )
 
     peepholes = Peepholes(
