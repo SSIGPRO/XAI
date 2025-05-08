@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 
 # Our stuff
 from peepholelib.datasets.cifar import Cifar
+from peepholelib.datasets.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.models.model_wrap import ModelWrap 
 
 from peepholelib.coreVectors.coreVectors import CoreVectors
@@ -20,16 +21,17 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 from peepholelib.peepholes.peepholes import Peepholes
 
 from peepholelib.utils.samplers import random_subsampling 
+from peepholelib.utils.analyze import evaluate, evaluate_dists 
 
 # torch stuff
 import torch
-from torchvision.models import vgg16, VGG16_Weights
+from torchvision.models import vgg16
 from cuda_selector import auto_cuda
 
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device('cuda:2')#auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -38,7 +40,6 @@ if __name__ == "__main__":
     ds_path = '/srv/newpenny/dataset/CIFAR100'
 
     # model parameters
-    pretrained = True
     dataset = 'CIFAR100' 
     seed = 29
     bs = 512 
@@ -69,9 +70,9 @@ if __name__ == "__main__":
             data_path = ds_path,
             dataset=dataset
             )
+
     ds.load_data(
-            batch_size = bs,
-            data_kwargs = {'num_workers': 4, 'pin_memory': True},
+            transform = ds_transform,
             seed = seed,
             )
     
@@ -79,17 +80,24 @@ if __name__ == "__main__":
     # Model 
     #--------------------------------
     
-    nn = vgg16(weights=VGG16_Weights.IMAGENET1K_V1)
-    in_features = 4096
+    nn = vgg16()
     n_classes = len(ds.get_classes()) 
-    nn.classifier[-1] = torch.nn.Linear(in_features, n_classes)
     model = ModelWrap(
-            model=nn,
-            path=model_dir,
-            name=model_name,
-            device=device
+            model = nn,
+            device = device
             )
-    model.load_checkpoint(verbose=verbose)
+
+    model.update_output(
+            output_layer = 'classifier.6', 
+            to_n_classes = n_classes,
+            overwrite = True 
+            )
+
+    model.load_checkpoint(
+            name = model_name,
+            path = model_dir,
+            verbose = verbose
+            )
 
     target_layers = [
             'classifier.0',
@@ -115,7 +123,7 @@ if __name__ == "__main__":
     model.get_svds(
             target_modules = target_layers,
             path = svds_path,
-            rank = 300,
+            rank = 100,
             channel_wise = True,
             name = svds_name,
             verbose = verbose
@@ -146,8 +154,7 @@ if __name__ == "__main__":
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    dss = ds._dss
-    #dss = random_subsampling(ds._dss, 0.025)
+    random_subsampling(ds, 0.025)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -191,7 +198,7 @@ if __name__ == "__main__":
         # copy dataset to activatons file
         cv.get_activations(
                 batch_size = bs,
-                datasets = dss,
+                datasets = ds,
                 n_threads = n_threads,
                 verbose = verbose
                 )        
@@ -203,7 +210,6 @@ if __name__ == "__main__":
                 n_threads = n_threads,
                 verbose = verbose
                 )
-
         cv_dl = cv.get_dataloaders(verbose=verbose)
     
         i = 0
@@ -361,7 +367,8 @@ if __name__ == "__main__":
             i += 1
             if i == 3: break
 
-        ph.evaluate_dists(
+        evaluate_dists(
+                peepholes = ph,
                 score_type = 'max',
                 activations = cv._actds,
                 bins = 20

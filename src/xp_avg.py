@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 # Our stuff
 from peepholelib.datasets.cifar import Cifar
+from peepholelib.datasets.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.models.model_wrap import ModelWrap 
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.avgPooling import ChannelWiseMean_conv
@@ -67,9 +68,9 @@ if __name__ == "__main__":
             data_path = ds_path,
             dataset=dataset
             )
+
     ds.load_data(
-            batch_size = bs,
-            data_kwargs = {'num_workers': 4, 'pin_memory': True},
+            transform = ds_transform,
             seed = seed,
             )
     
