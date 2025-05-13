@@ -4,8 +4,8 @@ sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
 # Our stuff
 from peepholelib.datasets.cifar import Cifar
-from peepholelib.datasets.transforms import mobile_netv2_augumentations as ds_transform 
-from peepholelib.models.model_wrap import ModelWrap 
+from peepholelib.datasets.transforms import mobilenet_v2_cifar10_augumentations as ds_transform 
+from peepholelib.models.model_wrap import ModelWrap
 from peepholelib.utils.fine_tune import fine_tune 
 from peepholelib.utils.samplers import random_subsampling 
 
@@ -24,7 +24,7 @@ def ds_parser(batch):
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    device = torch.device('cuda:4')#auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -33,16 +33,13 @@ if __name__ == "__main__":
     ds_path = '/srv/newpenny/dataset/CIFAR100'
 
     # model parameters
-    dataset = 'CIFAR10' 
+    dataset = 'CIFAR100' 
     seed = 29
     bs = 512 
     n_threads = 32
     
-    model_dir = '/srv/newpenny/XAI/models'
-    model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
-    
-    tune_dir = Path.cwd()/'../data/mobile_net_fine_tune_model'
-    tune_name = 'vgg16_cifar100'
+    tune_dir = Path.cwd()/'../../data/mobilenet_cifar100'
+    tune_name = 'checkpoints'
 
     verbose = True 
     
@@ -60,14 +57,14 @@ if __name__ == "__main__":
             seed = seed,
             )
 
-    random_subsampling(ds, 0.025)
+    #random_subsampling(ds, 0.025)
     
     #--------------------------------
     # Model 
     #--------------------------------
     
     # pretrained weights
-    nn = mobilenet_v2(weights=pre_train_weights)
+    nn = mobilenet_v2(weights=pre_train_weights.DEFAULT)
     n_classes = len(ds.get_classes()) 
     model = ModelWrap(
             model = nn,
@@ -77,7 +74,7 @@ if __name__ == "__main__":
     model.update_output(
             output_layer = 'classifier.1', 
             to_n_classes = n_classes,
-            overwrite = True 
+            overwrite = False 
             )
 
     # commenting load_checkpoint() means training model from scratch
@@ -95,11 +92,18 @@ if __name__ == "__main__":
             model = model,
             dataset = ds,
             ds_parser = ds_parser, 
+            loss_fn = torch.nn.CrossEntropyLoss,
+            loss_kwargs = {'reduction': 'mean'},
+            optimizer = torch.optim.SGD,
+            optim_kwargs = {'momentum': 0.9},
+            #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau,
+            #sched_kwargs = {'mode': 'min', 'factor': 0.1, 'patience': 5},
             lr = 1e-3,
-            iterations = 16,
-            batch_size = 256,
-            max_epochs = 10000,
-            save_every = 50,
-            n_threads = 1,
+            iterations = 'full',
+            batch_size = 512+256,
+            max_epochs = 30000,
+            save_every = 500,
+            n_threads = 4,
+            devices = [i for i in range(4, 6)], 
             verbose = verbose
             )

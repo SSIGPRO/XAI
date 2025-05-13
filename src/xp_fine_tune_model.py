@@ -12,6 +12,7 @@ from peepholelib.utils.samplers import random_subsampling
 # torch stuff
 import torch
 from torchvision.models import vgg16
+from torchvision.models import VGG16_Weights as pre_train_weights
 from cuda_selector import auto_cuda
 
 def ds_parser(batch):
@@ -23,7 +24,7 @@ def ds_parser(batch):
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    device = torch.device('cuda:1')#auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -37,18 +38,15 @@ if __name__ == "__main__":
     bs = 512 
     n_threads = 32
     
-    model_dir = '/srv/newpenny/XAI/models'
-    model_name = 'vgg16_pretrained=True_dataset=CIFAR10-augmented_policy=CIFAR10_seed=29.pth'
-    
-    tune_dir = Path.cwd()/'../data/fine_tune_model'
-    tune_name = 'vgg16_cifar10'
+    tune_dir = Path.cwd()/'../data/vgg16_cifar10'
+    tune_name = 'checkpoints'
 
     verbose = True 
     
     #--------------------------------
     # Dataset 
     #--------------------------------
-
+    
     ds = Cifar(
             data_path = ds_path,
             dataset = dataset
@@ -59,13 +57,13 @@ if __name__ == "__main__":
             seed = seed,
             )
 
-    random_subsampling(ds, 0.025)
+    #random_subsampling(ds, 0.025)
     
     #--------------------------------
     # Model 
     #--------------------------------
     
-    nn = vgg16()
+    nn = vgg16(weights=pre_train_weights.DEFAULT)
     n_classes = len(ds.get_classes()) 
     model = ModelWrap(
             model = nn,
@@ -78,24 +76,24 @@ if __name__ == "__main__":
             overwrite = True 
             )
     
-    # commenting load_checkpoint() means training model from scratch
-    model.load_checkpoint(
-            name = model_name,
-            path = model_dir,
-            verbose = verbose
-            )
-
     fine_tune(
             path = tune_dir,
             name = tune_name,
             model = model,
             dataset = ds,
             ds_parser = ds_parser, 
+            loss_fn = torch.nn.CrossEntropyLoss,
+            loss_kwargs = {'reduction': 'mean'},
+            optimizer = torch.optim.SGD,
+            optim_kwargs = {'momentum': 0.9},
+            #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau,
+            #sched_kwargs = {'mode': 'min', 'factor': 0.1, 'patience': 5},
             lr = 1e-3,
-            iterations = 16,
-            batch_size = 256,
-            max_epochs = 10000,
-            save_every = 50,
+            iterations = 'full',
+            batch_size = 512*3,
+            max_epochs = 30000,
+            save_every = 500,
             n_threads = 1,
+            devices = [i for i in range(1, 4)], 
             verbose = verbose
             )
