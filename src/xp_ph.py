@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # model parameters
     dataset = 'CIFAR100' 
     seed = 29
-    bs = 512 
+    bs = 128 
     n_threads = 32
 
     model_dir = '/srv/newpenny/XAI/models'
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     ds = Cifar(
             data_path = ds_path,
-            dataset=dataset
+            dataset = dataset
             )
 
     ds.load_data(
@@ -106,30 +106,27 @@ if __name__ == "__main__":
             'features.26',
             'features.28',
             ]
-    model.set_target_modules(target_modules=target_layers, verbose=verbose)
 
-    direction = {'save_input':True, 'save_output':False}
-    model.add_hooks(**direction, verbose=False) 
+    model.set_target_modules(
+            target_modules = target_layers,
+            verbose = verbose
+            )
     
-    dry_img, _ = ds._dss['train'][0]
-    dry_img = dry_img.reshape((1,)+dry_img.shape)
-    model.dry_run(x=dry_img)
-
     #--------------------------------
     # SVDs 
     #--------------------------------
-    print('target modules: ', model.get_target_modules()) 
     t0 = time()
     model.get_svds(
             target_modules = target_layers,
             path = svds_path,
-            rank = 100,
+            rank = 10,
             channel_wise = True,
             name = svds_name,
             verbose = verbose
             )
     print('time: ', time()-t0)
-
+    
+    '''
     print('\n----------- svds:')
     for k in model._svds.keys():
         for kk in model._svds[k].keys():
@@ -150,11 +147,11 @@ if __name__ == "__main__":
             ax.set_zlabel('EigenVec')
         plt.savefig((svds_path/(svds_name+'/'+k+'.png')).as_posix(), dpi=300, bbox_inches='tight')
         plt.close()
-    #quit()
+    '''
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    random_subsampling(ds, 0.025)
+    #random_subsampling(ds, 0.025)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -195,53 +192,50 @@ if __name__ == "__main__":
             }
     
     with corevecs as cv: 
-        # copy dataset to activatons file
-        cv.get_activations(
+        cv.parse_ds(
                 batch_size = bs,
                 datasets = ds,
                 n_threads = n_threads,
                 verbose = verbose
+                )
+        '''
+        # This occupies a lot of space. Only do if you need it
+        # copy dataset to activatons file
+        cv.get_activations(
+                batch_size = bs,
+                n_threads = n_threads,
+                save_input = True,
+                save_output = False,
+                verbose = verbose
                 )        
+        '''
 
         # computing the corevectors
         cv.get_coreVectors(
                 batch_size = bs,
                 reduction_fns = reduction_fns,
                 n_threads = n_threads,
+                save_input = True,
+                save_output = False,
                 verbose = verbose
                 )
-        cv_dl = cv.get_dataloaders(verbose=verbose)
-    
-        i = 0
-        print('\nPrinting some corevecs')
-        for data in cv_dl['train']:
-            print('\nfeatures.28')
-            print(data['features.28'][34:35,:])
-            i += 1
-            if i == 1: break
 
-        cv.normalize_corevectors(
-                wrt='train',
-                #from_file=cvs_path/(cvs_name+'.normalization.pt'),
-                to_file=cvs_path/(cvs_name+'.normalization.pt'),
-                batch_size = bs,
-                n_threads = n_threads,
-                verbose=verbose
-                )
-
-        i = 0
-        print('after norm')
-        for data in cv_dl['train']:
-            print(data['features.28'][34:35,:])
-            i += 1
-            if i == 1: break
+        if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
+            cv.normalize_corevectors(
+                    wrt = 'train',
+                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    to_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    batch_size = bs,
+                    n_threads = n_threads,
+                    verbose=verbose
+                    )
 
     #--------------------------------
     # Peepholes
     #--------------------------------
     n_classes = 100
-    n_cluster = 100
-    cv_dim = 50
+    n_cluster = 10
+    cv_dim = 5
     peep_layers = [
             'classifier.0',
             'classifier.3',
@@ -308,15 +302,13 @@ if __name__ == "__main__":
     peepholes = Peepholes(
             path = phs_path,
             name = phs_name,
-            driller = drillers,
-            target_modules = peep_layers,
             device = device
             )
-    
+
     # fitting classifiers
     with corevecs as cv:
         cv.load_only(
-                loaders = ['train'],#, 'test', 'val'],
+                loaders = ['train', 'test', 'val'],
                 verbose = True
                 ) 
 
@@ -328,9 +320,10 @@ if __name__ == "__main__":
                 t0 = time()
                 print(f'Fitting classifier for {drill_key} time = ', time()-t0)
                 driller.fit(corevectors = cv._corevds['train'], verbose=verbose)
+
                 driller.compute_empirical_posteriors(
-                        actds=cv._actds['train'],
-                        corevds=cv._corevds['train'],
+                        dataset = cv._dss['train'],
+                        corevectors = cv._corevds['train'],
                         batch_size = bs,
                         verbose=verbose
                         )
@@ -347,7 +340,9 @@ if __name__ == "__main__":
 
         ph.get_peepholes(
                 corevectors = cv,
+                target_modules = peep_layers,
                 batch_size = bs,
+                drillers = drillers,
                 n_threads = n_threads,
                 verbose = verbose
                 )
@@ -357,19 +352,9 @@ if __name__ == "__main__":
             verbose=verbose
             )
 
-        i = 0
-        print('\nPrinting some peeps')
-        ph_dl = ph.get_dataloaders(verbose=verbose)
-        for data in ph_dl['train']:
-            print('phs\n', data['features.28']['peepholes'])
-            print('max\n', data['features.28']['score_max'])
-            print('ent\n', data['features.28']['score_entropy'])
-            i += 1
-            if i == 3: break
-
         evaluate_dists(
                 peepholes = ph,
                 score_type = 'max',
-                activations = cv._actds,
+                dataset = cv._dss,
                 bins = 20
                 )
