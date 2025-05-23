@@ -121,11 +121,12 @@ if __name__ == "__main__":
     #--------------------------------
     t0 = time()
     model.get_svds(
-            target_modules = target_layers,
             path = svds_path,
+            name = svds_name,
+            target_modules = target_layers,
+            sample_in = ds._dss['train'][0][0],
             rank = 10,
             channel_wise = True,
-            name = svds_name,
             verbose = verbose
             )
     print('time: ', time()-t0)
