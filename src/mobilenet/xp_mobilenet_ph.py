@@ -1,5 +1,7 @@
 import sys
 from pathlib import Path as Path
+
+from matplotlib import pyplot as plt
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
 # python stuff
@@ -46,28 +48,23 @@ if __name__ == "__main__":
     pretrained = True
     dataset = 'CIFAR100' 
     seed = 29
-    bs = 64
-    
+    bs = 512
+    n_threads = 32
+
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
 
-    svds_path = Path.cwd()/'data/data_200_150clusters'
+    svds_path = Path.cwd()/'data/svds'
     svds_name = 'svds' 
     
-    cvs_path = Path.cwd()/'data/data_200_200clusters/corevectors'
+    cvs_path = Path.cwd()/'data/corevectors'
     cvs_name = 'corevectors'
 
-    act_path = Path.cwd()/'data/data_200_200clusters/corevectors'
-    act_name = 'activations'
-    
-    drill_path = Path.cwd()/'data/data_200_200clusters/drillers'
+    drill_path = Path.cwd()/'data/data200clusters/drillers'
     drill_name = 'classifier'
 
-    phs_path = Path.cwd()/'data/data_200_200clusters/peepholes'
+    phs_path = Path.cwd()/'data/data200clusters/peepholes'
     phs_name = 'peepholes'
-
-    cls_path = Path.cwd()/'data/data_200_200clusters/classifier'
-    cls_name = 'clustering'
 
     verbose = False
 
@@ -79,9 +76,9 @@ if __name__ == "__main__":
         data_path = ds_path,
         dataset=dataset
         )
+
     ds.load_data(
-            batch_size = bs,
-            data_kwargs = {'num_workers': 4, 'pin_memory': True},
+            transform = ds_transform,
             seed = seed,
             )
     
@@ -89,20 +86,24 @@ if __name__ == "__main__":
     # Model 
     #--------------------------------
 
-    nn = torchvision.models.mobilenet_v2(pretrained=True)
-    print(nn.state_dict().keys())
-
-    in_features = nn.classifier[-1].in_features
-    print("in features", in_features)
-    nn.classifier[-1] = torch.nn.Linear(in_features, len(ds.get_classes()))
-    model = ModelWrap(
-        model=nn,
-        path=model_dir,
-        name=model_name,
-        device=device
-        )
+    nn = torchvision.models.mobilenet_v2()
     
-    model.load_checkpoint(verbose=verbose)
+    model = ModelWrap(
+            model = nn,
+            device = device
+            )
+    
+    model.update_output(
+            output_layer = 'classifier.1', 
+            to_n_classes = n_classes,
+            overwrite = True 
+            )
+
+    model.load_checkpoint(
+            name = model_name,
+            path = model_dir,
+            verbose = verbose
+            )
     
     target_layers = [ 'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0',
                      # 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
@@ -136,9 +137,22 @@ if __name__ == "__main__":
     for k in model._svds.keys():
         for kk in model._svds[k].keys():
             print('svd shapes: ', k, kk, model._svds[k][kk].shape)
-        
-
-    quit()
+        s = model._svds[k]['s']
+        if len(s.shape) == 1:
+            plt.figure()
+            plt.plot(s, '-')
+            plt.xlabel('Rank')
+            plt.ylabel('EigenVec')
+        else:
+            fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+            _x = torch.linspace(0, s.shape[1]-1, s.shape[1])
+            for r in range(s.shape[0]):
+                plt.plot(xs=_x, ys=s[r,:], zs=r, zdir='y')
+            ax.set_xlabel('Rank')
+            ax.set_ylabel('Channel')
+            ax.set_zlabel('EigenVec')
+        plt.savefig((svds_path/(svds_name+'/'+k+'.png')).as_posix(), dpi=300, bbox_inches='tight')
+        plt.close()
 
     #--------------------------------
     # CoreVectors 
@@ -219,24 +233,24 @@ if __name__ == "__main__":
             
     }
 
-    shapes = {
-            # 'features.4.conv.1.0': 300, 
-            # 'features.5.conv.1.0':300,
-            #'features.6.conv.1.0':300,
-            #'features.7.conv.1.0':300,
-            #'features.8.conv.1.0':300,
-            #'features.9.conv.1.0':300,
-            #'features.10.conv.1.0':300,
-            #'features.11.conv.1.0':300,
-            #'features.12.conv.1.0':300,
-            'features.13.conv.1.0':300,
-            'features.14.conv.1.0':300,
-            'features.15.conv.1.0':300,
-            'features.16.conv.1.0':300,
-            'features.16.conv.2':300,
-            'features.17.conv.0.0':300,
-            'classifier.1': 300,
-            }
+    # shapes = {
+    #         # 'features.4.conv.1.0': 300, 
+    #         # 'features.5.conv.1.0':300,
+    #         #'features.6.conv.1.0':300,
+    #         #'features.7.conv.1.0':300,
+    #         #'features.8.conv.1.0':300,
+    #         #'features.9.conv.1.0':300,
+    #         #'features.10.conv.1.0':300,
+    #         #'features.11.conv.1.0':300,
+    #         #'features.12.conv.1.0':300,
+    #         'features.13.conv.1.0':300,
+    #         'features.14.conv.1.0':300,
+    #         'features.15.conv.1.0':300,
+    #         'features.16.conv.1.0':300,
+    #         'features.16.conv.2':300,
+    #         'features.17.conv.0.0':300,
+    #         'classifier.1': 300,
+    #         }
 
     with corevecs as cv: 
         # copy dataset to coreVect dataset
@@ -248,15 +262,15 @@ if __name__ == "__main__":
         )
         
         cv.get_coreVectors(
-                batch_size = bs,
-                reduction_fns = reduction_fns,
-                shapes = shapes,
-                verbose = verbose
+            batch_size = bs,
+            reduction_fns = reduction_fns,
+            n_threads = n_threads,
+            verbose = verbose
         )
 
         cv_dl = cv.get_dataloaders(verbose=verbose)
 
-        i = 0
+        #i = 0
         # print('\nPrinting some corevecs')
         # for data in cv_dl['test']:
         #     print('\nfeatures.16.conv.1.0')
@@ -268,6 +282,8 @@ if __name__ == "__main__":
                 wrt='train',
                 #from_file=cvs_path/(cvs_name+'.normalization.pt'),
                 to_file=cvs_path/(cvs_name+'.normalization.pt'),
+                batch_size = bs,
+                n_threads = n_threads,
                 verbose=verbose
                 )
         
@@ -285,9 +301,7 @@ if __name__ == "__main__":
 
     n_classes = 100
     n_cluster = 200
-    cv_dim = 200
-    parser_cv = trim_corevectors
-
+    cv_dim = 300
 
     peep_layers =[ #'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0', 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
                #'features.11.conv.1.0', 'features.12.conv.1.0', 
@@ -297,7 +311,6 @@ if __name__ == "__main__":
         
                ]
     
-
     cls_kwargs = {}#{'batch_size':256} 
 
     corevecs = CoreVectors(
@@ -336,7 +349,7 @@ if __name__ == "__main__":
         'features.16.conv.1.0': cv_dim,
         'features.16.conv.2': cv_dim,
         'features.17.conv.0.0': cv_dim,
-        'classifier.1': cv_dim,
+        'classifier.1': 100,
     }
     
     drillers = {}
@@ -369,7 +382,7 @@ if __name__ == "__main__":
                 ) 
 
         for drill_key, driller in drillers.items():
-            if (drill_path/(driller._suffix+'.empp.pt')).exists():
+            if (driller._empp_file).exists():
                 print(f'Loading Classifier for {drill_key}') 
                 driller.load()
             else:
@@ -382,7 +395,7 @@ if __name__ == "__main__":
                         batch_size = bs,
                         verbose=verbose
                         )
-                        
+        
                 # save classifiers
                 print(f'Saving classifier for {drill_key}')
                 driller.save()
@@ -404,15 +417,15 @@ if __name__ == "__main__":
             verbose=verbose
             )
 
-        i = 0
-        print('\nPrinting some peeps')
-        ph_dl = ph.get_dataloaders(verbose=verbose)
-        for data in ph_dl['test']:
-            print('phs\n', data[peep_layer]['peepholes'])
-            print('max\n', data[peep_layer]['score_max'])
-            print('ent\n', data[peep_layer]['score_entropy'])
-            i += 1
-            if i == 3: break
+        # i = 0
+        # print('\nPrinting some peeps')
+        # ph_dl = ph.get_dataloaders(verbose=verbose)
+        # for data in ph_dl['test']:
+        #     print('phs\n', data[peep_layer]['peepholes'])
+        #     print('max\n', data[peep_layer]['score_max'])
+        #     print('ent\n', data[peep_layer]['score_entropy'])
+        #     i += 1
+        #     if i == 3: break
 
         ph.evaluate_dists(
                 score_type = 'max',
