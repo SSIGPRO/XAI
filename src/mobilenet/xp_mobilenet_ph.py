@@ -13,7 +13,7 @@ from functools import partial
 # Our stuff
 from peepholelib.datasets.cifar import Cifar
 from peepholelib.models.model_wrap import ModelWrap 
-
+from peepholelib.datasets.transforms import mobilenet_v2 as ds_transform 
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds import svd_Linear, svd_Conv2D
 
@@ -68,6 +68,14 @@ if __name__ == "__main__":
 
     verbose = False
 
+    target_layers = [ 'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0',
+                    # 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
+        #    'features.11.conv.1.0', 'features.12.conv.1.0',
+        #    'features.13.conv.1.0', 'features.14.conv.1.0', 
+        #    'features.15.conv.1.0', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0',
+        #    'classifier.1'
+            ]
+
     #--------------------------------
     # Dataset 
     #--------------------------------
@@ -87,7 +95,7 @@ if __name__ == "__main__":
     #--------------------------------
 
     nn = torchvision.models.mobilenet_v2()
-    
+    n_classes = len(ds.get_classes()) 
     model = ModelWrap(
             model = nn,
             device = device
@@ -105,33 +113,21 @@ if __name__ == "__main__":
             verbose = verbose
             )
     
-    target_layers = [ 'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0',
-                     # 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
-            #    'features.11.conv.1.0', 'features.12.conv.1.0',
-            #    'features.13.conv.1.0', 'features.14.conv.1.0', 
-            #    'features.15.conv.1.0', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0',
-            #    'classifier.1'
-               ]
-    
     model.set_target_modules(target_modules=target_layers, verbose=False)
 
-
-    direction = {'save_input':True, 'save_output':True}
-    model.add_hooks(**direction, verbose=False) 
-        
-    dry_img, _ = ds._dss['train'][0]
-    dry_img = dry_img.reshape((1,)+dry_img.shape)
-    model.dry_run(x=dry_img)
 
     #--------------------------------
     # SVDs 
     #--------------------------------
 
     model.get_svds(
+            path = svds_path,
+            name = svds_name,
             target_modules = target_layers,
-            path=svds_path,
-            name=svds_name,
-            verbose=verbose
+            sample_in = ds._dss['train'][0][0],
+            rank = 10,
+            channel_wise = True,
+            verbose = verbose
             )
     
     for k in model._svds.keys():
@@ -153,7 +149,7 @@ if __name__ == "__main__":
             ax.set_zlabel('EigenVec')
         plt.savefig((svds_path/(svds_name+'/'+k+'.png')).as_posix(), dpi=300, bbox_inches='tight')
         plt.close()
-
+    quit()
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -233,91 +229,57 @@ if __name__ == "__main__":
             
     }
 
-    # shapes = {
-    #         # 'features.4.conv.1.0': 300, 
-    #         # 'features.5.conv.1.0':300,
-    #         #'features.6.conv.1.0':300,
-    #         #'features.7.conv.1.0':300,
-    #         #'features.8.conv.1.0':300,
-    #         #'features.9.conv.1.0':300,
-    #         #'features.10.conv.1.0':300,
-    #         #'features.11.conv.1.0':300,
-    #         #'features.12.conv.1.0':300,
-    #         'features.13.conv.1.0':300,
-    #         'features.14.conv.1.0':300,
-    #         'features.15.conv.1.0':300,
-    #         'features.16.conv.1.0':300,
-    #         'features.16.conv.2':300,
-    #         'features.17.conv.0.0':300,
-    #         'classifier.1': 300,
-    #         }
 
     with corevecs as cv: 
         # copy dataset to coreVect dataset
 
-        cv.get_activations(
-            batch_size = bs,
-            datasets = dss,
-            verbose = verbose
-        )
-        
-        cv.get_coreVectors(
-            batch_size = bs,
-            reduction_fns = reduction_fns,
-            n_threads = n_threads,
-            verbose = verbose
-        )
-
-        cv_dl = cv.get_dataloaders(verbose=verbose)
-
-        #i = 0
-        # print('\nPrinting some corevecs')
-        # for data in cv_dl['test']:
-        #     print('\nfeatures.16.conv.1.0')
-        #     print(data['features.16.conv.1.0'][34:56,:])
-        #     i += 1
-        #     if i == 1: break
-        
-        cv.normalize_corevectors(
-                wrt='train',
-                #from_file=cvs_path/(cvs_name+'.normalization.pt'),
-                to_file=cvs_path/(cvs_name+'.normalization.pt'),
+        cv.parse_ds(
                 batch_size = bs,
+                datasets = ds,
                 n_threads = n_threads,
-                verbose=verbose
+                verbose = verbose
                 )
         
-        # i = 0
-        # print('after norm')
-        # for data in cv_dl['test']:
-        #     print(data['features.16.conv.1.0'][34:56,:])
-        #     i += 1
-        #     if i == 1: break
-    quit()
+        # cv.get_activations(
+        #     batch_size = bs,
+        #     n_threads = n_threads,
+        #     save_input = True,
+        #     save_output = False,
+        #     verbose = verbose
+        #     ) 
+        
+        cv.get_coreVectors(
+                batch_size = bs,
+                reduction_fns = reduction_fns,
+                n_threads = n_threads,
+                save_input = True,
+                save_output = False,
+                verbose = verbose
+                )
+        
+        if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
+            cv.normalize_corevectors(
+                    wrt = 'train',
+                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    to_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    batch_size = bs,
+                    n_threads = n_threads,
+                    verbose=verbose
+                    )
 
     #--------------------------------
     # Peepholes
     #--------------------------------
 
-    n_classes = 100
-    n_cluster = 200
     cv_dim = 300
-
-    peep_layers =[ #'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0', 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
-               #'features.11.conv.1.0', 'features.12.conv.1.0', 
-               'features.13.conv.1.0', 'features.14.conv.1.0', 
-               'features.15.conv.1.0', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0',
-                'classifier.1'
-        
-               ]
-    
-    cls_kwargs = {}#{'batch_size':256} 
+    n_cluster = 200
 
     corevecs = CoreVectors(
-        path = cvs_path,
-        name = cvs_name,
-        )
-    
+            path = cvs_path,
+            name = cvs_name,
+            )
+
+
     cv_parsers = {
         'features.13.conv.1.0': partial(trim_corevectors,
                           module = 'features.13.conv.1.0',
@@ -339,7 +301,7 @@ if __name__ == "__main__":
                           cv_dim = cv_dim),
         'classifier.1': partial(trim_corevectors,
                             module = 'classifier.1',
-                            cv_dim = cv_dim),
+                            cv_dim = 100),
     }
 
     feature_sizes = {
@@ -353,7 +315,7 @@ if __name__ == "__main__":
     }
     
     drillers = {}
-    for peep_layer in peep_layers:
+    for peep_layer in target_layers:
         #parser_kwargs = {'module': peep_layer, 'cv_dim':cv_dim}
 
         drillers[peep_layer] = tGMM(
@@ -363,14 +325,12 @@ if __name__ == "__main__":
                 nl_model = n_classes,
                 n_features = feature_sizes[peep_layer],
                 parser = cv_parsers[peep_layer],
-                device = device,
+                device = device
                 )
 
     peepholes = Peepholes(
             path = phs_path,
             name = phs_name,
-            driller = drillers,
-            target_modules = peep_layers,
             device = device
             )
     
@@ -389,9 +349,10 @@ if __name__ == "__main__":
                 t0 = time()
                 print(f'Fitting classifier for {drill_key} time = ', time()-t0)
                 driller.fit(corevectors = cv._corevds['train'], verbose=verbose)
+
                 driller.compute_empirical_posteriors(
-                        actds=cv._actds['train'],
-                        corevds=cv._corevds['train'],
+                        dataset = cv._dss['train'],
+                        corevectors = cv._corevds['train'],
                         batch_size = bs,
                         verbose=verbose
                         )
@@ -408,7 +369,10 @@ if __name__ == "__main__":
 
         ph.get_peepholes(
                 corevectors = cv,
+                target_modules = target_layers,
                 batch_size = bs,
+                drillers = drillers,
+                n_threads = n_threads,
                 verbose = verbose
                 )
 
@@ -417,18 +381,10 @@ if __name__ == "__main__":
             verbose=verbose
             )
 
-        # i = 0
-        # print('\nPrinting some peeps')
-        # ph_dl = ph.get_dataloaders(verbose=verbose)
-        # for data in ph_dl['test']:
-        #     print('phs\n', data[peep_layer]['peepholes'])
-        #     print('max\n', data[peep_layer]['score_max'])
-        #     print('ent\n', data[peep_layer]['score_entropy'])
-        #     i += 1
-        #     if i == 3: break
+        evaluate_dists(
+            peepholes = ph,
+            score_type = 'max',
+            dataset = cv._dss,
+            bins = 20
+            )
 
-        ph.evaluate_dists(
-                score_type = 'max',
-                activations = cv._actds,
-                bins = 20
-                )
