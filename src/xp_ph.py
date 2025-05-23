@@ -62,6 +62,18 @@ if __name__ == "__main__":
     
     verbose = True 
     
+    # Peepholelib
+    target_layers = [
+            'classifier.0',
+            'classifier.3',
+            'features.24',
+            'features.26',
+            'features.28',
+            ]
+    
+    n_cluster = 10
+    cv_dim = 5
+
     #--------------------------------
     # Dataset 
     #--------------------------------
@@ -98,14 +110,6 @@ if __name__ == "__main__":
             path = model_dir,
             verbose = verbose
             )
-
-    target_layers = [
-            'classifier.0',
-            'classifier.3',
-            'features.24',
-            'features.26',
-            'features.28',
-            ]
 
     model.set_target_modules(
             target_modules = target_layers,
@@ -198,6 +202,7 @@ if __name__ == "__main__":
                 n_threads = n_threads,
                 verbose = verbose
                 )
+
         '''
         # This occupies a lot of space. Only do if you need it
         # copy dataset to activatons file
@@ -233,18 +238,6 @@ if __name__ == "__main__":
     #--------------------------------
     # Peepholes
     #--------------------------------
-    n_classes = 100
-    n_cluster = 10
-    cv_dim = 5
-    peep_layers = [
-            'classifier.0',
-            'classifier.3',
-            'features.24',
-            'features.26',
-            'features.28',
-            ]
-    
-    cls_kwargs = {}#{'batch_size': bs} 
 
     corevecs = CoreVectors(
             path = cvs_path,
@@ -287,8 +280,9 @@ if __name__ == "__main__":
             'features.26': cv_dim*model._svds['features.26']['Vh'].shape[0],
             'features.28': cv_dim*model._svds['features.28']['Vh'].shape[0],
             }
+
     drillers = {}
-    for peep_layer in peep_layers:
+    for peep_layer in target_layers:
         drillers[peep_layer] = tGMM(
                 path = drill_path,
                 name = drill_name+'.'+peep_layer,
@@ -340,7 +334,7 @@ if __name__ == "__main__":
 
         ph.get_peepholes(
                 corevectors = cv,
-                target_modules = peep_layers,
+                target_modules = target_layers,
                 batch_size = bs,
                 drillers = drillers,
                 n_threads = n_threads,

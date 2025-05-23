@@ -5,16 +5,15 @@ sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 # python stuff
 from time import time
 from functools import partial
-from sklearn import covariance
-import numpy as np
-from tqdm import tqdm
 
 # Our stuff
 from peepholelib.datasets.cifar import Cifar
 from peepholelib.datasets.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.models.model_wrap import ModelWrap 
+
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.avgPooling import ChannelWiseMean_conv
+from peepholelib.coreVectors.get_coreVectors import get_out_activations
 
 from peepholelib.peepholes.parsers import get_images 
 from peepholelib.peepholes.DeepMahalanobisDistance.DMD import DeepMahalanobisDistance as DMD
@@ -26,8 +25,6 @@ from peepholelib.utils.samplers import random_subsampling
 import torch
 from torchvision.models import vgg16, VGG16_Weights
 from cuda_selector import auto_cuda
-from tensordict import TensorDict
-from tensordict import MemoryMappedTensor as MMT
 
 
 if __name__ == "__main__":
@@ -41,11 +38,11 @@ if __name__ == "__main__":
     ds_path = '/srv/newpenny/dataset/CIFAR100'
 
     # model parameters
-    pretrained = True
     dataset = 'CIFAR100'
-    name_model = 'vgg16' 
     seed = 29
-    bs = 256 
+    bs = 64 
+    n_threads = 32
+
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
     
@@ -59,7 +56,14 @@ if __name__ == "__main__":
     phs_name = 'peepholes_avg'
 
     verbose = True 
-    
+
+    # Peepholelib
+    target_layers = [
+            'features.7',
+            'features.14',
+            'features.28',
+            ]
+
     #--------------------------------
     # Dataset 
     #--------------------------------
@@ -78,39 +82,34 @@ if __name__ == "__main__":
     # Model 
     #--------------------------------
     
-    nn = vgg16(weights=VGG16_Weights.IMAGENET1K_V1)
-    in_features = 4096
+    nn = vgg16()
     n_classes = len(ds.get_classes()) 
-    nn.classifier[-1] = torch.nn.Linear(in_features, n_classes)
     model = ModelWrap(
             model=nn,
-            path=model_dir,
-            name=model_name,
             device=device
             )
-    model.load_checkpoint(verbose=verbose)
-
-    target_layers = [
-        #     'classifier.0',
-            # 'classifier.3',
-            #'features.7',
-            'features.14',
-            'features.28',
-            ]
-    model.set_target_modules(target_modules=target_layers, verbose=verbose)
-
-    direction = {'save_input':True, 'save_output':False}
-    model.add_hooks(**direction, verbose=False) 
     
-    dry_img, _ = ds._dss['train'][0]
-    dry_img = dry_img.reshape((1,)+dry_img.shape)
-    model.dry_run(x=dry_img)
+    model.update_output(
+            output_layer = 'classifier.6', 
+            to_n_classes = n_classes,
+            overwrite = True 
+            )
+    
+    model.load_checkpoint(
+            name = model_name,
+            path = model_dir,
+            verbose = verbose
+            )
+
+    model.set_target_modules(
+            target_modules=target_layers,
+            verbose=verbose
+            )
 
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    #dss = ds._dss
-    dss = random_subsampling(ds._dss, 0.025)
+    random_subsampling(ds, 0.025)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -120,33 +119,40 @@ if __name__ == "__main__":
     
     # for each layer we define the function used to perform dimensionality reduction
     reduction_fns = {
+            'features.7': ChannelWiseMean_conv,
             'features.14': ChannelWiseMean_conv,
             'features.28': ChannelWiseMean_conv,
             }
     
     with corevecs as cv: 
-        # copy dataset to coreVect dataset
-        cv.get_activations(
+        cv.parse_ds(
                 batch_size = bs,
-                datasets = dss,
+                datasets = ds,
+                n_threads = n_threads,
                 verbose = verbose
                 )
         
+        '''
+        # This occupies a lot of space. Only do if you need it
+        # copy dataset to coreVect dataset
+        cv.get_activations(
+                batch_size = bs,
+                n_threads = n_threads,
+                save_input = False,
+                save_output = True,
+                verbose = verbose
+                )
+        '''
+
         cv.get_coreVectors(
                 batch_size = bs,
                 reduction_fns = reduction_fns,
+                activations_parser = get_out_activations,
+                save_input = False,
+                save_output = True,
+                n_threads = n_threads,
                 verbose = verbose
                 )
-
-        cv_dl = cv.get_dataloaders(verbose=verbose)
-    
-        i = 0
-        print('\nPrinting some corevecs')
-        for data in cv_dl['train']:
-            print(data['features.14'].shape)
-            print(data['features.14'][34:56,:])
-            i += 1
-            if i == 3: break
 
     #--------------------------------
     # Peepholes
@@ -157,22 +163,15 @@ if __name__ == "__main__":
             name = cvs_name,
             )
     
-    n_classes = 100
-    n_cluster = 10
-    peep_layers = ['features.14','features.28']
-
+    # number of channels in a conv layer. Get numbers from `nn`
     feature_sizes = {
+            'features.7': 128,
             'features.14': 256,
             'features.28': 512,
             }
     
-    corevecs = CoreVectors(
-            path = cvs_path,
-            name = cvs_name,
-            )
-
     drillers = {}
-    for peep_layer in peep_layers:
+    for peep_layer in target_layers:
         drillers[peep_layer] = DMD(
                 path = drill_path,
                 name = drill_name+'.'+peep_layer,
@@ -189,8 +188,6 @@ if __name__ == "__main__":
     peepholes = Peepholes(
             path = phs_path,
             name = phs_name,
-            driller = drillers,
-            target_modules = peep_layers,
             device = device
             )
         
@@ -208,8 +205,9 @@ if __name__ == "__main__":
             else:
                 t0 = time()
                 print(f'Fitting DMD for {drill_key} time = ', time()-t0)
-                driller.fit(corevectors = cv._corevds['train'][drill_key], 
-                        activations = cv._actds['train'], 
+                driller.fit(
+                        corevectors = cv._corevds['train'][drill_key], 
+                        dataset = cv._dss['train'], 
                         verbose=verbose
                         )
             
@@ -225,13 +223,14 @@ if __name__ == "__main__":
 
         ph.get_peepholes(
                 corevectors = cv,
+                target_modules = target_layers,
                 batch_size = bs,
+                drillers = drillers,
+                n_threads = n_threads,
                 verbose = verbose,
                 )
-        i = 0
-        print('\nPrinting some peeps')
-        ph_dl = ph.get_dataloaders(verbose=verbose)
-        for data in ph_dl['test']:
-            print('phs\n', data['features.28']['peepholes'])
-            i += 1
-            if i == 3: break
+
+        ph.get_scores(
+            batch_size = bs,
+            verbose=verbose
+            )
