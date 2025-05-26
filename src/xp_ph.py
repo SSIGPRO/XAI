@@ -21,7 +21,8 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 from peepholelib.peepholes.peepholes import Peepholes
 
 from peepholelib.utils.samplers import random_subsampling 
-from peepholelib.utils.analyze import evaluate, evaluate_dists 
+from peepholelib.utils.analyze import evaluate_dists, conceptogram_ghl_score, conceptogram_cl_score
+from peepholelib.utils.conceptograms import plot_conceptogram
 
 # torch stuff
 import torch
@@ -42,7 +43,7 @@ if __name__ == "__main__":
     # model parameters
     dataset = 'CIFAR100' 
     seed = 29
-    bs = 128 
+    bs = 512 
     n_threads = 32
 
     model_dir = '/srv/newpenny/XAI/models'
@@ -64,16 +65,19 @@ if __name__ == "__main__":
     
     # Peepholelib
     target_layers = [
-            'classifier.0',
-            'classifier.3',
             'features.24',
             'features.26',
             'features.28',
+            'classifier.0',
+            'classifier.3',
+            'classifier.6',
             ]
     
-    n_cluster = 10
-    cv_dim = 5
-
+    svd_rank = 300
+    n_cluster = 200
+    features_cv_dim = 150 
+    classifier_cv_dim = 150 
+    n_conceptograms = 10
     #--------------------------------
     # Dataset 
     #--------------------------------
@@ -115,7 +119,7 @@ if __name__ == "__main__":
             target_modules = target_layers,
             verbose = verbose
             )
-    
+
     #--------------------------------
     # SVDs 
     #--------------------------------
@@ -125,12 +129,12 @@ if __name__ == "__main__":
             name = svds_name,
             target_modules = target_layers,
             sample_in = ds._dss['train'][0][0],
-            rank = 10,
-            channel_wise = True,
+            rank = svd_rank,
+            channel_wise = False,
             verbose = verbose
             )
     print('time: ', time()-t0)
-    
+
     '''
     print('\n----------- svds:')
     for k in model._svds.keys():
@@ -166,16 +170,6 @@ if __name__ == "__main__":
     
     # define a dimensionality reduction function for each layer
     reduction_fns = {
-            'classifier.0': partial(
-                svd_Linear,
-                reduct_m=model._svds['classifier.0']['Vh'], 
-                device=device
-                ),
-            'classifier.3': partial(
-                svd_Linear,
-                reduct_m=model._svds['classifier.3']['Vh'], 
-                device=device
-                ),
             'features.24': partial(
                 svd_Conv2D, 
                 reduct_m=model._svds['features.24']['Vh'], 
@@ -192,6 +186,21 @@ if __name__ == "__main__":
                 svd_Conv2D, 
                 reduct_m=model._svds['features.28']['Vh'], 
                 layer=model._target_modules['features.28'], 
+                device=device
+                ),
+            'classifier.0': partial(
+                svd_Linear,
+                reduct_m=model._svds['classifier.0']['Vh'], 
+                device=device
+                ),
+            'classifier.3': partial(
+                svd_Linear,
+                reduct_m=model._svds['classifier.3']['Vh'], 
+                device=device
+                ),
+            'classifier.6': partial(
+                svd_Linear,
+                reduct_m=model._svds['classifier.6']['Vh'], 
                 device=device
                 ),
             }
@@ -246,40 +255,49 @@ if __name__ == "__main__":
             )
 
     cv_parsers = {
-            'classifier.0': partial(
+            'features.24': partial(
+                #trim_channelwise_corevectors,
                 trim_corevectors,
+                module = 'features.24',
+                cv_dim = features_cv_dim
+                ),
+            'features.26': partial(
+                #trim_channelwise_corevectors,
+                trim_corevectors,
+                module = 'features.26',
+                cv_dim = features_cv_dim
+                ),
+            'features.28': partial(
+                #trim_channelwise_corevectors,
+                trim_corevectors,
+                module = 'features.28',
+                cv_dim = features_cv_dim
+                ),
+            'classifier.0': partial(
+                trim_corevectors,#
                 module = 'classifier.0',
-                cv_dim = cv_dim
+                cv_dim = classifier_cv_dim
                 ),
             'classifier.3': partial(
                 trim_corevectors,
                 module = 'classifier.3',
-                cv_dim = cv_dim
+                cv_dim = classifier_cv_dim
                 ),
-            'features.24': partial(
-                trim_channelwise_corevectors,
-                module = 'features.24',
-                cv_dim = cv_dim
-                ),
-            'features.26': partial(
-                trim_channelwise_corevectors,
-                module = 'features.26',
-                cv_dim = cv_dim
-                ),
-            'features.28': partial(
-                trim_channelwise_corevectors,
-                module = 'features.28',
-                cv_dim = cv_dim
+            'classifier.6': partial(
+                trim_corevectors,
+                module = 'classifier.6',
+                cv_dim = classifier_cv_dim
                 ),
             }
 
     feature_sizes = {
-            'classifier.0': cv_dim,
-            'classifier.3': cv_dim,
             # for channel_wise corevectors, the size is n_channels * cv_dim
-            'features.24': cv_dim*model._svds['features.24']['Vh'].shape[0],
-            'features.26': cv_dim*model._svds['features.26']['Vh'].shape[0],
-            'features.28': cv_dim*model._svds['features.28']['Vh'].shape[0],
+            'features.24': features_cv_dim,#*model._svds['features.24']['Vh'].shape[0],
+            'features.26': features_cv_dim,#*model._svds['features.26']['Vh'].shape[0],
+            'features.28': features_cv_dim,#*model._svds['features.28']['Vh'].shape[0],
+            'classifier.0': classifier_cv_dim,
+            'classifier.3': classifier_cv_dim,
+            'classifier.6': 100#classifier_cv_dim,
             }
 
     drillers = {}
@@ -313,8 +331,9 @@ if __name__ == "__main__":
                 driller.load()
             else:
                 t0 = time()
-                print(f'Fitting classifier for {drill_key} time = ', time()-t0)
+                print(f'Fitting classifier for {drill_key}')
                 driller.fit(corevectors = cv._corevds['train'], verbose=verbose)
+                print(f'Fitting time for {drill_key}  = ', time()-t0)
 
                 driller.compute_empirical_posteriors(
                         dataset = cv._dss['train'],
@@ -347,9 +366,47 @@ if __name__ == "__main__":
             verbose=verbose
             )
 
+        scores, _, _, _, _ = conceptogram_ghl_score(
+                peepholes = ph,
+                corevectors = cv,
+                loaders = ['train', 'val', 'test'],
+                basis = 'from_output',
+                weights = [1, 1, 1, 1, 1, 1],
+                bins = 50,
+                plot = True,
+                verbose = verbose
+                )
+        '''
         evaluate_dists(
                 peepholes = ph,
-                score_type = 'max',
                 dataset = cv._dss,
-                bins = 20
+                score_type = 'max',
+                )
+        '''
+        idx_hh = (scores > 0.90).nonzero().squeeze()[:10]
+        idx_mh = (torch.logical_and(scores>0.7, scores<0.8)).nonzero().squeeze()[:10]
+        idx_mm = (torch.logical_and(scores>0.45, scores<0.55)).nonzero().squeeze()[:10]
+        idx_ml = (torch.logical_and(scores>0.2, scores<0.3)).nonzero().squeeze()[:10]
+        idx_ll = (scores<0.1).nonzero().squeeze()[:10]
+        # get `n_conceptograms` random samples for each score interval
+        idx = torch.hstack([
+            idx_hh[torch.randperm(idx_hh.shape[0])[:n_conceptograms]],
+            idx_mh[torch.randperm(idx_mh.shape[0])[:n_conceptograms]],
+            idx_mm[torch.randperm(idx_mm.shape[0])[:n_conceptograms]],
+            idx_ml[torch.randperm(idx_ml.shape[0])[:n_conceptograms]],
+            idx_ll[torch.randperm(idx_ll.shape[0])[:n_conceptograms]]
+            ]).numpy()  
+
+        plot_conceptogram(
+                path = phs_path,
+                name = phs_name,
+                corevectors = cv,
+                peepholes = ph,
+                portion = 'test',
+                samples = idx,
+                target_layers = target_layers,
+                classes = ds._classes,
+                alt_score = scores[idx],
+                alt_score_name = 'CL score',
+                verbose = verbose,
                 )
