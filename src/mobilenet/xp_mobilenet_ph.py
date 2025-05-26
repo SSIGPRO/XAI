@@ -33,7 +33,7 @@ import torch.nn as nn
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    #device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     #device = torch.device("cpu")
     device = torch.device("cuda:3")
     print(f"Using {device} device")
@@ -73,13 +73,13 @@ if __name__ == "__main__":
             #'features.11.conv.0.0', 'features.11.conv.1.0','features.11.conv.2', #B5
             #'features.12.conv.0.0', 'features.12.conv.1.0', 'features.12.conv.2', #B5
             #'features.13.conv.0.0', 
-            'features.13.conv.1.0', #'features.13.conv.2', #B5
+            #'features.13.conv.1.0', #'features.13.conv.2', #B5
             #'features.14.conv.0.0', 
-            'features.14.conv.1.0',#'features.14.conv.2', #B6
+            #'features.14.conv.1.0',#'features.14.conv.2', #B6
             #'features.15.conv.0.0', 
-            'features.15.conv.1.0', #'features.15.conv.2', #B6
+            #'features.15.conv.1.0', #'features.15.conv.2', #B6
             #'features.16.conv.0.0', 
-            'features.16.conv.1.0','features.16.conv.2', #B6
+            #'features.16.conv.1.0','features.16.conv.2', #B6
             'features.17.conv.0.0', #'features.17.conv.1.0', 'features.17.conv.2', #B7
             'classifier.1'
             ]
@@ -137,7 +137,7 @@ if __name__ == "__main__":
             channel_wise = False,
             verbose = verbose
             )
-    
+
     for k in model._svds.keys():
         for kk in model._svds[k].keys():
             print('svd shapes: ', k, kk, model._svds[k][kk].shape)
@@ -157,12 +157,11 @@ if __name__ == "__main__":
             ax.set_zlabel('EigenVec')
         plt.savefig((svds_path/(svds_name+'/'+k+'.png')).as_posix(), dpi=300, bbox_inches='tight')
         plt.close()
-    #quit()
+
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    dss = ds._dss
-    #dss = random_subsampling(ds._dss, 0.05)
+    random_subsampling(ds, 0.025)
 
     corevecs = CoreVectors(
         path = cvs_path,
@@ -207,26 +206,26 @@ if __name__ == "__main__":
             #                        reduct_m=model._svds['features.12.conv.1.0']['Vh'], 
             #                        layer = model._target_modules['features.12.conv.1.0'],
             #                        device=device),
-            'features.13.conv.1.0': partial(svd_Conv2D,
-                                   reduct_m=model._svds['features.13.conv.1.0']['Vh'], 
-                                   layer = model._target_modules['features.13.conv.1.0'],
-                                   device=device),
-            'features.14.conv.1.0': partial(svd_Conv2D,
-                                   reduct_m=model._svds['features.14.conv.1.0']['Vh'], 
-                                   layer = model._target_modules['features.14.conv.1.0'],
-                                   device=device),
-            'features.15.conv.1.0': partial(svd_Conv2D,
-                                   reduct_m=model._svds['features.15.conv.1.0']['Vh'], 
-                                   layer = model._target_modules['features.15.conv.1.0'],
-                                   device=device),
-            'features.16.conv.1.0': partial(svd_Conv2D,       
-                                   reduct_m=model._svds['features.16.conv.1.0']['Vh'], 
-                                   layer = model._target_modules['features.16.conv.1.0'],
-                                   device=device), 
-            'features.16.conv.2': partial(svd_Conv2D,
-                                   reduct_m=model._svds['features.16.conv.2']['Vh'], 
-                                   layer = model._target_modules['features.16.conv.2'],
-                                   device=device),
+            #'features.13.conv.1.0': partial(svd_Conv2D,
+            #                       reduct_m=model._svds['features.13.conv.1.0']['Vh'], 
+            #                       layer = model._target_modules['features.13.conv.1.0'],
+            #                       device=device),
+            #'features.14.conv.1.0': partial(svd_Conv2D,
+            #                       reduct_m=model._svds['features.14.conv.1.0']['Vh'], 
+            #                       layer = model._target_modules['features.14.conv.1.0'],
+            #                       device=device),
+            #'features.15.conv.1.0': partial(svd_Conv2D,
+            #                       reduct_m=model._svds['features.15.conv.1.0']['Vh'], 
+            #                       layer = model._target_modules['features.15.conv.1.0'],
+            #                       device=device),
+            #'features.16.conv.1.0': partial(svd_Conv2D,       
+            #                       reduct_m=model._svds['features.16.conv.1.0']['Vh'], 
+            #                       layer = model._target_modules['features.16.conv.1.0'],
+            #                       device=device), 
+            #'features.16.conv.2': partial(svd_Conv2D,
+            #                       reduct_m=model._svds['features.16.conv.2']['Vh'], 
+            #                       layer = model._target_modules['features.16.conv.2'],
+            #                       device=device),
             'features.17.conv.0.0': partial(svd_Conv2D,
                                    reduct_m=model._svds['features.17.conv.0.0']['Vh'], 
                                    layer = model._target_modules['features.17.conv.0.0'],
@@ -289,21 +288,21 @@ if __name__ == "__main__":
 
 
     cv_parsers = {
-        'features.13.conv.1.0': partial(trim_corevectors,
-                          module = 'features.13.conv.1.0',
-                          cv_dim = cv_dim),
-        'features.14.conv.1.0': partial(trim_corevectors,
-                          module = 'features.14.conv.1.0',
-                          cv_dim = cv_dim),        
-        'features.15.conv.1.0': partial(trim_corevectors,
-                          module = 'features.15.conv.1.0',
-                          cv_dim = cv_dim),
-        'features.16.conv.1.0': partial(trim_corevectors,
-                          module = 'features.16.conv.1.0',
-                          cv_dim = cv_dim),
-        'features.16.conv.2': partial(trim_corevectors,
-                          module = 'features.16.conv.2',
-                          cv_dim = cv_dim),
+        #'features.13.conv.1.0': partial(trim_corevectors,
+        #                  module = 'features.13.conv.1.0',
+        #                  cv_dim = cv_dim),
+        #'features.14.conv.1.0': partial(trim_corevectors,
+        #                  module = 'features.14.conv.1.0',
+        #                  cv_dim = cv_dim),        
+        #'features.15.conv.1.0': partial(trim_corevectors,
+        #                  module = 'features.15.conv.1.0',
+        #                  cv_dim = cv_dim),
+        #'features.16.conv.1.0': partial(trim_corevectors,
+        #                  module = 'features.16.conv.1.0',
+        #                  cv_dim = cv_dim),
+        #'features.16.conv.2': partial(trim_corevectors,
+        #                  module = 'features.16.conv.2',
+        #                  cv_dim = cv_dim),
         'features.17.conv.0.0': partial(trim_corevectors,   
                           module = 'features.17.conv.0.0',
                           cv_dim = cv_dim),
@@ -313,11 +312,11 @@ if __name__ == "__main__":
     }
 
     feature_sizes = {
-        'features.13.conv.1.0': cv_dim,
-        'features.14.conv.1.0': cv_dim,
-        'features.15.conv.1.0': cv_dim,
-        'features.16.conv.1.0': cv_dim,
-        'features.16.conv.2': cv_dim,
+        #'features.13.conv.1.0': cv_dim,
+        #'features.14.conv.1.0': cv_dim,
+        #'features.15.conv.1.0': cv_dim,
+        #'features.16.conv.1.0': cv_dim,
+        #'features.16.conv.2': cv_dim,
         'features.17.conv.0.0': cv_dim,
         'classifier.1': 100,
     }
@@ -389,10 +388,4 @@ if __name__ == "__main__":
             verbose=verbose
             )
 
-        evaluate_dists(
-            peepholes = ph,
-            score_type = 'max',
-            dataset = cv._dss,
-            bins = 20
-            )
 
