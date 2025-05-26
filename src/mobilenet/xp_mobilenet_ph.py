@@ -35,7 +35,7 @@ if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     #device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     #device = torch.device("cpu")
-    device = torch.device("cuda:3")
+    device = torch.device("cuda:5")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -73,7 +73,7 @@ if __name__ == "__main__":
             #'features.11.conv.0.0', 'features.11.conv.1.0','features.11.conv.2', #B5
             #'features.12.conv.0.0', 'features.12.conv.1.0', 'features.12.conv.2', #B5
             #'features.13.conv.0.0', 
-            #'features.13.conv.1.0', #'features.13.conv.2', #B5
+            'features.13.conv.1.0', #'features.13.conv.2', #B5
             #'features.14.conv.0.0', 
             #'features.14.conv.1.0',#'features.14.conv.2', #B6
             #'features.15.conv.0.0', 
@@ -97,7 +97,7 @@ if __name__ == "__main__":
             transform = ds_transform,
             seed = seed,
             )
-    
+
     #--------------------------------
     # Model 
     #--------------------------------
@@ -123,7 +123,6 @@ if __name__ == "__main__":
     
     model.set_target_modules(target_modules=target_layers, verbose=False)
 
-
     #--------------------------------
     # SVDs 
     #--------------------------------
@@ -137,26 +136,6 @@ if __name__ == "__main__":
             channel_wise = False,
             verbose = verbose
             )
-
-    for k in model._svds.keys():
-        for kk in model._svds[k].keys():
-            print('svd shapes: ', k, kk, model._svds[k][kk].shape)
-        s = model._svds[k]['s']
-        if len(s.shape) == 1:
-            plt.figure()
-            plt.plot(s, '-')
-            plt.xlabel('Rank')
-            plt.ylabel('EigenVec')
-        else:
-            fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-            _x = torch.linspace(0, s.shape[1]-1, s.shape[1])
-            for r in range(s.shape[0]):
-                plt.plot(xs=_x, ys=s[r,:], zs=r, zdir='y')
-            ax.set_xlabel('Rank')
-            ax.set_ylabel('Channel')
-            ax.set_zlabel('EigenVec')
-        plt.savefig((svds_path/(svds_name+'/'+k+'.png')).as_posix(), dpi=300, bbox_inches='tight')
-        plt.close()
 
     #--------------------------------
     # CoreVectors 
@@ -206,10 +185,10 @@ if __name__ == "__main__":
             #                        reduct_m=model._svds['features.12.conv.1.0']['Vh'], 
             #                        layer = model._target_modules['features.12.conv.1.0'],
             #                        device=device),
-            #'features.13.conv.1.0': partial(svd_Conv2D,
-            #                       reduct_m=model._svds['features.13.conv.1.0']['Vh'], 
-            #                       layer = model._target_modules['features.13.conv.1.0'],
-            #                       device=device),
+            'features.13.conv.1.0': partial(svd_Conv2D,
+                                   reduct_m=model._svds['features.13.conv.1.0']['Vh'], 
+                                   layer = model._target_modules['features.13.conv.1.0'],
+                                   device=device),
             #'features.14.conv.1.0': partial(svd_Conv2D,
             #                       reduct_m=model._svds['features.14.conv.1.0']['Vh'], 
             #                       layer = model._target_modules['features.14.conv.1.0'],
@@ -288,9 +267,9 @@ if __name__ == "__main__":
 
 
     cv_parsers = {
-        #'features.13.conv.1.0': partial(trim_corevectors,
-        #                  module = 'features.13.conv.1.0',
-        #                  cv_dim = cv_dim),
+        'features.13.conv.1.0': partial(trim_corevectors,
+                          module = 'features.13.conv.1.0',
+                          cv_dim = cv_dim),
         #'features.14.conv.1.0': partial(trim_corevectors,
         #                  module = 'features.14.conv.1.0',
         #                  cv_dim = cv_dim),        
@@ -312,7 +291,7 @@ if __name__ == "__main__":
     }
 
     feature_sizes = {
-        #'features.13.conv.1.0': cv_dim,
+        'features.13.conv.1.0': cv_dim,
         #'features.14.conv.1.0': cv_dim,
         #'features.15.conv.1.0': cv_dim,
         #'features.16.conv.1.0': cv_dim,
