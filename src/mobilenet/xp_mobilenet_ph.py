@@ -32,10 +32,10 @@ import torchvision
 import torch.nn as nn
 
 if __name__ == "__main__":
-    torch.cuda.empty_cache()
     use_cuda = torch.cuda.is_available()
-    cuda_index = torch.cuda.device_count() - 1
-    device = torch.device(f"cuda:{cuda_index}" if use_cuda else "cpu")
+    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    #device = torch.device("cpu")
+    device = torch.device("cuda:3")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
 
-    svds_path = Path.cwd()/'data/svds'
+    svds_path = Path.cwd()/'data'
     svds_name = 'svds' 
     
     cvs_path = Path.cwd()/'data/corevectors'
@@ -66,14 +66,22 @@ if __name__ == "__main__":
     phs_path = Path.cwd()/'data/data200clusters/peepholes'
     phs_name = 'peepholes'
 
-    verbose = False
+    verbose = True
 
-    target_layers = [ 'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0',
+    target_layers = [ #'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0',
                     # 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
-        #    'features.11.conv.1.0', 'features.12.conv.1.0',
-        #    'features.13.conv.1.0', 'features.14.conv.1.0', 
-        #    'features.15.conv.1.0', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0',
-        #    'classifier.1'
+            #'features.11.conv.0.0', 'features.11.conv.1.0','features.11.conv.2', #B5
+            #'features.12.conv.0.0', 'features.12.conv.1.0', 'features.12.conv.2', #B5
+            #'features.13.conv.0.0', 
+            'features.13.conv.1.0', #'features.13.conv.2', #B5
+            #'features.14.conv.0.0', 
+            'features.14.conv.1.0',#'features.14.conv.2', #B6
+            #'features.15.conv.0.0', 
+            'features.15.conv.1.0', #'features.15.conv.2', #B6
+            #'features.16.conv.0.0', 
+            'features.16.conv.1.0','features.16.conv.2', #B6
+            'features.17.conv.0.0', #'features.17.conv.1.0', 'features.17.conv.2', #B7
+            'classifier.1'
             ]
 
     #--------------------------------
@@ -125,8 +133,8 @@ if __name__ == "__main__":
             name = svds_name,
             target_modules = target_layers,
             sample_in = ds._dss['train'][0][0],
-            rank = 10,
-            channel_wise = True,
+            rank = 300,
+            channel_wise = False,
             verbose = verbose
             )
     
@@ -149,7 +157,7 @@ if __name__ == "__main__":
             ax.set_zlabel('EigenVec')
         plt.savefig((svds_path/(svds_name+'/'+k+'.png')).as_posix(), dpi=300, bbox_inches='tight')
         plt.close()
-    quit()
+    #quit()
     #--------------------------------
     # CoreVectors 
     #--------------------------------
