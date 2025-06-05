@@ -214,28 +214,32 @@ if __name__ == "__main__":
     phs_path = Path("/srv/newpenny/XAI/CN/data200cvdim300/peepholes")
     phs_name = 'peepholes'
 
-    target_layers = ['features.3.conv.1.0',
-        #'features.4.conv.1.0', 'features.5.conv.1.0', 
-        'features.6.conv.1.0',
-                # 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
-        #'features.11.conv.0.0', 'features.11.conv.1.0','features.11.conv.2', #B5
-        #'features.12.conv.0.0', 'features.12.conv.1.0', 'features.12.conv.2', #B5
-        #'features.13.conv.0.0', 
-        'features.13.conv.1.0', #'features.13.conv.2', #B5
-        #'features.14.conv.0.0', 
-        'features.14.conv.1.0',#'features.14.conv.2', #B6
-        #'features.15.conv.0.0', 
-        'features.15.conv.1.0', #'features.15.conv.2', #B6
-        #'features.16.conv.0.0', 
-        'features.16.conv.1.0','features.16.conv.2', #B6
-        'features.17.conv.0.0', #'features.17.conv.1.0', 'features.17.conv.2', #B7
+    target_layers = [ 
+        'features.1.conv.0.0', 'features.1.conv.1',
+        'features.2.conv.0.0','features.2.conv.1.0', 'features.2.conv.2',
+        'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2',
+        'features.4.conv.0.0','features.4.conv.1.0', 'features.4.conv.2',
+        'features.5.conv.0.0', 'features.5.conv.1.0','features.5.conv.2', 
+        'features.6.conv.0.0', 'features.6.conv.1.0', 'features.6.conv.2', #B3
+        'features.7.conv.0.0', 'features.7.conv.1.0', 'features.7.conv.2', #B3
+        'features.8.conv.0.0', 'features.8.conv.1.0', 'features.8.conv.2', #B4
+        'features.9.conv.0.0', 'features.9.conv.1.0', 'features.9.conv.2', #B4
+        'features.10.conv.0.0', 'features.10.conv.1.0', 'features.10.conv.2', #B5
+        'features.11.conv.0.0', 'features.11.conv.1.0','features.11.conv.2', #B5
+        'features.12.conv.0.0', 'features.12.conv.1.0', 'features.12.conv.2', #B5
+        'features.13.conv.0.0', 'features.13.conv.1.0', 'features.13.conv.2', #B5
+        'features.14.conv.0.0', 'features.14.conv.1.0','features.14.conv.2', #B6
+        'features.15.conv.0.0', 'features.15.conv.1.0', 'features.15.conv.2', #B6
+        'features.16.conv.0.0', 'features.16.conv.1.0','features.16.conv.2', #B6
+        'features.17.conv.0.0', 'features.17.conv.1.0', 'features.17.conv.2', #B7
+        'features.18.0', 
         'classifier.1'
-        ]
+ ]
     
     cv_dim = 300
     n_cluster = 200
     
-    superclass = False
+    superclass = True
 
     #--------------------------------
     # Dataset
@@ -308,6 +312,7 @@ if __name__ == "__main__":
 
     if superclass:
          cv_parsers = {
+             
         'features.13.conv.1.0': partial(trim_corevectors,
                           module = 'features.13.conv.1.0',
                           cv_dim = cv_dim,
@@ -440,24 +445,24 @@ if __name__ == "__main__":
                 n_threads = 32,
                 verbose = False
                 )
-        print_empirical_scores(ph._drillers, 0.75)
+        #print_empirical_scores(ph._drillers, 0.75)
 
         #empirical_posterior_heatmaps(ph._drillers, '/home/claranunesbarrancos/repos/XAI/src/mobilenet/empp/300cvdim_150clusters')
 
-        # get_conceptogram(
-        #     path = '/home/claranunesbarrancos/repos/XAI/src/mobilenet/superconcepto',
-        #     name = 'cp_300cvdim_100clusters'
-        #     corevecs = cv,
-        #     peepholes =ph,
-        #     portion = 'test',
-        #     sample = 9999,
-        #     target_layers = target_layers,
-        #     classes = ds._classes,
-        #     ticks = target_layers,
-        #     label_key = 'label'
-        #     pred_fn = pred_fun
-        #     ds = ds,
-        # )
+        get_conceptogram(
+            path = '/home/claranunesbarrancos/repos/XAI/src/mobilenet/superconceptos',
+            name = 'flower'
+            corevecs = cv,
+            peepholes = ph,
+            portion = 'test',
+            sample = [5, 29, 67, 69, 76, 82],
+            target_layers = target_layers,
+            classes = ds._classes,
+            ticks = target_layers,
+            krows = 5,
+            pred_fn = superclass_pred_fn(),
+            ds = ds,
+        )
 
 
 
