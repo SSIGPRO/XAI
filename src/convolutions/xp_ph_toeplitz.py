@@ -11,12 +11,12 @@ from matplotlib import pyplot as plt
 from peepholelib.datasets.cifar import Cifar
 from peepholelib.datasets.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.models.model_wrap import ModelWrap 
-from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd, conv2d_kernel_svd
+from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
 
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection, conv2d_kernel_svd_projection
+from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
 
-from peepholelib.peepholes.parsers import trim_corevectors, trim_channelwise_corevectors, trim_kernel_corevectors
+from peepholelib.peepholes.parsers import trim_corevectors
 from peepholelib.peepholes.classifiers.tkmeans import KMeans as tKMeans 
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
@@ -50,16 +50,16 @@ if __name__ == "__main__":
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
     
-    svds_path = Path.cwd()/'../data'
+    svds_path = Path.cwd()/'../../data3'
     svds_name = 'svds' 
     
-    cvs_path = Path.cwd()/'../data/corevectors'
+    cvs_path = Path.cwd()/'../../data3/corevectors'
     cvs_name = 'corevectors'
 
-    drill_path = Path.cwd()/'../data/drillers'
+    drill_path = Path.cwd()/'../../data3/drillers'
     drill_name = 'classifier'
 
-    phs_path = Path.cwd()/'../data/peepholes'
+    phs_path = Path.cwd()/'../../data3/peepholes'
     phs_name = 'peepholes'
     
     verbose = True 
@@ -74,11 +74,9 @@ if __name__ == "__main__":
             'classifier.6',
             ]
     
-    svd_rank = 300
+    svd_rank = 200
     n_cluster = 200
-    features24_cv_dim = 2
-    features26_cv_dim = 5
-    features28_cv_dim = 150
+    features_cv_dim = 196
     classifier_cv_dim = 150
     n_conceptograms = 10
     #--------------------------------
@@ -128,13 +126,15 @@ if __name__ == "__main__":
     #--------------------------------
     svd_fns = {
             'features.24': partial(
-                conv2d_kernel_svd, 
+                conv2d_toeplitz_svd, 
+                rank = svd_rank,
+                channel_wise = False,
                 device = device,
                 ),
             'features.26': partial(
                 conv2d_toeplitz_svd, 
                 rank = svd_rank,
-                channel_wise = True,
+                channel_wise = False,
                 device = device,
                 ),
             'features.28': partial(
@@ -168,33 +168,10 @@ if __name__ == "__main__":
             )
     print('time: ', time()-t0)
 
-    '''
-    print('\n----------- svds:')
-    for k in model._svds.keys():
-        for kk in model._svds[k].keys():
-            print('svd shapes: ', k, kk, model._svds[k][kk].shape)
-        s = model._svds[k]['s']
-        if len(s.shape) == 1:
-            plt.figure()
-            plt.plot(s, '-')
-            plt.xlabel('Rank')
-            plt.ylabel('EigenVec')
-        else:
-            fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-            _x = torch.linspace(0, s.shape[1]-1, s.shape[1])
-            for r in range(s.shape[0]):
-                plt.plot(xs=_x, ys=s[r,:], zs=r, zdir='y')
-            ax.set_xlabel('Rank')
-            ax.set_ylabel('Channel')
-            ax.set_zlabel('EigenVec')
-        plt.savefig((svds_path/(svds_name+'/'+k+'.png')).as_posix(), dpi=300, bbox_inches='tight')
-        plt.close()
-    '''
-
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    random_subsampling(ds, 0.025)
+    #random_subsampling(ds, 0.025)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -205,7 +182,7 @@ if __name__ == "__main__":
     # define a dimensionality reduction function for each layer
     reduction_fns = {
             'features.24': partial(
-                conv2d_kernel_svd_projection, 
+                conv2d_toeplitz_svd_projection, 
                 svd = model._svds['features.24'], 
                 layer = model._target_modules['features.24'], 
                 device=device
@@ -247,18 +224,6 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
 
-        '''
-        # This occupies a lot of space. Only do if you need it
-        # copy dataset to activatons file
-        cv.get_activations(
-                batch_size = bs,
-                n_threads = n_threads,
-                save_input = True,
-                save_output = False,
-                verbose = verbose
-                )        
-        '''
-
         # computing the corevectors
         cv.get_coreVectors(
                 batch_size = bs,
@@ -290,19 +255,19 @@ if __name__ == "__main__":
 
     cv_parsers = {
             'features.24': partial(
-                trim_kernel_corevectors,
+                trim_corevectors,
                 module = 'features.24',
-                cv_dim = features24_cv_dim
+                cv_dim = features_cv_dim
                 ),
             'features.26': partial(
-                trim_channelwise_corevectors,
+                trim_corevectors,
                 module = 'features.26',
-                cv_dim = features26_cv_dim
+                cv_dim = features_cv_dim
                 ),
             'features.28': partial(
                 trim_corevectors,
                 module = 'features.28',
-                cv_dim = features28_cv_dim
+                cv_dim = features_cv_dim
                 ),
             'classifier.0': partial(
                 trim_corevectors,#
@@ -322,12 +287,9 @@ if __name__ == "__main__":
             }
 
     feature_sizes = {
-            # for channel_wise corevectors, the size is out_size * cv_dim
-            # TODO: get 196 from somewhere
-            'features.24': features24_cv_dim*196,
-            # for channel_wise corevectors, the size is n_channels * cv_dim
-            'features.26': features26_cv_dim*model._svds['features.26']['Vh'].shape[0],
-            'features.28': features28_cv_dim,
+            'features.24': features_cv_dim,
+            'features.26': features_cv_dim,
+            'features.28': features_cv_dim,
             'classifier.0': classifier_cv_dim,
             'classifier.3': classifier_cv_dim,
             'classifier.6': 100#classifier_cv_dim,
