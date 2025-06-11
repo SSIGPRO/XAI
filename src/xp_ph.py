@@ -30,8 +30,12 @@ from cuda_selector import auto_cuda
 
 
 if __name__ == "__main__":
+#     use_cuda = torch.cuda.is_available()
+#     device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+#     print(f"Using {device} device")
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    cuda_index = torch.cuda.device_count() - 1
+    device = torch.device(f"cuda:{cuda_index}" if use_cuda else "cpu")
     print(f"Using {device} device")
 
     #--------------------------------
