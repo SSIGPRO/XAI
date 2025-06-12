@@ -1,13 +1,10 @@
 import sys
 from pathlib import Path as Path
-
-import numpy as np
-import torchvision
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
-
 
 # torch stuff
 import torch
+import torchvision
 import pickle
 import torch.nn.functional as F
 
@@ -19,37 +16,16 @@ from peepholelib.peepholes.parsers import trim_corevectors
 from peepholelib.coreVectors.coreVectors import CoreVectors 
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
-from peepholelib.utils.conceptograms import  get_conceptogram
+from peepholelib.utils.conceptograms import  *
+from peepholelib.utils.mappings import coarse_to_fine_cifar100 as coarse_to_fine
 from peepholelib.utils.viz_empp import *
 
 # python stuff
 import pandas as pd
 from pathlib import Path as Path
 from functools import partial
+import numpy as np
 
-
-coarse_to_fine = {
-        'aquatic_mammals': ['beaver', 'dolphin', 'otter', 'seal', 'whale'],
-        'fish': ['aquarium_fish', 'flatfish', 'ray', 'shark', 'trout'],
-        'flowers': ['orchid', 'poppy', 'rose', 'sunflower', 'tulip'],
-        'food_containers': ['bottle', 'bowl', 'can', 'cup', 'plate'],
-        'fruit_and_vegetables': ['apple', 'mushroom', 'orange', 'pear', 'sweet_pepper'],
-        'household_electrical_devices': ['clock', 'keyboard', 'lamp', 'telephone', 'television'],
-        'household_furniture': ['bed', 'chair', 'couch', 'table', 'wardrobe'],
-        'insects': ['bee', 'beetle', 'butterfly', 'caterpillar', 'cockroach'],
-        'large_carnivores': ['bear', 'leopard', 'lion', 'tiger', 'wolf'],
-        'large_man-made_outdoor_things': ['bridge', 'castle', 'house', 'road', 'skyscraper'],
-        'large_natural_outdoor_scenes': ['cloud', 'forest', 'mountain', 'plain', 'sea'],
-        'large_omnivores_and_herbivores': ['camel', 'cattle', 'chimpanzee', 'elephant', 'kangaroo'],
-        'medium_mammals': ['fox', 'porcupine', 'possum', 'raccoon', 'skunk'],
-        'non-insect_invertebrates': ['crab', 'lobster', 'snail', 'spider', 'worm'],
-        'people': ['baby', 'boy', 'girl', 'man', 'woman'],
-        'reptiles': ['crocodile', 'dinosaur', 'lizard', 'snake', 'turtle'],
-        'small_mammals': ['hamster', 'mouse', 'rabbit', 'shrew', 'squirrel'],
-        'trees': ['maple_tree', 'oak_tree', 'palm_tree', 'pine_tree', 'willow_tree'],
-        'vehicles_1': ['bicycle', 'bus', 'motorcycle', 'pickup_truck', 'train'],
-        'vehicles_2': ['lawn_mower', 'rocket', 'streetcar', 'tank', 'tractor']
-    }
 
 def superclass_pred_fn():
     """
@@ -97,107 +73,6 @@ def superclass_pred_fn():
     print("pred_fn ", pred_fn)
     return pred_fn
 
-def get_all_class_names(ds, superclass):
-    if ds._classes is None:
-        raise RuntimeError("Dataset not loaded. Please run load_data() first.")
-
-    if not superclass:
-        return [ds._classes[i] for i in sorted(ds._classes)]
-
-    # Handle superclass logic (only applies to CIFAR-100)
-    if ds.dataset != 'CIFAR100':
-        raise ValueError("Superclasses are only defined for CIFAR100.")
-
-    meta_path = '/srv/newpenny/dataset/CIFAR100/cifar-100-python/meta'
-    with open(meta_path, 'rb') as f:
-        meta = pickle.load(f, encoding='latin1')
-
-    return meta['coarse_label_names']
-
-def get_indices_by_classname(ds, split: str, class_name: str):
-    """
-    Returns all indices from a dataset split that belong to the given class or superclass name.
-
-    Args:
-        ds (DatasetBase): Instance of a DatasetBase dataset (e.g., Cifar).
-        split (str): One of 'train', 'val', or 'test'.
-        class_name (str): Class name or superclass name.
-
-    Returns:
-        List[int]: List of matching indices.
-    """
-    if ds._dss is None:
-        raise RuntimeError("Dataset not loaded. Please run load_data() first.")
-    if split not in ds._dss:
-        raise ValueError(f"Invalid split '{split}'. Must be one of: {list(ds._dss.keys())}")
-
-    split_data = ds._dss[split]
-
-    if ds.dataset == 'CIFAR100':
-        # Load CIFAR-100 meta
-        meta_path = '/srv/newpenny/dataset/CIFAR100/cifar-100-python/meta'
-        with open(meta_path, 'rb') as f:
-            meta = pickle.load(f, encoding='latin1')
-
-        fine_to_idx = {v: k for k, v in ds._classes.items()}
-
-        # if superclass
-        if class_name in coarse_to_fine: 
-            fine_classes = coarse_to_fine[class_name]
-            target_class_indices = {fine_to_idx[c] for c in fine_classes}
-            return [i for i, (_, y) in enumerate(split_data) if y in target_class_indices]
-    
-    # if not superclass
-    class_to_idx = {v: k for k, v in ds._classes.items()}
-    if class_name not in class_to_idx:
-        raise ValueError(f"Class name '{class_name}' not found in dataset classes.")
-    
-    target_class_idx = class_to_idx[class_name]
-    return [i for i, (_, y) in enumerate(split_data) if y == target_class_idx]
-
-from torch.nn.functional import softmax
-def get_filtered_samples(**kwargs):
-    """
-    Args:
-        ds: Dataset
-        cvs: Corevectors 
-        split (str): Dataset split ('train', 'val', or 'test').
-        class_name (str): Name of the class or superclass to filter.
-        correct (bool): Whether to select only correctly or incorrectly predicted samples.
-        conf_range (list): Confidence range [min, max] (in percent, 0–100 scale).
-        pred_fn (callable): Function to convert model output to probabilities (default: softmax).
-
-    Returns:
-        List[int]: List of sample indices based on class name, prediction, and confidence range
-    """
-    ds = kwargs['ds']
-    cvs = kwargs['corevectors'] 
-    class_name = kwargs['class_name'] 
-    correct = kwargs['correct'] if 'correct' in kwargs else None
-    conf_range = kwargs['conf_range'] if 'conf_range' in kwargs else [0, 100]
-    split = kwargs['split'] if 'split' in kwargs else 'test'
-    pred_fn = kwargs['pred_fn'] if 'pred_fn' in kwargs else partial(softmax, dim=0)
-
-    class_indices = get_indices_by_classname(ds, split, class_name)
-    
-    filtered_indices = []
-    for idx in class_indices:
-        _d = cvs._dss[split][idx]
-        pred = int(_d['pred'])
-        label = int(_d['label'])
-        output = pred_fn(_d['output'])
-        conf = output.max().item() * 100 
-        
-        if correct is not None:
-                    is_correct = (pred == label)
-                    if is_correct != correct:
-                        continue
-
-        if conf_range[0] <= conf <= conf_range[1]:
-            filtered_indices.append(idx)
-        
-    return filtered_indices
-
 def compute_average_confidence(cvs, indices, split='test', pred_fn=None):
     """
     Computes the average confidence for a list of sample indices.
@@ -230,7 +105,6 @@ def compute_average_confidence(cvs, indices, split='test', pred_fn=None):
 
     return total_conf / len(indices)
 
- 
 
 if __name__ == "__main__":
 
@@ -298,8 +172,7 @@ if __name__ == "__main__":
     ]
     
     cv_dim = 300
-    n_cluster = 100
-    
+    n_cluster = 100  
     superclass = False
 
     #--------------------------------
@@ -318,12 +191,6 @@ if __name__ == "__main__":
             seed = seed,
             )
     
-
-    #print("class names ", get_all_class_names(ds, True))
-    # indexes = get_indices_by_classname(ds, 'test', 'flowers')
-    # print("indexes ", indexes)
-    # quit()
-
     #--------------------------------
     # Model 
     #--------------------------------
@@ -1031,12 +898,12 @@ if __name__ == "__main__":
         samples = get_filtered_samples(
             ds = ds,
             corevectors = cv,
-            class_name = 'trees',
+            #class_name = 'trees',
             correct = True,
             #conf_range = [80,100],
         )
-        print (len(samples), 'samples')
-        print(compute_average_confidence(cv, samples))
+        print ('samples: ', samples)
+        #print(compute_average_confidence(cv, samples))
         quit()
 
         # print(samples)
