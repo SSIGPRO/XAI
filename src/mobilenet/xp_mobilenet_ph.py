@@ -24,6 +24,8 @@ from peepholelib.peepholes.peepholes import Peepholes
 
 from peepholelib.utils.samplers import random_subsampling 
 from peepholelib.utils.analyze import evaluate_dists 
+from peepholelib.utils.viz_empp import *
+
 
 
 
@@ -62,10 +64,10 @@ if __name__ == "__main__":
     cvs_path = Path("/srv/newpenny/XAI/CN/data/corevectors")
     cvs_name = 'corevectors'
 
-    drill_path = Path("/srv/newpenny/XAI/CN/data400cvdim300/drillers")
+    drill_path = Path("/srv/newpenny/XAI/CN/data100cvdim300/drillers")
     drill_name = 'classifier'
 
-    phs_path = Path("/srv/newpenny/XAI/CN/data400cvdim300/peepholes")
+    phs_path = Path("/srv/newpenny/XAI/CN/data100cvdim300/peepholes")
     phs_name = 'peepholes'
 
     verbose = True
@@ -93,7 +95,7 @@ if __name__ == "__main__":
  ]
     
     cv_dim = 300
-    n_cluster = 400
+    n_cluster = 100
 
     #--------------------------------
     # Dataset 
@@ -721,15 +723,17 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
 
-        ph.get_scores(
-            batch_size = bs,
-            verbose=verbose
-            )
-        print(ph._phs['train']['features.3.conv.1.0']['score_max'])
-        evaluate_dists(
-            peepholes = ph,
-            score_type = 'max',
-            dataset = cv._dss,
-            bins = 20
-            )
-
+        # ph.get_scores(
+        #     batch_size = bs,
+        #     verbose=verbose
+        #     )
+        
+        # evaluate_dists(
+        #     peepholes = ph,
+        #     score_type = 'max',
+        #     dataset = cv._dss,
+        #     bins = 20
+        #     )
+        
+        get_emp_coverage_scores(ph._drillers, 0.8)
+        plot_emp_coverage_scores(ph._drillers, 0.8,  '/home/claranunesbarrancos/repos/XAI/src/mobilenet/empp/300cvdim_100clusters/emp_coverage_scores_80.png')

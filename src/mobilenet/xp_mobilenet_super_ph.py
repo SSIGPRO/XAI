@@ -41,12 +41,16 @@ import torch.nn as nn
 def from_dataset_with_superclass(batch, fine_to_coarse_index=None):
     images, labels = zip(*batch)
     images = torch.stack(images)
-    labels = torch.tensor(labels)
+    labels = torch.tensor(labels, dtype=torch.long)
 
     # Compute superclasses
     if fine_to_coarse_index is None:
         raise ValueError("You must provide `fine_to_coarse_index` to extract superclasses.")
-    superclasses = torch.tensor([fine_to_coarse_index[int(lbl)] for lbl in labels])
+    
+    superclasses = torch.tensor([
+        fine_to_coarse_index[int(lbl.item())] if isinstance(lbl, torch.Tensor) else fine_to_coarse_index[int(lbl)]
+        for lbl in labels
+    ], dtype=torch.long)
 
     return {
         'image': images,
@@ -57,8 +61,8 @@ def from_dataset_with_superclass(batch, fine_to_coarse_index=None):
 if __name__ == "__main__":
     torch.cuda.empty_cache()
     use_cuda = torch.cuda.is_available()
-    #device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
-    device = torch.device("cuda:4")
+    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    #device = torch.device("cuda:4")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -71,7 +75,7 @@ if __name__ == "__main__":
     pretrained = True
     dataset = 'CIFAR100' 
     seed = 29
-    bs = 256
+    bs = 512
     n_threads = 512
 
     model_dir = '/srv/newpenny/XAI/models'
@@ -83,7 +87,7 @@ if __name__ == "__main__":
     cvs_path = Path("/srv/newpenny/XAI/CN/superdata/corevectors")
     cvs_name = 'corevectors'
     
-    drill_path = Path("/srv/newpenny/XAI/CN//superdata/data20cvdim300/drillers")
+    drill_path = Path("/srv/newpenny/XAI/CN/superdata/data20cvdim300/drillers")
     drill_name = 'classifier'
 
     phs_path = Path("/srv/newpenny/XAI/CN/superdata/data20cvdim300/peepholes")
@@ -438,26 +442,9 @@ if __name__ == "__main__":
             ds_parser=partial(from_dataset_with_superclass, fine_to_coarse_index=fine_to_coarse_index),
             key_list=['image', 'label', 'superclass']
         )
-        
-        
-        cv.get_coreVectors(
-            batch_size = bs,
-            reduction_fns = reduction_fns,
-            n_threads = n_threads,
-            save_input = True,
-            save_output = False,
-            verbose = verbose
-        )
 
-        if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
-            cv.normalize_corevectors(
-                wrt = 'train',
-                #from_file = cvs_path/(cvs_name+'.normalization.pt'),
-                to_file = cvs_path/(cvs_name+'.normalization.pt'),
-                batch_size = bs,
-                n_threads = n_threads,
-                verbose=verbose
-            )
+        print("Keys in _dss[train]:", list(cv._dss['train'].keys()))
+        print("Shape of superclass:", cv._dss['train']['superclass'].shape)
         
         for portion, _dss in cv._dss.items():
             
@@ -494,7 +481,23 @@ if __name__ == "__main__":
 
         print(cv._dss['train']['superclass'], cv._dss['val']['superclass'], cv._dss['test']['superclass'])  
 
-
+        cv.get_coreVectors(
+            batch_size = bs,
+            reduction_fns = reduction_fns,
+            n_threads = n_threads,
+            save_input = True,
+            save_output = False,
+            verbose = verbose
+        )
+        if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
+            cv.normalize_corevectors(
+                wrt = 'train',
+                #from_file = cvs_path/(cvs_name+'.normalization.pt'),
+                to_file = cvs_path/(cvs_name+'.normalization.pt'),
+                batch_size = bs,
+                n_threads = n_threads,
+                verbose=verbose
+            )
 
     #--------------------------------
     # Peepholes
@@ -506,147 +509,147 @@ if __name__ == "__main__":
         )
 
     cv_parsers = {
-        'features.1.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.1.conv.0.0': partial(trim_corevectors,
                           module = 'features.1.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.1.conv.1': partial(trim_channelwise_corevectors,
+        'features.1.conv.1': partial(trim_corevectors,
                           module = 'features.1.conv.1',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.2.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.2.conv.0.0': partial(trim_corevectors,
                           module = 'features.2.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.2.conv.1.0': partial(trim_channelwise_corevectors,    
+        'features.2.conv.1.0': partial(trim_corevectors,    
                           module = 'features.2.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.2.conv.2': partial(trim_channelwise_corevectors,
+        'features.2.conv.2': partial(trim_corevectors,
                           module = 'features.2.conv.2',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.3.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.3.conv.0.0': partial(trim_corevectors,
                           module = 'features.3.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.3.conv.1.0': partial(trim_channelwise_corevectors,
+        'features.3.conv.1.0': partial(trim_corevectors,
                           module = 'features.3.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.3.conv.2': partial(trim_channelwise_corevectors,
+        'features.3.conv.2': partial(trim_corevectors,
                           module = 'features.3.conv.2',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.4.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.4.conv.0.0': partial(trim_corevectors,
                           module = 'features.4.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.4.conv.1.0': partial(trim_channelwise_corevectors,
+        'features.4.conv.1.0': partial(trim_corevectors,
                           module = 'features.4.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.4.conv.2': partial(trim_channelwise_corevectors,
+        'features.4.conv.2': partial(trim_corevectors,
                           module = 'features.4.conv.2',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.5.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.5.conv.0.0': partial(trim_corevectors,
                           module = 'features.5.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.5.conv.1.0': partial(trim_channelwise_corevectors,
+        'features.5.conv.1.0': partial(trim_corevectors,
                           module = 'features.5.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.5.conv.2': partial(trim_channelwise_corevectors,
+        'features.5.conv.2': partial(trim_corevectors,
                           module = 'features.5.conv.2',
                           cv_dim = cv_dim,
                           label_key = 'superclass'), 
-        'features.6.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.6.conv.0.0': partial(trim_corevectors,
                           module = 'features.6.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.6.conv.1.0': partial(trim_channelwise_corevectors,
+        'features.6.conv.1.0': partial(trim_corevectors,
                           module = 'features.6.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.6.conv.2': partial(trim_channelwise_corevectors,
+        'features.6.conv.2': partial(trim_corevectors,
                           module = 'features.6.conv.2',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.7.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.7.conv.0.0': partial(trim_corevectors,
                           module = 'features.7.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.7.conv.1.0': partial(trim_channelwise_corevectors,
+        'features.7.conv.1.0': partial(trim_corevectors,
                           module = 'features.7.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.7.conv.2': partial(trim_channelwise_corevectors,
+        'features.7.conv.2': partial(trim_corevectors,
                           module = 'features.7.conv.2',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.8.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.8.conv.0.0': partial(trim_corevectors,
                           module = 'features.8.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.8.conv.1.0': partial(trim_channelwise_corevectors,
+        'features.8.conv.1.0': partial(trim_corevectors,
                           module = 'features.8.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.8.conv.2': partial(trim_channelwise_corevectors, 
+        'features.8.conv.2': partial(trim_corevectors, 
                             module = 'features.8.conv.2',
                             cv_dim = cv_dim,
                             label_key = 'superclass'),
-        'features.9.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.9.conv.0.0': partial(trim_corevectors,
                           module = 'features.9.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.9.conv.1.0': partial(trim_channelwise_corevectors,
+        'features.9.conv.1.0': partial(trim_corevectors,
                           module = 'features.9.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.9.conv.2': partial(trim_channelwise_corevectors,
+        'features.9.conv.2': partial(trim_corevectors,
                           module = 'features.9.conv.2',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.10.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.10.conv.0.0': partial(trim_corevectors,
                           module = 'features.10.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.10.conv.1.0': partial(trim_channelwise_corevectors,
+        'features.10.conv.1.0': partial(trim_corevectors,
                           module = 'features.10.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.10.conv.2': partial(trim_channelwise_corevectors,
+        'features.10.conv.2': partial(trim_corevectors,
                           module = 'features.10.conv.2',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.11.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.11.conv.0.0': partial(trim_corevectors,
                           module = 'features.11.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.11.conv.1.0': partial(trim_channelwise_corevectors,
+        'features.11.conv.1.0': partial(trim_corevectors,
                           module = 'features.11.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.11.conv.2': partial(trim_channelwise_corevectors,
+        'features.11.conv.2': partial(trim_corevectors,
                           module = 'features.11.conv.2',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.12.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.12.conv.0.0': partial(trim_corevectors,
                           module = 'features.12.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),    
-        'features.12.conv.1.0': partial(trim_channelwise_corevectors,
+        'features.12.conv.1.0': partial(trim_corevectors,
                           module = 'features.12.conv.1.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.12.conv.2': partial(trim_channelwise_corevectors,
+        'features.12.conv.2': partial(trim_corevectors,
                           module = 'features.12.conv.2',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),
-        'features.13.conv.0.0': partial(trim_channelwise_corevectors,
+        'features.13.conv.0.0': partial(trim_corevectors,
                           module = 'features.13.conv.0.0',
                           cv_dim = cv_dim,
                           label_key = 'superclass'),   
@@ -781,7 +784,7 @@ if __name__ == "__main__":
                 path = drill_path,
                 name = drill_name+'.'+peep_layer,
                 nl_classifier = n_cluster,
-                nl_model = n_classes,
+                nl_model = 20,
                 n_features = feature_sizes[peep_layer],
                 parser = cv_parsers[peep_layer],
                 device = device
@@ -817,6 +820,8 @@ if __name__ == "__main__":
                         
                 # save classifiers
                 print(f'Saving classifier for {drill_key}')
+                print("driller._empp.shape:", driller._empp.shape)
+                print("driller.nl_model:", driller.nl_model)
                 driller.save()
 
     with corevecs as cv, peepholes as ph:
