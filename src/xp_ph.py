@@ -76,8 +76,8 @@ if __name__ == "__main__":
     
     features24_svd_rank = 3 
     features26_svd_rank = 6
-    features28_svd_rank = 200
-    classifier_svd_rank = 200 
+    features28_svd_rank = 300
+    classifier_svd_rank = 300 
     n_cluster = 200
     features24_cv_dim = 2
     features26_cv_dim = 5
@@ -318,7 +318,7 @@ if __name__ == "__main__":
                 cv_dim = features28_cv_dim
                 ),
             'classifier.0': partial(
-                trim_corevectors,#
+                trim_corevectors,
                 module = 'classifier.0',
                 cv_dim = classifier_cv_dim
                 ),
@@ -412,7 +412,7 @@ if __name__ == "__main__":
             verbose=verbose
             )
 
-        scores, _, _, _, _ = conceptogram_cl_score(
+        scores, metrics = conceptogram_cl_score(
                 peepholes = ph,
                 corevectors = cv,
                 loaders = ['train', 'val', 'test'],

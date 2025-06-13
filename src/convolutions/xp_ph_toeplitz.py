@@ -33,7 +33,7 @@ from cuda_selector import auto_cuda
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device('cpu')#auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     # model parameters
     dataset = 'CIFAR100' 
     seed = 29
-    bs = 2**7 
+    bs = 2**9 
     n_threads = 1
 
     model_dir = '/srv/newpenny/XAI/models'
@@ -161,7 +161,7 @@ if __name__ == "__main__":
             verbose = verbose
             )
     print('time: ', time()-t0)
-    quit()
+    
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -295,7 +295,6 @@ if __name__ == "__main__":
             else:
                 t0 = time()
                 print(f'Fitting classifier for {drill_key}')
-                driller.load()
                 driller.fit(corevectors = cv._corevds['train'], verbose=verbose)
                 print(f'Fitting time for {drill_key}  = ', time()-t0)
 
@@ -334,7 +333,7 @@ if __name__ == "__main__":
                 peepholes = ph,
                 corevectors = cv,
                 loaders = ['train', 'val', 'test'],
-                weights = [1, 1, 1, 1, 1, 1],
+                weights = torch.ones(len(target_layers)).tolist(),
                 bins = 50,
                 plot = True,
                 verbose = verbose

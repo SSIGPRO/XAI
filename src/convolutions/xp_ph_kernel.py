@@ -334,7 +334,7 @@ if __name__ == "__main__":
                 peepholes = ph,
                 corevectors = cv,
                 loaders = ['train', 'val', 'test'],
-                weights = [1, 1, 1, 1, 1, 1],
+                weights = torch.ones(len(target_layers)).tolist(),
                 bins = 50,
                 plot = True,
                 verbose = verbose
