@@ -44,7 +44,7 @@ if __name__ == "__main__":
     # model parameters
     dataset = 'CIFAR100' 
     seed = 29
-    bs = 512 
+    bs = 2**11 
     n_threads = 1
 
     model_dir = '/srv/newpenny/XAI/models'
@@ -357,17 +357,17 @@ if __name__ == "__main__":
             verbose=verbose
             )
 
-        scores, _, _, _, _ = conceptogram_cl_score(
+        scores, _ = conceptogram_cl_score(
                 peepholes = ph,
                 corevectors = cv,
                 loaders = ['train', 'val', 'test'],
-                basis = 'from_output',
                 weights = [1, 1, 1, 1, 1, 1],
                 bins = 50,
                 plot = True,
                 verbose = verbose
                 )
         
+        '''
         idx_hh = (scores > 0.90).nonzero().squeeze()[:10]
         idx_mh = (torch.logical_and(scores>0.7, scores<0.8)).nonzero().squeeze()[:10]
         idx_mm = (torch.logical_and(scores>0.45, scores<0.55)).nonzero().squeeze()[:10]
@@ -381,7 +381,8 @@ if __name__ == "__main__":
             idx_ml[torch.randperm(idx_ml.shape[0])[:n_conceptograms]],
             idx_ll[torch.randperm(idx_ll.shape[0])[:n_conceptograms]]
             ]).numpy()  
-
+        '''
+        idx = [2, 5, 7, 9, 16, 17, 21, 23, 28, 29, 32, 33, 35, 37, 41, 43, 45, 48, 58, 62, 131, 319, 585, 862, 1070, 1289, 1391, 1675, 2510, 2686, 2822, 3873, 4890, 5251, 5431, 5865, 7459, 8414, 8486]
         plot_conceptogram(
                 path = phs_path,
                 name = phs_name,
