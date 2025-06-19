@@ -74,7 +74,10 @@ if __name__ == "__main__":
             'classifier.6',
             ]
     
-    svd_rank = 300
+    features24_svd_rank = 3 
+    features26_svd_rank = 6
+    features28_svd_rank = 200
+    classifier_svd_rank = 200 
     n_cluster = 200
     features24_cv_dim = 2
     features26_cv_dim = 5
@@ -129,30 +132,34 @@ if __name__ == "__main__":
     svd_fns = {
             'features.24': partial(
                 conv2d_kernel_svd, 
+                rank = features24_svd_rank,
                 device = device,
                 ),
             'features.26': partial(
                 conv2d_toeplitz_svd, 
-                rank = svd_rank,
+                rank = features26_svd_rank,
                 channel_wise = True,
                 device = device,
                 ),
             'features.28': partial(
                 conv2d_toeplitz_svd, 
-                rank = svd_rank,
+                rank = features26_svd_rank,
                 channel_wise = False,
                 device = device,
                 ),
             'classifier.0': partial(
                 linear_svd,
+                rank = classifier_svd_rank,
                 device = device,
                 ),
             'classifier.3': partial(
                 linear_svd,
+                rank = classifier_svd_rank,
                 device = device,
                 ),
             'classifier.6': partial(
                 linear_svd,
+                rank = classifier_svd_rank,
                 device = device,
                 ),
             }
@@ -208,33 +215,39 @@ if __name__ == "__main__":
                 conv2d_kernel_svd_projection, 
                 svd = model._svds['features.24'], 
                 layer = model._target_modules['features.24'], 
+                use_s = True,
                 device=device
                 ),
             'features.26': partial(
                 conv2d_toeplitz_svd_projection, 
                 svd = model._svds['features.26'], 
                 layer = model._target_modules['features.26'], 
+                use_s = True,
                 device = device
                 ),
             'features.28': partial(
                 conv2d_toeplitz_svd_projection, 
                 svd = model._svds['features.28'], 
                 layer = model._target_modules['features.28'], 
+                use_s = True,
                 device = device
                 ),
             'classifier.0': partial(
                 linear_svd_projection,
                 svd = model._svds['classifier.0'], 
+                use_s = True,
                 device=device
                 ),
             'classifier.3': partial(
                 linear_svd_projection,
                 svd = model._svds['classifier.3'], 
+                use_s = True,
                 device=device
                 ),
             'classifier.6': partial(
                 linear_svd_projection,
                 svd = model._svds['classifier.6'], 
+                use_s = True,
                 device=device
                 ),
             }

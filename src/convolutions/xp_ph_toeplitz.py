@@ -33,7 +33,7 @@ from cuda_selector import auto_cuda
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    device = torch.device('cpu')#auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     # model parameters
     dataset = 'CIFAR100' 
     seed = 29
-    bs = 2**11 
+    bs = 2**7 
     n_threads = 1
 
     model_dir = '/srv/newpenny/XAI/models'
@@ -66,6 +66,16 @@ if __name__ == "__main__":
     
     # Peepholelib
     target_layers = [
+            #'features.0',
+            #'features.2',
+            #'features.5',
+            #'features.7',
+            'features.10',
+            'features.12',
+            'features.14',
+            'features.17',
+            'features.19',
+            'features.21',
             'features.24',
             'features.26',
             'features.28',
@@ -73,8 +83,9 @@ if __name__ == "__main__":
             'classifier.3',
             'classifier.6',
             ]
-    
-    svd_rank = 200
+
+    features_svd_rank = 200 
+    classifier_svd_rank = 200
     n_cluster = 200
     features_cv_dim = 196
     classifier_cv_dim = 150
@@ -124,38 +135,21 @@ if __name__ == "__main__":
     #--------------------------------
     # SVDs 
     #--------------------------------
-    svd_fns = {
-            'features.24': partial(
-                conv2d_toeplitz_svd, 
-                rank = svd_rank,
-                channel_wise = False,
-                device = device,
-                ),
-            'features.26': partial(
-                conv2d_toeplitz_svd, 
-                rank = svd_rank,
-                channel_wise = False,
-                device = device,
-                ),
-            'features.28': partial(
-                conv2d_toeplitz_svd, 
-                rank = svd_rank,
-                channel_wise = False,
-                device = device,
-                ),
-            'classifier.0': partial(
-                linear_svd,
-                device = device,
-                ),
-            'classifier.3': partial(
-                linear_svd,
-                device = device,
-                ),
-            'classifier.6': partial(
-                linear_svd,
-                device = device,
-                ),
-            }
+    svd_fns = {}
+    for _layer in target_layers:
+        if 'features' in _layer:
+            svd_fns[_layer] = partial(
+                    conv2d_toeplitz_svd, 
+                    rank = features_svd_rank, 
+                    channel_wise = False,
+                    device = device,
+                    )
+        elif 'classifier' in _layer:
+            svd_fns[_layer] = partial(
+                    linear_svd,
+                    rank = classifier_svd_rank,
+                    device = device,
+                    )
 
     t0 = time()
     model.get_svds(
@@ -167,7 +161,7 @@ if __name__ == "__main__":
             verbose = verbose
             )
     print('time: ', time()-t0)
-
+    quit()
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -180,41 +174,23 @@ if __name__ == "__main__":
             )
     
     # define a dimensionality reduction function for each layer
-    reduction_fns = {
-            'features.24': partial(
-                conv2d_toeplitz_svd_projection, 
-                svd = model._svds['features.24'], 
-                layer = model._target_modules['features.24'], 
-                device=device
-                ),
-            'features.26': partial(
-                conv2d_toeplitz_svd_projection, 
-                svd = model._svds['features.26'], 
-                layer = model._target_modules['features.26'], 
-                device = device
-                ),
-            'features.28': partial(
-                conv2d_toeplitz_svd_projection, 
-                svd = model._svds['features.28'], 
-                layer = model._target_modules['features.28'], 
-                device = device
-                ),
-            'classifier.0': partial(
-                linear_svd_projection,
-                svd = model._svds['classifier.0'], 
-                device=device
-                ),
-            'classifier.3': partial(
-                linear_svd_projection,
-                svd = model._svds['classifier.3'], 
-                device=device
-                ),
-            'classifier.6': partial(
-                linear_svd_projection,
-                svd = model._svds['classifier.6'], 
-                device=device
-                ),
-            }
+    reduction_fns = {}
+    for _layer in target_layers:
+        if 'features' in _layer:
+            reduction_fns[_layer] = partial(
+                    conv2d_toeplitz_svd_projection, 
+                    svd = model._svds[_layer], 
+                    layer = model._target_modules[_layer], 
+                    use_s = True,
+                    device=device
+                    )
+        elif 'classifier' in _layer:
+            reduction_fns[_layer] = partial(
+                    linear_svd_projection,
+                    svd = model._svds[_layer], 
+                    use_s = True,
+                    device=device
+                    )
 
     with corevecs as cv: 
         cv.parse_ds(
@@ -253,40 +229,32 @@ if __name__ == "__main__":
             name = cvs_name,
             )
 
-    cv_parsers = {
-            'features.24': partial(
-                trim_corevectors,
-                module = 'features.24',
-                cv_dim = features_cv_dim
-                ),
-            'features.26': partial(
-                trim_corevectors,
-                module = 'features.26',
-                cv_dim = features_cv_dim
-                ),
-            'features.28': partial(
-                trim_corevectors,
-                module = 'features.28',
-                cv_dim = features_cv_dim
-                ),
-            'classifier.0': partial(
-                trim_corevectors,#
-                module = 'classifier.0',
-                cv_dim = classifier_cv_dim
-                ),
-            'classifier.3': partial(
-                trim_corevectors,
-                module = 'classifier.3',
-                cv_dim = classifier_cv_dim
-                ),
-            'classifier.6': partial(
-                trim_corevectors,
-                module = 'classifier.6',
-                cv_dim = classifier_cv_dim
-                ),
-            }
-
+    cv_parsers = {}
+    for _layer in target_layers:
+        if 'features' in _layer:
+            cv_parsers[_layer] = partial(
+                    trim_corevectors,
+                    module = _layer,
+                    cv_dim = features_cv_dim
+                    )
+        if 'classifier' in _layer:
+            cv_parsers[_layer] = partial(
+                    trim_corevectors,
+                    module = _layer,
+                    cv_dim = classifier_cv_dim
+                    )
+    
     feature_sizes = {
+            'features.0': features_cv_dim,
+            'features.2': features_cv_dim,
+            'features.5': features_cv_dim,
+            'features.7': features_cv_dim,
+            'features.10': features_cv_dim,
+            'features.12': features_cv_dim,
+            'features.14': features_cv_dim,
+            'features.17': features_cv_dim,
+            'features.19': features_cv_dim,
+            'features.21': features_cv_dim,
             'features.24': features_cv_dim,
             'features.26': features_cv_dim,
             'features.28': features_cv_dim,
