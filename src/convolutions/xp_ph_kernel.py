@@ -22,7 +22,7 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 from peepholelib.peepholes.peepholes import Peepholes
 
 from peepholelib.utils.samplers import random_subsampling 
-from peepholelib.utils.analyze import evaluate_dists, conceptogram_ghl_score, conceptogram_cl_score
+from peepholelib.utils.analyze import conceptogram_protoclass_score as conceptogram_eval
 from peepholelib.utils.conceptograms import plot_conceptogram
 
 # torch stuff
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     # model parameters
     dataset = 'CIFAR100' 
     seed = 29
-    bs = 2**8 
+    bs = 2**7 
     n_threads = 1
 
     model_dir = '/srv/newpenny/XAI/models'
@@ -160,7 +160,6 @@ if __name__ == "__main__":
             verbose = verbose
             )
     print('time: ', time()-t0)
-
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -192,6 +191,7 @@ if __name__ == "__main__":
                     )
 
     with corevecs as cv: 
+
         cv.parse_ds(
                 batch_size = bs,
                 datasets = ds,
@@ -246,10 +246,10 @@ if __name__ == "__main__":
     feature_sizes = {
             # for channel_wise corevectors, the size is out_size * cv_dim
             # TODO: get 196 from somewhere
-            'features.0': features_cv_dim*196,
-            'features.2': features_cv_dim*196,
-            'features.5': features_cv_dim*196,
-            'features.7': features_cv_dim*196,
+            'features.0': features_cv_dim*196,#TODO: get size
+            'features.2': features_cv_dim*196,#TODO: get size
+            'features.5': features_cv_dim*196,#TODO: get size
+            'features.7': features_cv_dim*12544,
             'features.10': features_cv_dim*3136,
             'features.12': features_cv_dim*3136,
             'features.14': features_cv_dim*3136,
@@ -325,36 +325,18 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
 
-        ph.get_scores(
-            batch_size = bs,
-            verbose=verbose
-            )
-
-        scores, _ = conceptogram_cl_score(
+        scores = conceptogram_eval(
                 peepholes = ph,
                 corevectors = cv,
                 loaders = ['train', 'val', 'test'],
+                target_modules = target_layers,
                 weights = torch.ones(len(target_layers)).tolist(),
+                #score_type = 'max_min',
                 bins = 50,
                 plot = True,
                 verbose = verbose
                 )
         
-        '''
-        idx_hh = (scores > 0.90).nonzero().squeeze()[:10]
-        idx_mh = (torch.logical_and(scores>0.7, scores<0.8)).nonzero().squeeze()[:10]
-        idx_mm = (torch.logical_and(scores>0.45, scores<0.55)).nonzero().squeeze()[:10]
-        idx_ml = (torch.logical_and(scores>0.2, scores<0.3)).nonzero().squeeze()[:10]
-        idx_ll = (scores<0.1).nonzero().squeeze()[:10]
-        # get `n_conceptograms` random samples for each score interval
-        idx = torch.hstack([
-            idx_hh[torch.randperm(idx_hh.shape[0])[:n_conceptograms]],
-            idx_mh[torch.randperm(idx_mh.shape[0])[:n_conceptograms]],
-            idx_mm[torch.randperm(idx_mm.shape[0])[:n_conceptograms]],
-            idx_ml[torch.randperm(idx_ml.shape[0])[:n_conceptograms]],
-            idx_ll[torch.randperm(idx_ll.shape[0])[:n_conceptograms]]
-            ]).numpy()  
-        '''
         idx = [2, 5, 7, 9, 16, 17, 21, 23, 28, 29, 32, 33, 35, 37, 41, 43, 45, 48, 58, 62, 131, 319, 585, 862, 1070, 1289, 1391, 1675, 2510, 2686, 2822, 3873, 4890, 5251, 5431, 5865, 7459, 8414, 8486]
         plot_conceptogram(
                 path = phs_path,
@@ -363,9 +345,10 @@ if __name__ == "__main__":
                 peepholes = ph,
                 portion = 'test',
                 samples = idx,
-                target_layers = target_layers,
+                target_modules = target_layers,
                 classes = ds._classes,
-                alt_score = scores[idx],
-                alt_score_name = 'CL score',
+                protoclasses = scores['protoclasses'],
+                alt_score = scores['score']['test'][idx],
+                alt_score_name = 'Protoclass score',
                 verbose = verbose,
                 )
