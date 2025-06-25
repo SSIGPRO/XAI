@@ -330,7 +330,6 @@ if __name__ == "__main__":
                 target_modules = target_layers,
                 weights = torch.ones(len(target_layers)).tolist(),
                 #score_type = 'max_min',
-                bins = 50,
                 plot = True,
                 verbose = verbose
                 )

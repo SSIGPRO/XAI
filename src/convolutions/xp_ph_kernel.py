@@ -332,11 +332,10 @@ if __name__ == "__main__":
                 target_modules = target_layers,
                 weights = torch.ones(len(target_layers)).tolist(),
                 #score_type = 'max_min',
-                bins = 50,
                 plot = True,
                 verbose = verbose
                 )
-        
+
         idx = [2, 5, 7, 9, 16, 17, 21, 23, 28, 29, 32, 33, 35, 37, 41, 43, 45, 48, 58, 62, 131, 319, 585, 862, 1070, 1289, 1391, 1675, 2510, 2686, 2822, 3873, 4890, 5251, 5431, 5865, 7459, 8414, 8486]
         plot_conceptogram(
                 path = phs_path,
