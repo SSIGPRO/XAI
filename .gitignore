@@ -1,5 +1,5 @@
 xai-venv/
 build/
-data/
+*data*
 *.ipynb_checkpoints*
 peepholes.egg-info/
