@@ -879,8 +879,8 @@ if __name__ == "__main__":
         # print ('samples: ', samples)
         # quit()
         
-        for _, driller in drillers.items():
-            driller.load()
+        # for _, driller in drillers.items():
+        #     driller.load()
         #    driller.empirical_posterior_heatmap()
 
         # empp_coverage_scores(
@@ -899,21 +899,21 @@ if __name__ == "__main__":
             #score_type = 'entropy',
             verbose = True
         )
-        print(target_layers)
-        indices = torch.tensor([76,1631,9677,9775,44,9981])
-        plot_conceptogram(
-            path = Path('/home/claranunesbarrancos/repos/XAI/src/mobilenet/conceptos/scores'),
-            name = 'idk',
-            corevectors = cv,
-            peepholes = ph,
-            portion = 'test',
-            samples = [76,1631,9677,9775,44,9981],
-            target_modules = target_layers,
-            classes = coarse_label_names if superclass else ds.get_classes(),
-            alt_score = dicionario['score']['test'][indices],
-            ticks = target_layers,
-            krows = 5,
-            # label_key = 'superclass',
-            # pred_fn = superclass_pred_fn(),
-            ds = ds,
-        )
+        # print(target_layers)
+        # indices = torch.tensor([76,1631,9677,9775,44,9981])
+        # plot_conceptogram(
+        #     path = Path('/home/claranunesbarrancos/repos/XAI/src/mobilenet/conceptos/scores'),
+        #     name = 'idk',
+        #     corevectors = cv,
+        #     peepholes = ph,
+        #     portion = 'test',
+        #     samples = [76,1631,9677,9775,44,9981],
+        #     target_modules = target_layers,
+        #     classes = coarse_label_names if superclass else ds.get_classes(),
+        #     alt_score = dicionario['score']['test'][indices],
+        #     ticks = target_layers,
+        #     krows = 5,
+        #     # label_key = 'superclass',
+        #     # pred_fn = superclass_pred_fn(),
+        #     ds = ds,
+        # )
