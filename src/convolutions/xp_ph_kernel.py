@@ -22,7 +22,8 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 from peepholelib.peepholes.peepholes import Peepholes
 
 from peepholelib.utils.samplers import random_subsampling 
-from peepholelib.utils.analyze import conceptogram_protoclass_score as conceptogram_eval
+from peepholelib.utils.scores import conceptogram_protoclass_score as proto_score, model_confidence_score as mconf_score 
+from peepholelib.utils.plots import plot_confidence, plot_calibration, plot_ood 
 from peepholelib.utils.conceptograms import plot_conceptogram
 
 # torch stuff
@@ -40,11 +41,12 @@ if __name__ == "__main__":
     # Directories definitions
     #--------------------------------
     ds_path = '/srv/newpenny/dataset/CIFAR100'
+    dsc_path = '/srv/newpenny/dataset/CIFAR-100-C'
 
     # model parameters
     dataset = 'CIFAR100' 
     seed = 29
-    bs = 2**7 
+    bs = 2**10 
     n_threads = 1
 
     model_dir = '/srv/newpenny/XAI/models'
@@ -62,6 +64,8 @@ if __name__ == "__main__":
     phs_path = Path.cwd()/'../../data2/peepholes'
     phs_name = 'peepholes'
     
+    plots_path = Path.cwd()/'../temp_plots/kernel_proto/'
+
     verbose = True 
     
     # Peepholelib
@@ -101,6 +105,7 @@ if __name__ == "__main__":
 
     ds.load_data(
             transform = ds_transform,
+            corrupted_path = dsc_path,
             seed = seed,
             )
     
@@ -212,8 +217,9 @@ if __name__ == "__main__":
         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
             cv.normalize_corevectors(
                     wrt = 'train',
-                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
                     to_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    #loaders = ['ood-c0', 'ood-c1', 'ood-c2', 'ood-c3', 'ood-c4'],
                     batch_size = bs,
                     n_threads = n_threads,
                     verbose=verbose
@@ -285,8 +291,8 @@ if __name__ == "__main__":
     # fitting classifiers
     with corevecs as cv:
         cv.load_only(
-                loaders = ['train', 'test', 'val'],
-                verbose = True
+                loaders = ['train', 'val', 'test'],
+                verbose = verbose 
                 ) 
 
         for drill_key, driller in drillers.items():
@@ -296,12 +302,16 @@ if __name__ == "__main__":
             else:
                 t0 = time()
                 print(f'Fitting classifier for {drill_key}')
-                driller.fit(corevectors = cv._corevds['train'], verbose=verbose)
+                driller.fit(
+                        corevectors = cv,
+                        loader = 'train',
+                        verbose=verbose
+                        )
                 print(f'Fitting time for {drill_key}  = ', time()-t0)
 
                 driller.compute_empirical_posteriors(
-                        dataset = cv._dss['train'],
-                        corevectors = cv._corevds['train'],
+                        corevectors = cv,
+                        loader = 'train',
                         batch_size = bs,
                         verbose=verbose
                         )
@@ -312,8 +322,8 @@ if __name__ == "__main__":
 
     with corevecs as cv, peepholes as ph:
         cv.load_only(
-                loaders = ['train', 'test', 'val'],
-                verbose = True
+                loaders = ['train', 'val', 'test', 'ood-c0', 'ood-c1', 'ood-c2', 'ood-c3', 'ood-c4'],
+                verbose = verbose 
                 ) 
 
         ph.get_peepholes(
@@ -324,30 +334,57 @@ if __name__ == "__main__":
                 n_threads = n_threads,
                 verbose = verbose
                 )
-
-        scores = conceptogram_eval(
+        
+        # get scores
+        scores, protoclasses = proto_score(
                 peepholes = ph,
                 corevectors = cv,
-                loaders = ['train', 'val', 'test'],
-                target_modules = target_layers,
-                weights = torch.ones(len(target_layers)).tolist(),
-                #score_type = 'max_min',
-                plot = True,
+                verbose = verbose
+                )
+                                        
+        scores = mconf_score(
+                corevectors = cv,
+                append_scores = scores,
+                verbose = verbose
+                ) 
+
+        # make plots
+        plot_confidence(
+                corevectors = cv,
+                scores = scores,
+                max_score = 1.,
+                path = plots_path,
+                verbose = verbose
+                )
+                                                                                  
+        plot_calibration(
+                corevectors = cv,
+                scores = scores,
+                calib_bin = 0.1,
+                path = plots_path,
+                verbose = verbose
+                )
+
+        plot_ood(
+                scores = scores,
+                id_loader = 'test',
+                ood_loaders = ['ood-c0', 'ood-c1', 'ood-c2', 'ood-c3', 'ood-c4'],
+                path = plots_path,
                 verbose = verbose
                 )
 
         idx = [2, 5, 7, 9, 16, 17, 21, 23, 28, 29, 32, 33, 35, 37, 41, 43, 45, 48, 58, 62, 131, 319, 585, 862, 1070, 1289, 1391, 1675, 2510, 2686, 2822, 3873, 4890, 5251, 5431, 5865, 7459, 8414, 8486]
         plot_conceptogram(
-                path = phs_path,
-                name = phs_name,
+                path = plots_path,
+                name = 'conceptogram',
                 corevectors = cv,
                 peepholes = ph,
-                portion = 'test',
+                loaders = ['test'],
                 samples = idx,
                 target_modules = target_layers,
                 classes = ds._classes,
-                protoclasses = scores['protoclasses'],
-                alt_score = scores['score']['test'][idx],
-                alt_score_name = 'Protoclass score',
+                protoclasses = protoclasses,
+                scores = scores,
                 verbose = verbose,
                 )
+        

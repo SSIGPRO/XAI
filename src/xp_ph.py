@@ -22,7 +22,8 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 from peepholelib.peepholes.peepholes import Peepholes
 
 from peepholelib.utils.samplers import random_subsampling 
-from peepholelib.utils.analyze import evaluate_dists, conceptogram_ghl_score, conceptogram_cl_score
+from peepholelib.utils.scores import conceptogram_protoclass_score as proto_score, model_confidence_score as mconf_score 
+from peepholelib.utils.plots import plot_confidence, plot_calibration, plot_ood 
 from peepholelib.utils.conceptograms import plot_conceptogram
 
 # torch stuff
@@ -61,6 +62,8 @@ if __name__ == "__main__":
 
     phs_path = Path.cwd()/'../data/peepholes'
     phs_name = 'peepholes'
+
+    plots_path = Path.cwd()/'temp_plots/xp_ph/'
     
     verbose = True 
     
@@ -285,8 +288,9 @@ if __name__ == "__main__":
         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
             cv.normalize_corevectors(
                     wrt = 'train',
-                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
                     to_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    #loaders = ['ood-c0', 'ood-c1', 'ood-c2', 'ood-c3', 'ood-c4'],
                     batch_size = bs,
                     n_threads = n_threads,
                     verbose=verbose
@@ -367,8 +371,8 @@ if __name__ == "__main__":
     # fitting classifiers
     with corevecs as cv:
         cv.load_only(
-                loaders = ['train', 'test', 'val'],
-                verbose = True
+                loaders = ['train', 'val', 'test'],
+                verbose = verbose 
                 ) 
 
         for drill_key, driller in drillers.items():
@@ -378,12 +382,16 @@ if __name__ == "__main__":
             else:
                 t0 = time()
                 print(f'Fitting classifier for {drill_key}')
-                driller.fit(corevectors = cv._corevds['train'], verbose=verbose)
+                driller.fit(
+                        corevectors = cv,
+                        loader = 'train',
+                        verbose=verbose
+                        )
                 print(f'Fitting time for {drill_key}  = ', time()-t0)
 
                 driller.compute_empirical_posteriors(
-                        dataset = cv._dss['train'],
-                        corevectors = cv._corevds['train'],
+                        corevectors = cv,
+                        loader = 'train',
                         batch_size = bs,
                         verbose=verbose
                         )
@@ -394,8 +402,8 @@ if __name__ == "__main__":
 
     with corevecs as cv, peepholes as ph:
         cv.load_only(
-                loaders = ['train', 'test', 'val'],
-                verbose = True
+                loaders = ['train', 'val', 'test'],
+                verbose = verbose 
                 ) 
 
         ph.get_peepholes(
@@ -407,46 +415,61 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
 
-        ph.get_scores(
-            batch_size = bs,
-            verbose=verbose
-            )
-
-        scores, metrics = conceptogram_cl_score(
+        # get scores
+        scores, protoclasses = proto_score(
                 peepholes = ph,
                 corevectors = cv,
-                loaders = ['train', 'val', 'test'],
-                basis = 'from_output',
-                weights = [1, 1, 1, 1, 1, 1],
-                bins = 50,
-                plot = True,
+                verbose = verbose
+                )
+                                        
+        scores = mconf_score(
+                corevectors = cv,
+                append_scores = scores,
+                verbose = verbose
+                )
+
+        # make plots
+        plot_confidence(
+                corevectors = cv,
+                scores = scores,
+                max_score = 1.,
+                path = plots_path,
+                verbose = verbose
+                )
+                                                                                  
+        plot_calibration(
+                corevectors = cv,
+                scores = scores,
+                calib_bin = 0.1,
+                path = plots_path,
                 verbose = verbose
                 )
         
-        idx_hh = (scores > 0.90).nonzero().squeeze()[:10]
-        idx_mh = (torch.logical_and(scores>0.7, scores<0.8)).nonzero().squeeze()[:10]
-        idx_mm = (torch.logical_and(scores>0.45, scores<0.55)).nonzero().squeeze()[:10]
-        idx_ml = (torch.logical_and(scores>0.2, scores<0.3)).nonzero().squeeze()[:10]
-        idx_ll = (scores<0.1).nonzero().squeeze()[:10]
+        # plot conceptograms
         # get `n_conceptograms` random samples for each score interval
+        idx_hh = (scores['test']['Proto-Class'] > 0.90).nonzero().squeeze()[:10]
+        idx_mh = (torch.logical_and(scores['test']['Proto-Class']>0.7, scores['test']['Proto-Class']<0.8)).nonzero().squeeze()[:10]
+        idx_mm = (torch.logical_and(scores['test']['Proto-Class']>0.45, scores['test']['Proto-Class']<0.55)).nonzero().squeeze()[:10]
+        idx_ml = (torch.logical_and(scores['test']['Proto-Class']>0.2, scores['test']['Proto-Class']<0.3)).nonzero().squeeze()[:10]
+        idx_ll = (scores['test']['Proto-Class']<0.1).nonzero().squeeze()[:10]
         idx = torch.hstack([
             idx_hh[torch.randperm(idx_hh.shape[0])[:n_conceptograms]],
             idx_mh[torch.randperm(idx_mh.shape[0])[:n_conceptograms]],
             idx_mm[torch.randperm(idx_mm.shape[0])[:n_conceptograms]],
             idx_ml[torch.randperm(idx_ml.shape[0])[:n_conceptograms]],
             idx_ll[torch.randperm(idx_ll.shape[0])[:n_conceptograms]]
-            ]).numpy()  
+            ]).tolist()  
 
         plot_conceptogram(
-                path = phs_path,
-                name = phs_name,
+                path = plots_path,
+                name = 'conceptogram',
                 corevectors = cv,
                 peepholes = ph,
-                portion = 'test',
+                loaders = ['test'],
                 samples = idx,
-                target_layers = target_layers,
+                target_modules = target_layers,
                 classes = ds._classes,
-                alt_score = scores[idx],
-                alt_score_name = 'CL score',
+                protoclasses = protoclasses,
+                scores = scores,
                 verbose = verbose,
                 )
