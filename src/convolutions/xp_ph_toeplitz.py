@@ -18,7 +18,7 @@ from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, con
 
 from peepholelib.peepholes.parsers import trim_corevectors
 from peepholelib.peepholes.classifiers.tkmeans import KMeans as tKMeans 
-from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
+from peepholelib.peepholes.classifiers.birch import Birch as Clustering 
 from peepholelib.peepholes.peepholes import Peepholes
 
 from peepholelib.utils.samplers import random_subsampling 
@@ -90,9 +90,9 @@ if __name__ == "__main__":
 
     features_svd_rank = 200 
     classifier_svd_rank = 200
-    n_cluster = 200
-    features_cv_dim = 196
-    classifier_cv_dim = 150
+    n_cluster = 1000 
+    features_cv_dim = 96 
+    classifier_cv_dim = 100
     n_conceptograms = 10
     #--------------------------------
     # Dataset 
@@ -269,7 +269,7 @@ if __name__ == "__main__":
 
     drillers = {}
     for peep_layer in target_layers:
-        drillers[peep_layer] = tGMM(
+        drillers[peep_layer] = Clustering(
                 path = drill_path,
                 name = drill_name+'.'+peep_layer,
                 nl_classifier = n_cluster,
@@ -349,14 +349,16 @@ if __name__ == "__main__":
         plot_confidence(
                 corevectors = cv,
                 scores = scores,
+                loaders = ['test', 'ood-c0', 'ood-c1', 'ood-c2', 'ood-c3', 'ood-c4'],
                 max_score = 1.,
                 path = plots_path,
                 verbose = verbose
                 )
-                                                                                  
+
         plot_calibration(
                 corevectors = cv,
                 scores = scores,
+                loaders = ['test', 'ood-c0', 'ood-c1', 'ood-c2', 'ood-c3', 'ood-c4'],
                 calib_bin = 0.1,
                 path = plots_path,
                 verbose = verbose
@@ -369,7 +371,7 @@ if __name__ == "__main__":
                 path = plots_path,
                 verbose = verbose
                 )
-
+        quit()
         idx = [2, 5, 7, 9, 16, 17, 21, 23, 28, 29, 32, 33, 35, 37, 41, 43, 45, 48, 58, 62, 131, 319, 585, 862, 1070, 1289, 1391, 1675, 2510, 2686, 2822, 3873, 4890, 5251, 5431, 5865, 7459, 8414, 8486]
         plot_conceptogram(
                 path = plots_path,
