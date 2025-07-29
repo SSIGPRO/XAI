@@ -125,10 +125,10 @@ if __name__ == "__main__":
     cvs_path = Path("/srv/newpenny/XAI/CN/data/corevectors")
     cvs_name = 'corevectors'
 
-    drill_path = Path("/srv/newpenny/XAI/CN/data100cvdim300/drillers")
+    drill_path = Path("/srv/newpenny/XAI/CN/data100cvdim300_1/drillers")
     drill_name = 'classifier'
 
-    phs_path = Path("/srv/newpenny/XAI/CN/data100cvdim300/peepholes")
+    phs_path = Path("/srv/newpenny/XAI/CN/data100cvdim300_1/peepholes")
     phs_name = 'peepholes'
 
     # target_layers = [ 
@@ -808,9 +808,6 @@ if __name__ == "__main__":
                 parser = cv_parsers[peep_layer],
                 device = device
                 )
-        print(drillers[peep_layer].__dict__)
-        quit()
-
     
     peepholes = Peepholes(
         path = phs_path,
