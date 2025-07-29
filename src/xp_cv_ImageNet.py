@@ -158,7 +158,7 @@ if __name__ == "__main__":
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    random_subsampling(ds, 0.02)
+    random_subsampling(ds, 0.3)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -187,9 +187,12 @@ if __name__ == "__main__":
                 device=device
                 ),
             }
-    '''
+    
     with corevecs as cv: 
-        
+        cv.load_only(loaders=['train'], verbose=True)
+        plt.imshow(cv._dss['train'][0].detach().cpu().numpy().transpose(1,2,0))
+        plt.savefig('prova.png')
+        quit()
         cv.parse_ds(
                 batch_size = bs,
                 datasets = ds,
@@ -197,7 +200,7 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
 
-        
+        '''
         # This occupies a lot of space. Only do if you need it
         # copy dataset to activatons file
         cv.get_activations(
@@ -207,7 +210,7 @@ if __name__ == "__main__":
                 save_output = False,
                 verbose = verbose
                 )        
-        
+        ''' 
 
         # computing the corevectors
         cv.get_coreVectors(
@@ -218,7 +221,7 @@ if __name__ == "__main__":
                 save_output = False,
                 verbose = verbose
                 )
-       
+        
 
         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
             cv.normalize_corevectors(
@@ -244,9 +247,7 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.savefig((cvs_path/(cvs_name+'.labels_distribution.png')).as_posix(), dpi=300, bbox_inches='tight')
         plt.close() 
-    '''    
-    
-
+       
     #--------------------------------
     # Peepholes
     #--------------------------------

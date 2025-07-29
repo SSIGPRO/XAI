@@ -10,6 +10,9 @@ import math
 import numpy as np
 import json
 
+from sklearn.cluster import AgglomerativeClustering
+from scipy.cluster.hierarchy import linkage, dendrogram
+
 # Our stuff
 from peepholelib.datasets.imagenet import ImageNet
 from peepholelib.datasets.transforms import vgg16_imagenet as ds_transform 
@@ -30,6 +33,8 @@ from peepholelib.utils.samplers import random_subsampling
 import torch
 from torchvision.models import vgg16
 from cuda_selector import auto_cuda
+
+# Xp speicific
 import clip
 from nltk.corpus import wordnet as wn
 
@@ -173,8 +178,34 @@ if __name__ == "__main__":
 
         probs = torch.empty(n_samples, n_cluster, dtype=torch.float32)
 
-        cv_dl = DataLoader(cv._corevds['train'][layer][...,:classifier_cv_dim], batch_size=bs, num_workers = n_threads)
-        
+        cv_dss = cv._corevds['train'][layer][:500,:classifier_cv_dim]
+        clust = AgglomerativeClustering(
+                                    n_clusters=5,        # or None if you use distance_threshold
+                                    metric='euclidean', # distance metric: ‘euclidean’ is default
+                                    linkage='ward'       # ‘ward’, ‘complete’, ‘average’ or ‘single’
+                                )
+
+        labels = clust.fit_predict(cv_dss)
+
+        Z = linkage(cv_dss, method='ward', metric='euclidean')
+
+        plt.figure(figsize=(12, 6))
+        threshold = 25
+        dendrogram(
+            Z,
+            color_threshold=threshold,   # color clusters below this line
+            above_threshold_color='gray',
+            truncate_mode='level',     # uncomment to show only the top p levels
+            p=5,                        # how many levels to keep if truncating
+        )
+        plt.axhline(y=threshold, linestyle='--', color='k', label=f'cut at {threshold}')
+        plt.title("Hierarchical Clustering Dendrogram (cut at distance={})".format(threshold))
+        plt.xlabel("Sample index")
+        plt.ylabel("Distance")
+        plt.legend()
+        plt.show()
+        plt.savefig('prova.png')
+        quit()
         start = 0
         
         for data in cv_dl:
@@ -185,7 +216,7 @@ if __name__ == "__main__":
         conf, clusters = torch.max(probs, dim=1)
         labels_ = cv._dss['train']['label']
 
-        for cluster in range(52, 56):
+        for cluster in range(50):
 
             idx = torch.argwhere((clusters==cluster)).squeeze()
             images = cv._dss['train']['image'][idx]
