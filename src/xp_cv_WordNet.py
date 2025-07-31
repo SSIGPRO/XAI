@@ -9,9 +9,7 @@ from matplotlib import pyplot as plt
 import math 
 import numpy as np
 import json
-
-from sklearn.cluster import AgglomerativeClustering
-from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+from tqdm import tqdm
 
 # Our stuff
 from peepholelib.datasets.imagenet import ImageNet
@@ -33,8 +31,6 @@ from peepholelib.utils.samplers import random_subsampling
 import torch
 from torchvision.models import vgg16
 from cuda_selector import auto_cuda
-
-# Xp speicific
 import clip
 from nltk.corpus import wordnet as wn
 
@@ -101,15 +97,9 @@ if __name__ == "__main__":
     #--------------------------------
     # Tokens
     #--------------------------------
-    # classes = list(ds._classes.values())
-    # classes.append('reptile')
 
-    # class_names = [tup[0] for tup in classes]
-    #class_names = ['person','small furry mammal','analogical clock', 'gown','dress', 'curly dog', 'food', 'close up', 'mirror' ,'basket', 'ladybug', 'ladybird', 'dragonfly', 'reptile', 'mountain', 'human', 'amphibian', 'mammal', 'fish', 'brown object', 'wood', 'seaside', 'bed', 'countryside', 'bird', 'horse', 'skyscraper', 'white background', 'line', 'geometric form', 'dog', 'white and brown dog' ]
-    #text_inputs = [f"a photo of a {label}" for label in class_names]
-
-    text_inputs = [f"a photo of a {lbl}" for lbl in short_labels]
-    text_inputs = clip.tokenize([f"a photo of a {lbl}" for lbl in short_labels]).to(device)
+    lbl = 'canine'
+    text_inputs = clip.tokenize(f"a photo of a {lbl}").to(device)
     with torch.no_grad():
         text_embeds = model.encode_text(text_inputs)
         text_embeds /= text_embeds.norm(dim=-1, keepdim=True)
@@ -178,40 +168,11 @@ if __name__ == "__main__":
 
         probs = torch.empty(n_samples, n_cluster, dtype=torch.float32)
 
-        cv_dss = cv._corevds['train'][layer][:500,:classifier_cv_dim]
-        clust = AgglomerativeClustering(
-                                    n_clusters=5,        # or None if you use distance_threshold
-                                    metric='euclidean', # distance metric: ‘euclidean’ is default
-                                    linkage='ward'       # ‘ward’, ‘complete’, ‘average’ or ‘single’
-                                )
-
-        labels = clust.fit_predict(cv_dss)
-
-        Z = linkage(cv_dss, method='ward', metric='euclidean')
-
-        plt.figure(figsize=(12, 6))
-        dendrogram(
-            Z,
-            truncate_mode='level',     # uncomment to show only the top p levels
-            p=3,                        # how many levels to keep if truncating
-            )
-        plt.title("Hierarchical Clustering Dendrogram")
-        plt.xlabel("Sample index")
-        plt.ylabel("Distance")
-        plt.legend()
-        plt.show()
-        plt.savefig('prova.png')
-        cluster_labels = fcluster(Z, t=5, criterion='distance')
-        n_clusters = len(np.unique(cluster_labels))
-        for cluster_id in np.unique(cluster_labels):
-            samples_in_cluster = np.where(cluster_labels == cluster_id)[0]
-            print(f"Cluster {cluster_id}: {len(samples_in_cluster)} samples")
-            print(f"  Samples: {list(samples_in_cluster)}")
+        cv_dl = DataLoader(cv._corevds['train'][layer][...,:classifier_cv_dim], batch_size=bs, num_workers = n_threads)
         
-        quit()
         start = 0
         
-        for data in cv_dl:
+        for data in tqdm(cv_dl):
             bs = data.shape[0]
             probs[start:start+bs] = drillers[layer]._classifier.predict_proba(data)
             start += bs
@@ -219,7 +180,9 @@ if __name__ == "__main__":
         conf, clusters = torch.max(probs, dim=1)
         labels_ = cv._dss['train']['label']
 
-        for cluster in range(50):
+        dog_similarity = []
+
+        for cluster in tqdm(range(n_cluster)):
 
             idx = torch.argwhere((clusters==cluster)).squeeze()
             images = cv._dss['train']['image'][idx]
@@ -232,58 +195,20 @@ if __name__ == "__main__":
                 mean_image = image_features.mean(dim=0, keepdim=True)           
                 mean_image = mean_image / mean_image.norm(dim=-1, keepdim=True)   
 
-            similarity = mean_image @ text_embeds.t()  
+            similarity = mean_image @ text_embeds.t() 
+            dog_similarity.append(similarity.squeeze().detach().cpu().numpy())
 
-            topk = 10
-            values, indices = similarity[0].topk(topk)
-
-            for score, idx in zip(values, indices):
-                print(f"{short_labels[idx]}: {score.item():.3f}")
-            
-            if len(images) < 50:
-                num_images = len(images) -2
-            else:
-                num_images = 50
-
-            # choose number of columns
-            cols = 7
-            rows = math.ceil(num_images / cols)
-
-            # make a big enough figure
-            fig, axs = plt.subplots(rows, cols, figsize=(cols * 4, rows * 4))
-
-            # flatten the axes array for easy indexing
-
-            axs = axs.flatten()
-
-            # inv_norm = transforms.Normalize(
-            #     mean=[-m/s for m, s in zip([0.229, 0.224, 0.225], [0.485, 0.456, 0.406])],
-            #     std =[ 1/s   for s   in [0.485, 0.456, 0.406]]
-            # )
-            # denorm = inv_norm(tensor_img)
-
-            for i, ax in enumerate(axs):
-
-                # show the image
-                img = images[i].detach().cpu().numpy().transpose(1,2,0)
-                img = img * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]
-                img = np.clip(img, 0, 1)
-                ax.imshow(img)
-                # ax.imshow(img.detach().cpu().numpy().transpose(1,2,0))
-                # turn off ticks & frame
-                ax.axis('off')
-
-            # turn off any remaining empty subplots
-            for ax in axs[num_images:]:
-                ax.axis('off')
-            
-            fig.suptitle(f"{short_labels[similarity[0].topk(1)[1]]}: cluster population {len(images)}", fontsize=20, y=1.02)
-
-            plt.tight_layout()
-            fig.savefig(drillers[layer]._clas_path/f'samples_cluster.{cluster}.png', dpi=200, bbox_inches='tight')
+        indexed = list(enumerate(dog_similarity))
         
+        plt.figure(figsize=(15, 5))
+        plt.bar(np.arange(len(dog_similarity)), dog_similarity,linewidth=0)
+        plt.xlabel('Sample Index')
+        plt.ylabel('similarity wrt dog')
+        plt.title('Similarity Plot wrt Dog')
+        plt.savefig('prova_dog.png')
 
-        
-
-            
-    
+        indexed.sort(key=lambda pair: pair[1], reverse=True)
+        with open('indexed_dog.txt', 'w') as f:
+            for idx, sim in indexed:
+                # write each pair on its own line, tab-separated:
+                f.write(f"{idx}\t{sim}\n")

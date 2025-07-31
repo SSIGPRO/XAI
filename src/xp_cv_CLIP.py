@@ -103,7 +103,7 @@ if __name__ == "__main__":
     #class_names = ['person','small furry mammal','analogical clock', 'gown','dress', 'curly dog', 'food', 'close up', 'mirror' ,'basket', 'ladybug', 'ladybird', 'dragonfly', 'reptile', 'mountain', 'human', 'amphibian', 'mammal', 'fish', 'brown object', 'wood', 'seaside', 'bed', 'countryside', 'bird', 'horse', 'skyscraper', 'white background', 'line', 'geometric form', 'dog', 'white and brown dog' ]
     #text_inputs = [f"a photo of a {label}" for label in class_names]
 
-    text_inputs = [f"a photo of a {lbl}" for lbl in short_labels]
+    # text_inputs = [f"a photo of a {lbl}" for lbl in short_labels]
     text_inputs = clip.tokenize([f"a photo of a {lbl}" for lbl in short_labels]).to(device)
     with torch.no_grad():
         text_embeds = model.encode_text(text_inputs)
@@ -221,12 +221,6 @@ if __name__ == "__main__":
             # flatten the axes array for easy indexing
 
             axs = axs.flatten()
-
-            # inv_norm = transforms.Normalize(
-            #     mean=[-m/s for m, s in zip([0.229, 0.224, 0.225], [0.485, 0.456, 0.406])],
-            #     std =[ 1/s   for s   in [0.485, 0.456, 0.406]]
-            # )
-            # denorm = inv_norm(tensor_img)
 
             for i, ax in enumerate(axs):
 
