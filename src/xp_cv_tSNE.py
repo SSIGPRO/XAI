@@ -28,10 +28,9 @@ from peepholelib.utils.samplers import random_subsampling
 
 # torch stuff
 import torch
-from torchvision.models import vgg16
 from cuda_selector import auto_cuda
 import clip
-from nltk.corpus import wordnet as wn
+from sklearn.manifold import TSNE
 
 if __name__ == "__main__":
     # use_cuda = torch.cuda.is_available()
@@ -53,20 +52,19 @@ if __name__ == "__main__":
     bs = 512 
     n_threads = 1
     
-    cvs_path = Path.cwd()/f'../data/{dataset}/corevectors'
+    cvs_path = Path.cwd()/f'../data/{dataset}_/corevectors'
     cvs_name = 'corevectors'
 
-    drill_path = Path.cwd()/f'../data/{dataset}/drillers'
+    drill_path = Path.cwd()/f'../data/{dataset}_/drillers'
     drill_name = 'classifier'
     
     verbose = True 
     
     # Peepholelib
     target_layers = [
-            'classifier.0',
-            #'classifier.3',
+            #'classifier.0',
+             'classifier.3',
             # 'classifier.6',
-            #'features.28',
             ]
     
     #--------------------------------
@@ -127,35 +125,19 @@ if __name__ == "__main__":
             )
     
     classifier_cv_dim = 100
-    features28_cv_dim = 100
-    n_cluster = 1000
+    n_cluster = 500
 
     cv_parsers = {
-            # 'features.24': partial(
-            #     trim_kernel_corevectors,
-            #     module = 'features.24',
-            #     cv_dim = features24_cv_dim
-            #     ),
-            # 'features.26': partial(
-            #     trim_channelwise_corevectors,
-            #     module = 'features.26',
-            #     cv_dim = features26_cv_dim
-            #     ),
-            # 'features.28': partial(
+            # 'classifier.0': partial(
             #     trim_corevectors,
-            #     module = 'features.28',
-            #     cv_dim = features28_cv_dim
-            #     ),
-            'classifier.0': partial(
-                trim_corevectors,
-                module = 'classifier.0',
-                cv_dim = classifier_cv_dim
-                ),
-            # 'classifier.3': partial(
-            #     trim_corevectors,
-            #     module = 'classifier.3',
+            #     module = 'classifier.0',
             #     cv_dim = classifier_cv_dim
             #     ),
+            'classifier.3': partial(
+                trim_corevectors,
+                module = 'classifier.3',
+                cv_dim = classifier_cv_dim
+                ),
             # 'classifier.6': partial(
             #     trim_corevectors,
             #     module = 'classifier.6',
@@ -164,9 +146,8 @@ if __name__ == "__main__":
             }
 
     feature_sizes = {
-            #'features.28': features28_cv_dim,
-            'classifier.0': classifier_cv_dim,
-            #'classifier.3': classifier_cv_dim,
+            #'classifier.0': classifier_cv_dim,
+             'classifier.3': classifier_cv_dim,
             # 'classifier.6': classifier_cv_dim,
             }
 
@@ -192,7 +173,7 @@ if __name__ == "__main__":
         for drill_key, driller in drillers.items():
             print(f'Loading Classifier for {drill_key}') 
             driller.load()
-        layer = 'classifier.0'
+        layer = 'classifier.3'
 
         n_samples = len(cv._corevds['train'][layer])                   
 
@@ -209,87 +190,58 @@ if __name__ == "__main__":
 
         conf, clusters = torch.max(probs, dim=1)
         labels_ = cv._dss['train']['label']
-        counts = torch.bincount(clusters)
-        # counts[i] = number of samples with cluster==i
 
-        # 2) sort clusters by their population, descending
-        sorted_counts, sorted_labels = counts.sort(descending=True)
-        # sorted_labels[j] is the j-th most populous cluster label
-        # sorted_counts[j] is how many in that cluster
+        allowed = torch.tensor([281, 13, 6, 4, 7], dtype=clusters.dtype, device=clusters.device)
 
-        # 3) build a “rank” tensor s.t. rank[i] = 1 if i is the largest, 2 if 2nd, …
-        ranks = torch.empty_like(sorted_labels)
-        ranks[sorted_labels] = torch.arange(1, sorted_labels.numel()+1)
+        # build a mask: True where t is in `allowed`
+        # (requires PyTorch ≥1.10; for older, see note below)
+        mask = torch.isin(clusters, allowed)
 
-        # Now you have:
-        #   counts: tensor of size (K,)
-        #   sorted_labels: tensor of size (K,)
-        #   sorted_counts: tensor of size (K,)
-        #   ranks: tensor of size (K,), where ranks[i] is the rank of cluster i
+        # zero out everything not in allowed
+        clusters_filtered = torch.where(mask, clusters, torch.zeros_like(clusters))
 
-        # Example printout:
-        for lbl, cnt in zip(sorted_labels.tolist(), sorted_counts.tolist()):
-            print(f"Cluster {lbl:>2} : {cnt:>4} samples,  rank = {ranks[lbl].item()}")
+        X = cv._corevds['train'][layer][...,:classifier_cv_dim]
+        y = clusters
 
-        
-        for cluster in [389, 932, 7, 913, 629, 996]: # 
+        # 2) Move to CPU + numpy if you’re in PyTorch/TensorFlow
+        if hasattr(X, 'detach'):
+            X = X.detach()
+        if hasattr(X, 'cpu'):
+            X = X.cpu()
+        X = np.array(X)
 
-            idx = torch.argwhere((clusters==cluster)).squeeze()
-            images = cv._dss['train']['image'][idx]
+        if hasattr(y, 'detach'):
+            y = y.detach()
+        if hasattr(y, 'cpu'):
+            y = y.cpu()
+        y = np.array(y)
 
-            model, preprocess = clip.load("ViT-B/32", device=device, jit=False)
-            with torch.no_grad():
-                
-                image_features = model.encode_image(images.to(device))
+        # 3) Run t-SNE
+        tsne = TSNE(n_components=2, random_state=42)
+        X_2d = tsne.fit_transform(X)
 
-                mean_image = image_features.mean(dim=0, keepdim=True)           
-                mean_image = mean_image / mean_image.norm(dim=-1, keepdim=True)   
+        classes = np.unique(y)  # e.g. array([  4,   6,   7,  13, 281])
+        print(classes)
 
-            similarity = mean_image @ text_embeds.t()
-            topk = 10
-            values, indices = similarity[0].topk(topk)
+        # 2) choose a qualitative colormap with >= len(classes) colors
+        cmap = plt.get_cmap('tab10', len(classes))
 
-            for score, idx in zip(values, indices):
-                print(f"{short_labels[idx]}: {score.item():.3f}")
-            
-            if len(images) <= 50:
-                num_images = len(images)-5
-            else:
-                num_images = 40
+        # 3) build a mapping label -> color
+        label_to_color = {lab: cmap(i) for i, lab in enumerate(classes)}
 
-            # choose number of columns
-            cols = 5
-            rows = math.ceil(num_images / cols)
+        # 4) plot each class separately
+        plt.figure(figsize=(8,6))
+        for lab in classes:
+            idx = (y == lab)
+            plt.scatter(
+                X_2d[idx, 0],
+                X_2d[idx, 1],
+                color=label_to_color[lab],
+                label=str(lab),
+                s=30,             # marker size
+                alpha=0.8         # optional transparency
+            )
+        #plt.legend()
 
-            # make a big enough figure
-            fig, axs = plt.subplots(rows, cols, figsize=(cols * 4, rows * 4))
-
-            # flatten the axes array for easy indexing
-
-            axs = axs.flatten()
-
-            for i, ax in enumerate(axs):
-
-                # show the image
-                img = images[i].detach().cpu().numpy().transpose(1,2,0)
-                img = img * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]
-                img = np.clip(img, 0, 1)
-                ax.imshow(img)
-                # ax.imshow(img.detach().cpu().numpy().transpose(1,2,0))
-                # turn off ticks & frame
-                ax.axis('off')
-
-            # turn off any remaining empty subplots
-            for ax in axs[num_images:]:
-                ax.axis('off')
-            
-            fig.suptitle(f"{short_labels[similarity[0].topk(1)[1]]}: cluster population {len(images)}", fontsize=20, y=1.02)
-
-            plt.tight_layout()
-            fig.savefig(drillers[layer]._clas_path/f'samples_cluster.{cluster}.png', dpi=200, bbox_inches='tight')
-        
-
-        
-
-            
-    
+        plt.show()
+        plt.savefig('prova.png')

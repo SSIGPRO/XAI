@@ -39,8 +39,13 @@ import clip
 from nltk.corpus import wordnet as wn
 
 if __name__ == "__main__":
+    # use_cuda = torch.cuda.is_available()
+    # device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    # print(f"Using {device} device")
+
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    cuda_index = torch.cuda.device_count() - 4
+    device = torch.device(f"cuda:{cuda_index}" if use_cuda else "cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -54,10 +59,10 @@ if __name__ == "__main__":
     bs = 512 
     n_threads = 1
     
-    cvs_path = Path.cwd()/f'../data/{dataset}/corevectors'
+    cvs_path = Path.cwd()/f'../data/{dataset}_/corevectors'
     cvs_name = 'corevectors'
 
-    drill_path = Path.cwd()/f'../data/{dataset}/drillers'
+    drill_path = Path.cwd()/f'../data/{dataset}_/drillers'
     drill_name = 'classifier'
     
     verbose = True 
@@ -85,7 +90,7 @@ if __name__ == "__main__":
     
     n_classes = len(ds.get_classes()) 
 
-    with open(Path.cwd()/"../data/ImageNet/imagenet_class_index.json") as f:
+    with open(Path.cwd()/f"../data/{dataset}_/imagenet_class_index.json") as f:
         class_idx = json.load(f)
 
     idx2label = {int(k): v[1] for k, v in class_idx.items()}
@@ -178,9 +183,9 @@ if __name__ == "__main__":
 
         probs = torch.empty(n_samples, n_cluster, dtype=torch.float32)
 
-        cv_dss = cv._corevds['train'][layer][:500,:classifier_cv_dim]
+        cv_dss = cv._corevds['train'][layer][:,:classifier_cv_dim]
         clust = AgglomerativeClustering(
-                                    n_clusters=5,        # or None if you use distance_threshold
+                                    n_clusters=100,        # or None if you use distance_threshold
                                     metric='euclidean', # distance metric: ‘euclidean’ is default
                                     linkage='ward'       # ‘ward’, ‘complete’, ‘average’ or ‘single’
                                 )
@@ -193,7 +198,7 @@ if __name__ == "__main__":
         dendrogram(
             Z,
             truncate_mode='level',     # uncomment to show only the top p levels
-            p=3,                        # how many levels to keep if truncating
+            #p=3,                        # how many levels to keep if truncating
             )
         plt.title("Hierarchical Clustering Dendrogram")
         plt.xlabel("Sample index")

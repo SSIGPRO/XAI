@@ -59,6 +59,7 @@ if __name__ == "__main__":
     verbose = True 
 
     classifier_svd_rank = 1000
+    features_svd_rank = 300
     
     # Peepholelib
     target_layers = [
@@ -66,8 +67,8 @@ if __name__ == "__main__":
             # 'features.26',
             # 'features.28',
             'classifier.0',
-            'classifier.3',
-            'classifier.6',
+            # 'classifier.3',
+            # 'classifier.6',
             ]
     
     #--------------------------------
@@ -104,21 +105,27 @@ if __name__ == "__main__":
     # SVDs 
     #--------------------------------
     svd_fns = {
+        #     'features.28': partial(
+        #         conv2d_toeplitz_svd, 
+        #         rank = features_svd_rank,
+        #         channel_wise = False,
+        #         device = device,
+        #         ),
             'classifier.0': partial(
                 linear_svd,
                 rank = classifier_svd_rank,
                 device = device,
                 ),
-            'classifier.3': partial(
-                linear_svd,
-                rank = classifier_svd_rank,
-                device = device,
-                ),
-            'classifier.6': partial(
-                linear_svd,
-                rank = classifier_svd_rank,
-                device = device,
-                ),
+            # 'classifier.3': partial(
+            #     linear_svd,
+            #     rank = classifier_svd_rank,
+            #     device = device,
+            #     ),
+            # 'classifier.6': partial(
+            #     linear_svd,
+            #     rank = classifier_svd_rank,
+            #     device = device,
+            #     ),
             }
 
     t0 = time()
@@ -168,85 +175,92 @@ if __name__ == "__main__":
     
     # define a dimensionality reduction function for each layer
     reduction_fns = {
+        #     'features.28': partial(
+        #         conv2d_toeplitz_svd_projection, 
+        #         svd = model._svds['features.28'], 
+        #         layer = model._target_modules['features.28'], 
+        #         use_s = True,
+        #         device = device
+        #         ),
             'classifier.0': partial(
                 linear_svd_projection,
                 svd = model._svds['classifier.0'], 
                 use_s = True,
                 device=device
                 ),
-            'classifier.3': partial(
-                linear_svd_projection,
-                svd = model._svds['classifier.3'], 
-                use_s = True,
-                device=device
-                ),
-            'classifier.6': partial(
-                linear_svd_projection,
-                svd = model._svds['classifier.6'], 
-                use_s = True,
-                device=device
-                ),
+            # 'classifier.3': partial(
+            #     linear_svd_projection,
+            #     svd = model._svds['classifier.3'], 
+            #     use_s = True,
+            #     device=device
+            #     ),
+            # 'classifier.6': partial(
+            #     linear_svd_projection,
+            #     svd = model._svds['classifier.6'], 
+            #     use_s = True,
+            #     device=device
+            #     ),
             }
     
-    with corevecs as cv: 
-        cv.load_only(loaders=['train'], verbose=True)
-        plt.imshow(cv._dss['train'][0].detach().cpu().numpy().transpose(1,2,0))
-        plt.savefig('prova.png')
-        quit()
-        cv.parse_ds(
-                batch_size = bs,
-                datasets = ds,
-                n_threads = n_threads,
-                verbose = verbose
-                )
+#     with corevecs as cv: 
+#         #cv.load_only(loaders=['train'], verbose=True)
+#         # plt.imshow(cv._dss['train'][0].detach().cpu().numpy().transpose(1,2,0))
+#         # plt.savefig('prova.png')
+#         # quit()
+#         cv.parse_ds(
+#                 batch_size = bs,
+#                 datasets = ds,
+#                 n_threads = n_threads,
+#                 verbose = verbose
+#                 )
 
-        '''
-        # This occupies a lot of space. Only do if you need it
-        # copy dataset to activatons file
-        cv.get_activations(
-                batch_size = bs,
-                n_threads = n_threads,
-                save_input = True,
-                save_output = False,
-                verbose = verbose
-                )        
-        ''' 
+#         '''
+#         # This occupies a lot of space. Only do if you need it
+#         # copy dataset to activatons file
+#         cv.get_activations(
+#                 batch_size = bs,
+#                 n_threads = n_threads,
+#                 save_input = True,
+#                 save_output = False,
+#                 verbose = verbose
+#                 )        
+#         ''' 
 
-        # computing the corevectors
-        cv.get_coreVectors(
-                batch_size = bs,
-                reduction_fns = reduction_fns,
-                n_threads = n_threads,
-                save_input = True,
-                save_output = False,
-                verbose = verbose
-                )
+#         # computing the corevectors
+#         cv.get_coreVectors(
+#                 batch_size = bs,
+#                 reduction_fns = reduction_fns,
+#                 n_threads = n_threads,
+#                 save_input = True,
+#                 save_output = False,
+#                 verbose = verbose
+#                 )
         
 
-        if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
-            cv.normalize_corevectors(
-                    wrt = 'train',
-                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
-                    to_file = cvs_path/(cvs_name+'.normalization.pt'),
-                    batch_size = bs,
-                    n_threads = n_threads,
-                    verbose=verbose
-                    )
+#         #if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
+#         cv.normalize_corevectors(
+#                 wrt = 'train',
+#                 #from_file = cvs_path/(cvs_name+'.normalization.pt'),
+#                 to_file = cvs_path/(cvs_name+'.normalization.pt'),
+#                 batch_size = bs,
+#                 n_threads = n_threads,
+#                 verbose=verbose
+#                 )
         
-        fig, axs = plt.subplots(1,2, figsize=(12, 6))
-        axs[0].hist(cv._dss['train']['label'], bins=1000, color='blue', alpha=0.7)
-        axs[0].set_title('Train Labels Distribution')
-        axs[0].set_xlabel('Labels')
-        axs[0].set_ylabel('Frequency')
-        axs[1].hist(cv._dss['train']['label'][cv._dss['train']['result']==0], bins=1000, color='red', label='W',alpha=0.7)
-        axs[1].hist(cv._dss['train']['label'][cv._dss['train']['result']==1], bins=1000, color='green', label='C',alpha=0.7)
-        axs[1].set_title('Correct and Wrong Labels Distribution')
-        axs[1].set_xlabel('Labels')
-        axs[1].set_ylabel('Frequency')
-        axs[1].legend()
-        plt.tight_layout()
-        plt.savefig((cvs_path/(cvs_name+'.labels_distribution.png')).as_posix(), dpi=300, bbox_inches='tight')
-        plt.close() 
+#         fig, axs = plt.subplots(1,2, figsize=(12, 6))
+#         axs[0].hist(cv._dss['train']['label'], bins=1000, color='blue', alpha=0.7)
+#         axs[0].set_title('Train Labels Distribution')
+#         axs[0].set_xlabel('Labels')
+#         axs[0].set_ylabel('Frequency')
+#         axs[1].hist(cv._dss['train']['label'][cv._dss['train']['result']==0], bins=1000, color='red', label='W',alpha=0.7)
+#         axs[1].hist(cv._dss['train']['label'][cv._dss['train']['result']==1], bins=1000, color='green', label='C',alpha=0.7)
+#         axs[1].set_title('Correct and Wrong Labels Distribution')
+#         axs[1].set_xlabel('Labels')
+#         axs[1].set_ylabel('Frequency')
+#         axs[1].legend()
+#         plt.tight_layout()
+#         plt.savefig((cvs_path/(cvs_name+'.labels_distribution.png')).as_posix(), dpi=300, bbox_inches='tight')
+#         plt.close() 
        
     #--------------------------------
     # Peepholes
@@ -258,7 +272,8 @@ if __name__ == "__main__":
             )
     
     classifier_cv_dim = 100
-    n_cluster = 500
+    features28_cv_dim = 100
+    n_cluster = 1000
 
     cv_parsers = {
             # 'features.24': partial(
@@ -271,32 +286,33 @@ if __name__ == "__main__":
             #     module = 'features.26',
             #     cv_dim = features26_cv_dim
             #     ),
-            # 'features.28': partial(
-            #     trim_corevectors,
-            #     module = 'features.28',
-            #     cv_dim = features28_cv_dim
-            #     ),
+        #     'features.28': partial(
+        #         trim_corevectors,
+        #         module = 'features.28',
+        #         cv_dim = features28_cv_dim
+        #         ),
             'classifier.0': partial(
                 trim_corevectors,
                 module = 'classifier.0',
                 cv_dim = classifier_cv_dim
                 ),
-            'classifier.3': partial(
-                trim_corevectors,
-                module = 'classifier.3',
-                cv_dim = classifier_cv_dim
-                ),
-            'classifier.6': partial(
-                trim_corevectors,
-                module = 'classifier.6',
-                cv_dim = classifier_cv_dim
-                ),
+            # 'classifier.3': partial(
+            #     trim_corevectors,
+            #     module = 'classifier.3',
+            #     cv_dim = classifier_cv_dim
+            #     ),
+            # 'classifier.6': partial(
+            #     trim_corevectors,
+            #     module = 'classifier.6',
+            #     cv_dim = classifier_cv_dim
+            #     ),
             }
 
     feature_sizes = {
+            #'features.28': features28_cv_dim,
             'classifier.0': classifier_cv_dim,
-            'classifier.3': classifier_cv_dim,
-            'classifier.6': classifier_cv_dim,
+            # 'classifier.3': classifier_cv_dim,
+            # 'classifier.6': classifier_cv_dim,
             }
 
     drillers = {}
@@ -325,12 +341,11 @@ if __name__ == "__main__":
             else:
                 t0 = time()
                 print(f'Fitting classifier for {drill_key}')
-                driller.fit(corevectors = cv._corevds['train'], verbose=verbose)
+                driller.fit(corevectors = cv, verbose=verbose)
                 print(f'Fitting time for {drill_key}  = ', time()-t0)
 
                 driller.compute_empirical_posteriors(
-                        dataset = cv._dss['train'],
-                        corevectors = cv._corevds['train'],
+                        corevectors = cv,
                         batch_size = bs,
                         verbose=verbose
                         )
