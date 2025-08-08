@@ -34,6 +34,9 @@ from cuda_selector import auto_cuda
 import clip
 from nltk.corpus import wordnet as wn
 
+def is_descendant(syn, ancestor):
+    return any(ancestor in path for path in syn.hypernym_paths())
+
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
@@ -83,10 +86,26 @@ if __name__ == "__main__":
 
     with open(Path.cwd()/"../data/ImageNet/imagenet_class_index.json") as f:
         class_idx = json.load(f)
+    root = wn.synset('dog.n.01')
 
-    idx2label = {int(k): v[1] for k, v in class_idx.items()}
-    synset_ids = [class_idx[str(i)][0] for i in range(1000)]
-    short_labels = [class_idx[str(i)][1] for i in range(1000)]
+    wnid_to_syn = {}
+    for _, (wnid, _) in class_idx.items():
+        pos = wnid[0]             # 'n' for noun
+        offset = int(wnid[1:])    # e.g. 'n02481823' → 2481823
+        try:
+            syn = wn.synset_from_pos_and_offset(pos, offset)
+            wnid_to_syn[wnid] = syn
+        except Exception:
+            # skip any WNIDs not in your local WordNet install
+            continue
+    
+
+    root = wn.synset('bird.n.01')
+
+    filtered = {syn for syn in wnid_to_syn.values() if is_descendant(syn, root)}
+
+    prompts = [f"a photo of a {syn.lemma_names()[0].replace('_',' ')}" for syn in filtered]
+    print(prompts)
 
     #--------------------------------
     # Models
@@ -98,8 +117,7 @@ if __name__ == "__main__":
     # Tokens
     #--------------------------------
 
-    lbl = 'canine'
-    text_inputs = clip.tokenize(f"a photo of a {lbl}").to(device)
+    text_inputs = clip.tokenize(prompts).to(device)
     with torch.no_grad():
         text_embeds = model.encode_text(text_inputs)
         text_embeds /= text_embeds.norm(dim=-1, keepdim=True)
@@ -179,10 +197,9 @@ if __name__ == "__main__":
 
         conf, clusters = torch.max(probs, dim=1)
         labels_ = cv._dss['train']['label']
+        clusters_reptile = []
 
-        dog_similarity = []
-
-        for cluster in tqdm(range(n_cluster)):
+        for cluster in tqdm(range(3)):
 
             idx = torch.argwhere((clusters==cluster)).squeeze()
             images = cv._dss['train']['image'][idx]
@@ -196,19 +213,9 @@ if __name__ == "__main__":
                 mean_image = mean_image / mean_image.norm(dim=-1, keepdim=True)   
 
             similarity = mean_image @ text_embeds.t() 
-            dog_similarity.append(similarity.squeeze().detach().cpu().numpy())
+            print(similarity.min())
+            if similarity.min() > 0.3:
+                clusters_reptile.append(cluster)
+            print(clusters_reptile)
 
-        indexed = list(enumerate(dog_similarity))
         
-        plt.figure(figsize=(15, 5))
-        plt.bar(np.arange(len(dog_similarity)), dog_similarity,linewidth=0)
-        plt.xlabel('Sample Index')
-        plt.ylabel('similarity wrt dog')
-        plt.title('Similarity Plot wrt Dog')
-        plt.savefig('prova_dog.png')
-
-        indexed.sort(key=lambda pair: pair[1], reverse=True)
-        with open('indexed_dog.txt', 'w') as f:
-            for idx, sim in indexed:
-                # write each pair on its own line, tab-separated:
-                f.write(f"{idx}\t{sim}\n")
