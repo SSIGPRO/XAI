@@ -49,14 +49,15 @@ if __name__ == "__main__":
 
     # model parameters
     dataset = 'ImageNet' 
+    model_name = 'vgg'
     seed = 29
     bs = 512 
     n_threads = 1
     
-    cvs_path = Path.cwd()/f'../data/{dataset}/corevectors'
+    cvs_path = Path.cwd()/f'../data/{model_name}/corevectors'
     cvs_name = 'corevectors'
 
-    drill_path = Path.cwd()/f'../data/{dataset}/drillers'
+    drill_path = Path.cwd()/f'../data/{model_name}/drillers'
     drill_name = 'classifier'
     
     verbose = True 
@@ -85,7 +86,7 @@ if __name__ == "__main__":
     
     n_classes = len(ds.get_classes()) 
 
-    with open(Path.cwd()/"../data/ImageNet_/imagenet_class_index.json") as f:
+    with open(Path.cwd()/"../data/vgg/imagenet_class_index.json") as f:
         class_idx = json.load(f)
 
     idx2label = {int(k): v[1] for k, v in class_idx.items()}
@@ -128,7 +129,7 @@ if __name__ == "__main__":
     
     classifier_cv_dim = 100
     features28_cv_dim = 100
-    n_cluster = 1000
+    n_cluster = 500
 
     cv_parsers = {
             # 'features.24': partial(
@@ -232,7 +233,7 @@ if __name__ == "__main__":
             print(f"Cluster {lbl:>2} : {cnt:>4} samples,  rank = {ranks[lbl].item()}")
 
         
-        for cluster in [389, 932, 7, 913, 629, 996]: # 
+        for cluster in range(2): # 
 
             idx = torch.argwhere((clusters==cluster)).squeeze()
             images = cv._dss['train']['image'][idx]
@@ -272,8 +273,8 @@ if __name__ == "__main__":
 
                 # show the image
                 img = images[i].detach().cpu().numpy().transpose(1,2,0)
-                img = img * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]
-                img = np.clip(img, 0, 1)
+                # img = img * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]
+                # img = np.clip(img, 0, 1)
                 ax.imshow(img)
                 # ax.imshow(img.detach().cpu().numpy().transpose(1,2,0))
                 # turn off ticks & frame
@@ -286,7 +287,7 @@ if __name__ == "__main__":
             fig.suptitle(f"{short_labels[similarity[0].topk(1)[1]]}: cluster population {len(images)}", fontsize=20, y=1.02)
 
             plt.tight_layout()
-            fig.savefig(drillers[layer]._clas_path/f'samples_cluster.{cluster}.png', dpi=200, bbox_inches='tight')
+            fig.savefig(drillers[layer]._clas_path/f'samples_cluster.{cluster}_.png', dpi=200, bbox_inches='tight')
         
 
         

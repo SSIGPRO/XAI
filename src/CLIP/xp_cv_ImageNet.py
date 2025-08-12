@@ -7,9 +7,7 @@ from time import time
 from functools import partial
 from matplotlib import pyplot as plt
 
-# Our stuff
-from peepholelib.datasets.imagenet import ImageNet
-from peepholelib.datasets.transforms import vgg16_imagenet as ds_transform 
+# Our stuff 
 
 from peepholelib.coreVectors.coreVectors import CoreVectors
 
@@ -19,77 +17,32 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 from peepholelib.utils.samplers import random_subsampling 
 
 if sys.argv[1] == 'vgg':
-    from .config_vgg import *
-elif sys.argv[1] == 'vgg_cifar10':
-    from config_cifar10_vgg16_toeplitz import *
+    from config.config_vgg import *
+elif sys.argv[1] == 'vit':
+    from config.config_vit import *
 else:
     raise RuntimeError('Select a configuration by runing \'python xp_get_corevectors.py <vgg_cifar10|vgg_cifar100|vit_cifar100>\'')
 
 
 if __name__ == "__main__":
     
-
     #--------------------------------
     # Directories definitions
     #--------------------------------
-    ds_path = '/srv/newpenny/dataset/ImageNet_torchvision'
 
-    # model parameters
-    dataset = 'ImageNet' 
+    # model parameters 
     seed = 29
     bs = 512 
     n_threads = 1
 
-    # model_dir = '/srv/newpenny/XAI/models'
-    # model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
-    
-    svds_path = Path.cwd()/f'../data/{dataset}'
-    svds_name = 'svds' 
-    
-    cvs_path = Path.cwd()/f'../data/{dataset}/corevectors'
+    cvs_path = Path.cwd()/f'../../data/{model_name}/corevectors'
     cvs_name = 'corevectors'
 
-    drill_path = Path.cwd()/f'../data/{dataset}/drillers'
+    drill_path = Path.cwd()/f'../../data/{model_name}/drillers'
     drill_name = 'classifier'
     
     verbose = True 
     
-    #--------------------------------
-    # Dataset 
-    #--------------------------------
-
-    ds = ImageNet(
-            data_path = ds_path,
-            dataset = dataset
-            )
-
-    ds.load_data(
-            transform = ds_transform,
-            seed = seed,
-            )
-    
-    n_classes = len(ds.get_classes()) 
-
-    #--------------------------------
-    # Model 
-    #--------------------------------    
-
-    model.set_target_modules(
-            target_modules = target_layers,
-            verbose = verbose
-            )
-
-    t0 = time()
-    model.get_svds(
-            path = svds_path,
-            name = svds_name,
-            target_modules = target_layers,
-            sample_in = ds._dss['train'][0][0],
-            svd_fns = svd_fns,
-            verbose = verbose
-            )
-    print('time: ', time()-t0)
-
     '''
     print('\n----------- svds:')
     for k in model._svds.keys():
@@ -127,10 +80,7 @@ if __name__ == "__main__":
     # define a dimensionality reduction function for each layer
     
     with corevecs as cv: 
-        #cv.load_only(loaders=['train'], verbose=True)
-        # plt.imshow(cv._dss['train'][0].detach().cpu().numpy().transpose(1,2,0))
-        # plt.savefig('prova.png')
-        # quit()
+        
         cv.parse_ds(
                 batch_size = bs,
                 datasets = ds,
@@ -214,7 +164,9 @@ if __name__ == "__main__":
         cv.load_only(
                 loaders = ['train', 'val'],
                 verbose = True
-                ) 
+                )
+        for ds_key, cv_dss in cv._dss.items():
+            print(ds_key, cv_dss['result'].sum()/len(cv_dss))
 
         for drill_key, driller in drillers.items():
             if (driller._empp_file).exists():
