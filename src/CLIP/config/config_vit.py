@@ -31,8 +31,7 @@ ds_path = '/srv/newpenny/dataset/ImageNet_torchvision'
 svds_path = Path.cwd()/f'../../data/{model_name}'
 svds_name = 'svds' 
 
-classifier_svd_rank = 1000
-features_svd_rank = 300
+svd_rank = 300
 
 nn = vit_b_16(weights='IMAGENET1K_V1')
 model = ModelWrap(

@@ -32,6 +32,67 @@ from torchvision.models import vgg16
 from cuda_selector import auto_cuda
 import clip
 from nltk.corpus import wordnet as wn
+from diffusers import StableDiffusionPipeline
+from PIL import Image
+
+def generate_with_image_steering(pipe, image_cross_attn_embeds, num_steps=50, guidance_scale=7.5, height=512, width=512):   
+    """
+    Generate images using CLIP image embeddings instead of text embeddings
+    for cross-attention steering in UNet
+    """
+    device = pipe.device
+
+    # Create unconditional (negative) embeddings for classifier-free guidance
+    uncond_cross_attn_embeds = torch.zeros_like(image_cross_attn_embeds)
+    
+    # Concatenate for CFG: [unconditional, conditional]
+    encoder_hidden_states = torch.cat([uncond_cross_attn_embeds, image_cross_attn_embeds])
+    
+    # Initialize random latents
+    latents = torch.randn(
+        (1, 4, height // 8, width // 8),
+        device=device,
+        dtype=pipe.unet.dtype
+    )
+    
+    # Setup scheduler
+    pipe.scheduler.set_timesteps(num_steps)
+    latents = latents * pipe.scheduler.init_noise_sigma
+    
+    # Denoising loop with image-guided cross-attention
+    for i, t in enumerate(pipe.scheduler.timesteps):
+        # Expand latents for classifier-free guidance
+        latent_model_input = torch.cat([latents] * 2)
+        latent_model_input = pipe.scheduler.scale_model_input(latent_model_input, t)
+        
+        # UNet forward pass - image embeddings steer via cross-attention
+        with torch.no_grad():
+            noise_pred = pipe.unet(
+                latent_model_input,
+                t,
+                encoder_hidden_states=encoder_hidden_states,  # Image embeds → cross-attention
+                return_dict=False
+            )[0]
+        
+        # Classifier-free guidance
+        noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+        noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
+        
+        # Scheduler step
+        latents = pipe.scheduler.step(noise_pred, t, latents, return_dict=False)[0]
+        
+        if i % 10 == 0:
+            print(f"Step {i}/{num_steps}")
+    
+    # Decode latents to image
+    with torch.no_grad():
+        image = pipe.vae.decode(latents / pipe.vae.config.scaling_factor, return_dict=False)[0]
+        image = (image / 2 + 0.5).clamp(0, 1)
+        image = image.cpu().permute(0, 2, 3, 1).numpy()[0]
+        image = (image * 255).round().astype("uint8")
+    
+    return image
+
 
 if __name__ == "__main__":
     # use_cuda = torch.cuda.is_available()
@@ -86,38 +147,17 @@ if __name__ == "__main__":
     
     n_classes = len(ds.get_classes()) 
 
-    with open(Path.cwd()/"../data/vgg/imagenet_class_index.json") as f:
-        class_idx = json.load(f)
-
-    idx2label = {int(k): v[1] for k, v in class_idx.items()}
-    synset_ids = [class_idx[str(i)][0] for i in range(1000)]
-    short_labels = [class_idx[str(i)][1] for i in range(1000)]
-
     #--------------------------------
-    # Models
+    # Visual Encoder
     #--------------------------------
 
-    model, preprocess = clip.load("ViT-B/32", device=device)
+    model, preprocess = clip.load("ViT-L/14", device=device)
 
-    #--------------------------------
-    # Tokens
-    #--------------------------------
-    # classes = list(ds._classes.values())
-    # classes.append('reptile')
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5", 
+        torch_dtype=torch.float32
+    ).to(device)
 
-    # class_names = [tup[0] for tup in classes]
-    #class_names = ['person','small furry mammal','analogical clock', 'gown','dress', 'curly dog', 'food', 'close up', 'mirror' ,'basket', 'ladybug', 'ladybird', 'dragonfly', 'reptile', 'mountain', 'human', 'amphibian', 'mammal', 'fish', 'brown object', 'wood', 'seaside', 'bed', 'countryside', 'bird', 'horse', 'skyscraper', 'white background', 'line', 'geometric form', 'dog', 'white and brown dog' ]
-    #text_inputs = [f"a photo of a {label}" for label in class_names]
-
-    # text_inputs = [f"a photo of a {lbl}" for lbl in short_labels]
-    text_inputs = clip.tokenize([f"a photo of a {lbl}" for lbl in short_labels]).to(device)
-    text_back = clip.tokenize([" "]).to(device)
-    
-    with torch.no_grad():
-        text_embeds = model.encode_text(text_inputs)
-        text_back_embed = model.encode_text(text_back)
-        text_embeds /= text_embeds.norm(dim=-1, keepdim=True)
-        text_back_embed /= text_back_embed.norm(dim=-1, keepdim=True)
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -129,7 +169,7 @@ if __name__ == "__main__":
     
     classifier_cv_dim = 100
     features28_cv_dim = 100
-    n_cluster = 500
+    n_cluster = 1000
 
     cv_parsers = {
             # 'features.24': partial(
@@ -192,6 +232,7 @@ if __name__ == "__main__":
 
         for drill_key, driller in drillers.items():
             print(f'Loading Classifier for {drill_key}') 
+            print(driller._clas_path)
             driller.load()
         layer = 'classifier.0'
 
@@ -209,85 +250,35 @@ if __name__ == "__main__":
             start += bs
 
         conf, clusters = torch.max(probs, dim=1)
-        labels_ = cv._dss['train']['label']
-        counts = torch.bincount(clusters)
-        # counts[i] = number of samples with cluster==i
-
-        # 2) sort clusters by their population, descending
-        sorted_counts, sorted_labels = counts.sort(descending=True)
-        # sorted_labels[j] is the j-th most populous cluster label
-        # sorted_counts[j] is how many in that cluster
-
-        # 3) build a “rank” tensor s.t. rank[i] = 1 if i is the largest, 2 if 2nd, …
-        ranks = torch.empty_like(sorted_labels)
-        ranks[sorted_labels] = torch.arange(1, sorted_labels.numel()+1)
-
-        # Now you have:
-        #   counts: tensor of size (K,)
-        #   sorted_labels: tensor of size (K,)
-        #   sorted_counts: tensor of size (K,)
-        #   ranks: tensor of size (K,), where ranks[i] is the rank of cluster i
-
-        # Example printout:
-        for lbl, cnt in zip(sorted_labels.tolist(), sorted_counts.tolist()):
-            print(f"Cluster {lbl:>2} : {cnt:>4} samples,  rank = {ranks[lbl].item()}")
-
         
-        for cluster in range(2): # 
+        for cluster in range(6,7): # 
 
             idx = torch.argwhere((clusters==cluster)).squeeze()
             images = cv._dss['train']['image'][idx]
 
-            model, preprocess = clip.load("ViT-B/32", device=device, jit=False)
             with torch.no_grad():
                 
                 image_features = model.encode_image(images.to(device))
 
                 mean_image = image_features.mean(dim=0, keepdim=True)           
-                mean_image = mean_image / mean_image.norm(dim=-1, keepdim=True)   
+                image_embeddings = mean_image / mean_image.norm(dim=-1, keepdim=True) 
 
-            similarity = mean_image @ text_embeds.t()
-            topk = 10
-            values, indices = similarity[0].topk(topk)
-
-            for score, idx in zip(values, indices):
-                print(f"{short_labels[idx]}: {score.item():.3f}")
+            batch_size = 1
+            seq_length = 77  # Standard for SD
             
-            if len(images) <= 50:
-                num_images = len(images)-5
-            else:
-                num_images = 40
-
-            # choose number of columns
-            cols = 5
-            rows = math.ceil(num_images / cols)
-
-            # make a big enough figure
-            fig, axs = plt.subplots(rows, cols, figsize=(cols * 4, rows * 4))
-
-            # flatten the axes array for easy indexing
-
-            axs = axs.flatten()
-
-            for i, ax in enumerate(axs):
-
-                # show the image
-                img = images[i].detach().cpu().numpy().transpose(1,2,0)
-                # img = img * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]
-                # img = np.clip(img, 0, 1)
-                ax.imshow(img)
-                # ax.imshow(img.detach().cpu().numpy().transpose(1,2,0))
-                # turn off ticks & frame
-                ax.axis('off')
-
-            # turn off any remaining empty subplots
-            for ax in axs[num_images:]:
-                ax.axis('off')
+            # Option A: Repeat single image embedding across sequence
+            cross_attention_embeddings = image_embeddings.unsqueeze(1).repeat(1, seq_length, 1)
             
-            fig.suptitle(f"{short_labels[similarity[0].topk(1)[1]]}: cluster population {len(images)}", fontsize=20, y=1.02)
+            # Option B: Use image embedding as first token, pad rest with zeros
+            # cross_attention_embeddings = torch.zeros(batch_size, seq_length, image_embeddings.shape[-1], device=device)
+            # cross_attention_embeddings[:, 0] = image_embeddings
+            
+            cross_attention_embeddings = cross_attention_embeddings.to(device=pipe.device, dtype=pipe.unet.dtype)
 
-            plt.tight_layout()
-            fig.savefig(drillers[layer]._clas_path/f'samples_cluster.{cluster}_.png', dpi=200, bbox_inches='tight')
+            image = generate_with_image_steering(pipe=pipe, image_cross_attn_embeds=cross_attention_embeddings, guidance_scale=1)
+            plt.imshow(image)
+            plt.savefig(drillers[layer]._clas_path/f'diffusion_image.{cluster}.png', dpi=200, bbox_inches='tight')
+            quit()
         
 
         

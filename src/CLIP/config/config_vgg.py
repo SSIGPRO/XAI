@@ -51,7 +51,6 @@ ds.load_data(
 
 n_classes = len(ds.get_classes()) 
 
-
 nn = vgg16(weights='IMAGENET1K_V1')
 model = ModelWrap(
         model = nn,
