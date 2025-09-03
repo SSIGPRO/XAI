@@ -67,6 +67,9 @@ if __name__ == "__main__":
     cvs_path = Path.cwd()/f'../../data/{model_name}/corevectors'
     cvs_name = 'corevectors'
 
+    embeds_path = Path.cwd()/f'../../data/{model_name}/corevectors'
+    embeds_name = 'CLIP_embeddings_ViT-L14'
+
     drill_path = Path.cwd()/f'../../data/{model_name}/drillers'
     drill_name = 'classifier'
     
@@ -96,6 +99,12 @@ if __name__ == "__main__":
             path = cvs_path,
             name = cvs_name,
             )
+
+    embeds = CoreVectors(
+            path = embeds_path,
+            name = embeds_name,
+            model = model,
+            )
     
     drillers = {_layer: tGMM(
                             path = drill_path,
@@ -111,11 +120,16 @@ if __name__ == "__main__":
     concept_path.mkdir(parents=True, exist_ok=True)
 
     # fitting classifiers
-    with corevecs as cv:
+    with corevecs as cv, embeds as em:
         cv.load_only(
                 loaders = ['train', 'val'],
                 verbose = True
                 ) 
+        
+        em.load_only(
+                loaders = ['train', 'val'],
+                verbose = True
+                )
 
         for drill_key, driller in drillers.items():
             print(f'Loading Classifier for {drill_key}') 
@@ -129,7 +143,7 @@ if __name__ == "__main__":
         
         start = 0
         
-        for data in cv_dl:
+        for data in tqdm(cv_dl):
             bs = data.shape[0]
             probs[start:start+bs] = drillers[_layer]._classifier.predict_proba(data)
             start += bs
@@ -149,16 +163,11 @@ if __name__ == "__main__":
             for cluster in tqdm(range(n_cluster)): 
 
                 idx = torch.argwhere((clusters==cluster)).squeeze()
-                images = cv._dss['train']['image'][idx]
 
-                with torch.no_grad():
-                    
-                    image_features = model.encode_image(images.to(device))
+                mean_em = em._corevds['train']['embedding'][idx].mean(dim=0, keepdim=True)           
+                mean_em = mean_em / mean_em.norm(dim=-1, keepdim=True)   
 
-                    mean_image = image_features.mean(dim=0, keepdim=True)           
-                    mean_image = mean_image / mean_image.norm(dim=-1, keepdim=True)   
-
-                sim[cluster] = mean_image @ text_embeds.t()
+                sim[cluster] = mean_em.float().to(device) @ text_embeds.float().t()
 
             torch.save(sim.cpu(), concept_path / f"distribution_similarity_{_concept}.pt") 
 
@@ -170,19 +179,20 @@ if __name__ == "__main__":
         plt.ylabel("Frequency")
         plt.title("Distribution of similarities")
         plt.savefig('prova.png')
+        
 
         threshold = threshold_otsu(sim_values.numpy())
         print("Otsu threshold:", threshold)
 
         # Take the 95th percentile
-        percentile_90 = torch.quantile(sim_values, 0.90)
+        percentile_90 = torch.quantile(sim_values, 0.97)
         print("90th percentile:", percentile_90.item())
 
         # If you want the *values* above the 95th percentile
         top_values = sim_values[sim_values >= percentile_90]
         print("Number of values above 90th percentile:", top_values.numel())
 
-        thr = torch.quantile(sim.float().flatten(), 0.90)
+        thr = torch.quantile(sim.float().flatten(), 0.97)
 
         top_mask = sim >= thr                         # [num_clusters]
         cluster_ids = torch.nonzero(top_mask).squeeze(1)  # indices of clusters
@@ -220,7 +230,6 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.title("Distribution of similarities")
         plt.savefig(concept_path/'Similarity_distribution.png')
-        quit()
 
         for cluster, sim in tqdm(zip(cluster_ids.tolist(),top_vals.tolist())):
             idx = torch.argwhere((clusters==cluster)).squeeze()
