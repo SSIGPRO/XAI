@@ -10,6 +10,7 @@ import math
 import numpy as np
 import json
 from tqdm import tqdm
+from skimage.filters import threshold_otsu
 
 # Our stuff
 from torch.utils.data import DataLoader
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     # Models
     #--------------------------------
 
-    model, preprocess = clip.load("ViT-L/14", device=device)
+    model, _ = clip.load("ViT-L/14", device=device)
 
     #--------------------------------
     # Tokens
@@ -134,24 +135,32 @@ if __name__ == "__main__":
             start += bs
 
         conf, clusters = torch.max(probs, dim=1)
-        
-        sim = torch.zeros(n_cluster)
-        
-        for cluster in tqdm(range(n_cluster)):#[10, 17, 18, 19, 32]: 
 
-            idx = torch.argwhere((clusters==cluster)).squeeze()
-            images = cv._dss['train']['image'][idx]
+        check_path = concept_path/f"distribution_similarity_{_concept}.pt"
 
-            with torch.no_grad():
-                
-                image_features = model.encode_image(images.to(device))
+        if check_path.exists():
 
-                mean_image = image_features.mean(dim=0, keepdim=True)           
-                mean_image = mean_image / mean_image.norm(dim=-1, keepdim=True)   
+            sim = torch.load(concept_path / f"distribution_similarity_{_concept}.pt")
 
-            sim[cluster] = mean_image @ text_embeds.t()
+        else:        
 
-        torch.save(sim.cpu(), concept_path / f"distribution_similarity_{_concept}.pt") 
+            sim = torch.zeros(n_cluster)
+            
+            for cluster in tqdm(range(n_cluster)): 
+
+                idx = torch.argwhere((clusters==cluster)).squeeze()
+                images = cv._dss['train']['image'][idx]
+
+                with torch.no_grad():
+                    
+                    image_features = model.encode_image(images.to(device))
+
+                    mean_image = image_features.mean(dim=0, keepdim=True)           
+                    mean_image = mean_image / mean_image.norm(dim=-1, keepdim=True)   
+
+                sim[cluster] = mean_image @ text_embeds.t()
+
+            torch.save(sim.cpu(), concept_path / f"distribution_similarity_{_concept}.pt") 
 
         sim_values = sim.flatten().cpu()
 
@@ -161,6 +170,9 @@ if __name__ == "__main__":
         plt.ylabel("Frequency")
         plt.title("Distribution of similarities")
         plt.savefig('prova.png')
+
+        threshold = threshold_otsu(sim_values.numpy())
+        print("Otsu threshold:", threshold)
 
         # Take the 95th percentile
         percentile_90 = torch.quantile(sim_values, 0.90)
@@ -198,6 +210,8 @@ if __name__ == "__main__":
         thr_val = float(thr.item())
         plt.axvline(thr_val, linestyle="--", linewidth=2, color="red",
                     label=f"90th pct = {thr_val:.4f}")
+        plt.axvline(threshold, linestyle="--", linewidth=2, color="green",
+                    label=f"Otsu = {threshold:.4f}")
 
         # (optional) shade the top 5% region
         plt.axvspan(thr_val, sim_values.max().item(), alpha=0.15, color="red", label="top 10%")
@@ -206,6 +220,7 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.title("Distribution of similarities")
         plt.savefig(concept_path/'Similarity_distribution.png')
+        quit()
 
         for cluster, sim in tqdm(zip(cluster_ids.tolist(),top_vals.tolist())):
             idx = torch.argwhere((clusters==cluster)).squeeze()
@@ -246,53 +261,3 @@ if __name__ == "__main__":
 
             plt.tight_layout()
             fig.savefig(concept_path/f'samples_cluster.{cluster}_.png', dpi=200, bbox_inches='tight')
-            
-        quit()    
-            # topk = 10
-            # values, indices = similarity[0].topk(topk)
-
-            # for score, idx in zip(values, indices):
-            #     print(f"{short_labels[idx]}: {score.item():.3f}")
-            
-            # if len(images) <= 50:
-            #     num_images = len(images)-5
-            # else:
-            #     num_images = 40
-
-            # # choose number of columns
-            # cols = 5
-            # rows = math.ceil(num_images / cols)
-
-            # # make a big enough figure
-            # fig, axs = plt.subplots(rows, cols, figsize=(cols * 4, rows * 4))
-
-            # # flatten the axes array for easy indexing
-
-            # axs = axs.flatten()
-
-            # for i, ax in enumerate(axs):
-
-            #     # show the image
-            #     img = images[i].detach().cpu().numpy().transpose(1,2,0)
-            #     img = img * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]
-            #     img = np.clip(img, 0, 1)
-            #     ax.imshow(img)
-            #     # ax.imshow(img.detach().cpu().numpy().transpose(1,2,0))
-            #     # turn off ticks & frame
-            #     ax.axis('off')
-
-            # # turn off any remaining empty subplots
-            # for ax in axs[num_images:]:
-            #     ax.axis('off')
-            
-            # fig.suptitle(f"{short_labels[similarity[0].topk(1)[1]]}: cluster population {len(images)}", fontsize=20, y=1.02)
-
-            # plt.tight_layout()
-            # fig.savefig(drillers[_layer]._clas_path/f'samples_cluster.{cluster}_.png', dpi=200, bbox_inches='tight')
-            
-        
-
-        
-
-            
-    

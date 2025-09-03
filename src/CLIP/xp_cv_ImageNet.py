@@ -16,6 +16,15 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 
 from peepholelib.utils.samplers import random_subsampling 
 
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("model", choices=["vgg", "vit"], help="Model type to use")
+parser.add_argument("--n_cluster", required=True, help="number of cluster for the cvs")
+args = parser.parse_args()
+
+n_cluster = args.n_cluster
+
 if sys.argv[1] == 'vgg':
     from config.config_vgg import *
 elif sys.argv[1] == 'vit':
@@ -35,8 +44,11 @@ if __name__ == "__main__":
     bs = 512 
     n_threads = 1
 
-    cvs_path = Path.cwd()/f'../../data/{model_name}/corevectors'
+    cvs_path = Path.cwd()/f'../../data/{model_name}/corevectors_prova'
     cvs_name = 'corevectors'
+
+    embeds_path = Path.cwd()/f'../../data/{model_name}/corevectors_prova'
+    embeds_name = 'CLIP_embeddings_ViT-L14'
 
     drill_path = Path.cwd()/f'../../data/{model_name}/drillers'
     drill_name = 'classifier'
@@ -69,7 +81,7 @@ if __name__ == "__main__":
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    random_subsampling(ds, 0.3)
+    random_subsampling(ds, 0.00003)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -77,11 +89,24 @@ if __name__ == "__main__":
             model = model,
             )
     
+    embeds = CoreVectors(
+            path = embeds_path,
+            name = embeds_name,
+            model = model,
+            )
+    
     # define a dimensionality reduction function for each layer
     
-    with corevecs as cv: 
-        
+    with corevecs as cv, embeds as em: 
+
         cv.parse_ds(
+                batch_size = bs,
+                datasets = ds,
+                n_threads = n_threads,
+                verbose = verbose
+                )
+        
+        em.parse_ds(
                 batch_size = bs,
                 datasets = ds,
                 n_threads = n_threads,
@@ -100,6 +125,8 @@ if __name__ == "__main__":
                 )        
         ''' 
 
+        em.get_clip_embeddings(device=device, clip_model='ViT-L/14', batch_size=bs, n_threads=n_threads, verbose=verbose)
+
         # computing the corevectors
         cv.get_coreVectors(
                 batch_size = bs,
@@ -109,7 +136,6 @@ if __name__ == "__main__":
                 save_output = False,
                 verbose = verbose
                 )
-        
 
         #if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
         cv.normalize_corevectors(
