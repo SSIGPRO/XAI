@@ -80,7 +80,7 @@ if __name__ == "__main__":
     ds_path = '/srv/newpenny/dataset/ImageNet_torchvision'
 
     # model parameters
-    bs = 512 
+    bs = 2**12 
     n_threads = 1
     
     cvs_path = Path.cwd()/f'../../data/{model_name}/corevectors'
@@ -153,6 +153,8 @@ if __name__ == "__main__":
         for drill_key, driller in drillers.items():
             print(f'Loading Classifier for {drill_key}') 
             driller.load()
+        
+        check_path = concept_path/f"distribution_similarity_{_concept}.pt"
 
         n_samples = len(cv._corevds['train'][_layer])                   
 
@@ -168,8 +170,6 @@ if __name__ == "__main__":
             start += bs
 
         conf, clusters = torch.max(probs, dim=1)
-
-        check_path = concept_path/f"distribution_similarity_{_concept}.pt"
 
         if check_path.exists():
 

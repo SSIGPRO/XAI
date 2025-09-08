@@ -30,6 +30,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("model", choices=["vgg", "vit"], help="Model type to use")
 parser.add_argument("--layer", required=True, help="Layer name to use")
+parser.add_argument("--cv_dim", type=int, default=100, help="CoreVector dimension to use")
 args = parser.parse_args()
 
 model_type = args.model
@@ -85,7 +86,9 @@ if __name__ == "__main__":
     # Tokens
     #--------------------------------
     
-    text_inputs = clip.tokenize([f"a photo of a {lbl}" for lbl in short_labels]).to(device)
+    #text_inputs = clip.tokenize([f"a photo of a {lbl}" for lbl in short_labels]).to(device)
+
+    text_inputs = clip.tokenize([f"a photo of a bird"]).to(device)
     
     with torch.no_grad():
         text_embeds = model.encode_text(text_inputs)   
@@ -127,7 +130,7 @@ if __name__ == "__main__":
 
         probs = torch.empty(n_samples, n_cluster, dtype=torch.float32)
 
-        cv_dl = DataLoader(cv._corevds['train'][_layer][...,:classifier_cv_dim], batch_size=bs, num_workers = n_threads)
+        cv_dl = DataLoader(cv._corevds['train'][_layer][...,:cv_dim], batch_size=bs, num_workers = n_threads)
         
         start = 0
         
@@ -138,7 +141,7 @@ if __name__ == "__main__":
 
         conf, clusters = torch.max(probs, dim=1)
         
-        for cluster in range(50, 55): # 
+        for cluster in range(53, 55): # 
 
             idx = torch.argwhere((clusters==cluster)).squeeze()
             images = cv._dss['train']['image'][idx]
@@ -151,7 +154,7 @@ if __name__ == "__main__":
                 mean_image = mean_image / mean_image.norm(dim=-1, keepdim=True)   
 
             similarity = mean_image @ text_embeds.t()
-            topk = 10
+            topk = 1
             values, indices = similarity[0].topk(topk)
 
             for score, idx in zip(values, indices):

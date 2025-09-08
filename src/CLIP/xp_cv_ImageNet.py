@@ -41,13 +41,13 @@ if __name__ == "__main__":
 
     # model parameters 
     seed = 29
-    bs = 512 
+    bs = 2**12 
     n_threads = 1
 
-    cvs_path = Path.cwd()/f'../../data/{model_name}/corevectors_prova'
+    cvs_path = Path.cwd()/f'../../data/{model_name}/corevectors'
     cvs_name = 'corevectors'
 
-    embeds_path = Path.cwd()/f'../../data/{model_name}/corevectors_prova'
+    embeds_path = Path.cwd()/f'../../data/{model_name}/corevectors'
     embeds_name = 'CLIP_embeddings_ViT-L14'
 
     drill_path = Path.cwd()/f'../../data/{model_name}/drillers'
@@ -81,13 +81,13 @@ if __name__ == "__main__":
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    random_subsampling(ds, 0.00003)
+    random_subsampling(ds, 0.3)
     
-    corevecs = CoreVectors(
-            path = cvs_path,
-            name = cvs_name,
-            model = model,
-            )
+    # corevecs = CoreVectors(
+    #         path = cvs_path,
+    #         name = cvs_name,
+    #         model = model,
+    #         )
     
     embeds = CoreVectors(
             path = embeds_path,
@@ -97,14 +97,14 @@ if __name__ == "__main__":
     
     # define a dimensionality reduction function for each layer
     
-    with corevecs as cv, embeds as em: 
+    with embeds as em: #corevecs as cv,
 
-        cv.parse_ds(
-                batch_size = bs,
-                datasets = ds,
-                n_threads = n_threads,
-                verbose = verbose
-                )
+        # cv.parse_ds(
+        #         batch_size = bs,
+        #         datasets = ds,
+        #         n_threads = n_threads,
+        #         verbose = verbose
+        #         )
         
         em.parse_ds(
                 batch_size = bs,
@@ -125,8 +125,12 @@ if __name__ == "__main__":
                 )        
         ''' 
 
-        em.get_clip_embeddings(device=device, clip_model='ViT-L/14', batch_size=bs, n_threads=n_threads, verbose=verbose)
-
+        em.get_clip_embeddings(device=device, 
+                               clip_model='ViT-L/14', 
+                               batch_size=bs, 
+                               n_threads=n_threads, 
+                               verbose=verbose)
+        quit()
         # computing the corevectors
         cv.get_coreVectors(
                 batch_size = bs,
