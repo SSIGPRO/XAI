@@ -8,8 +8,8 @@ from peepholelib.datasets.transforms import vgg16_imagenet as ds_transform
 from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
 
 from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection, conv2d_kernel_svd_projection
-
-from peepholelib.peepholes.parsers import trim_corevectors, trim_channelwise_corevectors, trim_kernel_corevectors
+from peepholelib.coreVectors.dimReduction.avgPooling import ChannelWiseMean_conv
+from peepholelib.peepholes.parsers import null_corevectors, trim_corevectors, trim_channelwise_corevectors, trim_kernel_corevectors
 
 # torch stuff
 import torch
@@ -18,8 +18,13 @@ from cuda_selector import auto_cuda
 
 from functools import partial
 
+# use_cuda = torch.cuda.is_available()
+# device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+# print(f"Using {device} device")
+
 use_cuda = torch.cuda.is_available()
-device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+cuda_index = torch.cuda.device_count() - 4
+device = torch.device(f"cuda:{cuda_index}" if use_cuda else "cpu")
 print(f"Using {device} device")
 
 model_name = 'vgg'
@@ -59,9 +64,6 @@ model = ModelWrap(
 
 # Peepholelib
 target_layers = [
-        # 'features.24',
-        # 'features.26',
-        #'features.28',
         'classifier.0',
         'classifier.3',
         'classifier.6',
@@ -112,14 +114,31 @@ model.get_svds(
         verbose = verbose
         )
 
+target_layers = [
+        # 'features.24',
+        'features.2',
+        'features.7',
+        'features.14',
+        'features.21',
+        'features.26',
+        'features.28',
+        'classifier.0',
+        'classifier.3',
+        'classifier.6',
+        ]
+
+model.set_target_modules(
+        target_modules = target_layers,
+        verbose = verbose
+        )
+
 reduction_fns = {
-        # 'features.28': partial(
-        #     conv2d_toeplitz_svd_projection, 
-        #     svd = model._svds['features.28'], 
-        #     layer = model._target_modules['features.28'], 
-        #     use_s = True,
-        #     device = device
-        #     ),
+        'features.2': ChannelWiseMean_conv,
+        'features.7': ChannelWiseMean_conv,
+        'features.14': ChannelWiseMean_conv,
+        'features.21': ChannelWiseMean_conv,
+        'features.26': ChannelWiseMean_conv,
+        'features.28': ChannelWiseMean_conv,
         'classifier.0': partial(
             linear_svd_projection,
             svd = model._svds['classifier.0'], 
@@ -152,16 +171,26 @@ cv_parsers = {
         #     module = 'features.24',
         #     cv_dim = features_cv_dim
         #     ),
-        # 'features.26': partial(
-        #     trim_channelwise_corevectors,
-        #     module = 'features.26',
-        #     cv_dim = features_cv_dim
-        #     ),
-        # 'features.28': partial(
-        #     trim_corevectors,
-        #     module = 'features.28',
-        #     cv_dim = features_cv_dim
-        #     ),
+        'features.2': partial(
+            null_corevectors,
+            module = 'features.2'
+            ),
+        'features.7': partial(
+            null_corevectors,
+            module = 'features.7'
+            ),
+        'features.14': partial(
+            null_corevectors,
+            module = 'features.14'
+            ),
+        'features.21': partial(
+            null_corevectors,
+            module = 'features.21'
+            ),
+        'features.28': partial(
+            null_corevectors,
+            module = 'features.28'
+            ),
         'classifier.0': partial(
             trim_corevectors,
             module = 'classifier.0',
@@ -180,7 +209,12 @@ cv_parsers = {
         }
 
 feature_sizes = {
-        #'features.28': features_cv_dim,
+        'features.2': 64,
+        'features.7': 128,
+        'features.14': 256,
+        'features.21': 512,
+        'features.26': 512,
+        'features.28': 512,
         'classifier.0': classifier_cv_dim,
         'classifier.3': classifier_cv_dim,
         'classifier.6': classifier_cv_dim,

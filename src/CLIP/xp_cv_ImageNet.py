@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     # model parameters 
     seed = 29
-    bs = 2**12 
+    bs = 2**10 
     n_threads = 1
 
     cvs_path = Path.cwd()/f'../../data/{model_name}/corevectors'
@@ -83,11 +83,11 @@ if __name__ == "__main__":
     #--------------------------------
     random_subsampling(ds, 0.3)
     
-    # corevecs = CoreVectors(
-    #         path = cvs_path,
-    #         name = cvs_name,
-    #         model = model,
-    #         )
+    corevecs = CoreVectors(
+            path = cvs_path,
+            name = cvs_name,
+            model = model,
+            )
     
     embeds = CoreVectors(
             path = embeds_path,
@@ -97,21 +97,21 @@ if __name__ == "__main__":
     
     # define a dimensionality reduction function for each layer
     
-    with embeds as em: #corevecs as cv,
+    with corevecs as cv, embeds as em: #
 
-        # cv.parse_ds(
-        #         batch_size = bs,
-        #         datasets = ds,
-        #         n_threads = n_threads,
-        #         verbose = verbose
-        #         )
-        
-        em.parse_ds(
+        cv.parse_ds(
                 batch_size = bs,
                 datasets = ds,
                 n_threads = n_threads,
                 verbose = verbose
                 )
+        
+        # em.parse_ds(
+        #         batch_size = bs,
+        #         datasets = ds,
+        #         n_threads = n_threads,
+        #         verbose = verbose
+        #         )
 
         '''
         # This occupies a lot of space. Only do if you need it
@@ -125,12 +125,12 @@ if __name__ == "__main__":
                 )        
         ''' 
 
-        em.get_clip_embeddings(device=device, 
-                               clip_model='ViT-L/14', 
-                               batch_size=bs, 
-                               n_threads=n_threads, 
-                               verbose=verbose)
-        quit()
+        # em.get_clip_embeddings(device=device, 
+        #                        clip_model='ViT-L/14', 
+        #                        batch_size=bs, 
+        #                        n_threads=n_threads, 
+        #                        verbose=verbose)
+    
         # computing the corevectors
         cv.get_coreVectors(
                 batch_size = bs,
@@ -141,15 +141,15 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
 
-        #if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
-        cv.normalize_corevectors(
-                wrt = 'train',
-                #from_file = cvs_path/(cvs_name+'.normalization.pt'),
-                to_file = cvs_path/(cvs_name+'.normalization.pt'),
-                batch_size = bs,
-                n_threads = n_threads,
-                verbose=verbose
-                )
+        if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
+            cv.normalize_corevectors(
+                    wrt = 'train',
+                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    to_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    batch_size = bs,
+                    n_threads = n_threads,
+                    verbose=verbose
+                    )
         
         fig, axs = plt.subplots(1,2, figsize=(12, 6))
         axs[0].hist(cv._dss['train']['label'], bins=1000, color='blue', alpha=0.7)

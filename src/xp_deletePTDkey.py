@@ -33,10 +33,10 @@ if __name__ == "__main__":
     # Directories definitions
     #--------------------------------
     # model parameters
-    name_model = 'vgg16' # 'ViT' 
+    model_name = 'vgg' # 'ViT' 
     dataset = 'ImageNet' 
     
-    cvs_path = Path.cwd()/f'../data/{dataset}/corevectors'
+    cvs_path = Path.cwd()/f'../data/{model_name}/corevectors'
     cvs_name = 'corevectors'
      
     #--------------------------------
@@ -50,6 +50,7 @@ if __name__ == "__main__":
     
 
     target_layers = [
+           'features.26'
            'features.28'
             ]
 
@@ -58,7 +59,7 @@ if __name__ == "__main__":
                 loaders = [
                         'train', 
                         #'test', 
-                        'val'
+                        #'val'
                         ],
                 verbose = True,
                 mode = 'r+'
@@ -69,9 +70,11 @@ if __name__ == "__main__":
         #         mode = 'r+'
         #         )
         print('------------------------')
-        print(cv._corevds['train'],cv._corevds['val'])
+        print(cv._corevds['train'])
+        cv._corevds['train'].del_('features.26')
+        print(cv._corevds['train'])
         cv._corevds['train'].del_('features.28')
-        print(cv._corevds['train'],cv._corevds['val'])
+        print(cv._corevds['train'])
         quit()
         
         for layer in target_layers:

@@ -30,11 +30,12 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("model", choices=["vgg", "vit"], help="Model type to use")
 parser.add_argument("--layer", required=True, help="Layer name to use")
-parser.add_argument("--cv_dim", type=int, default=100, help="CoreVector dimension to use")
+parser.add_argument("--cv_dim", type=int, default=None, help="CoreVector dimension to use")
 args = parser.parse_args()
 
 model_type = args.model
 _layer = args.layer
+cv_dim = args.cv_dim
 
 # Load config depending on model_type
 if model_type == "vgg":
@@ -86,9 +87,9 @@ if __name__ == "__main__":
     # Tokens
     #--------------------------------
     
-    #text_inputs = clip.tokenize([f"a photo of a {lbl}" for lbl in short_labels]).to(device)
+    text_inputs = clip.tokenize([f"a photo of a {lbl}" for lbl in short_labels]).to(device)
 
-    text_inputs = clip.tokenize([f"a photo of a bird"]).to(device)
+    #text_inputs = clip.tokenize([f"a photo of a bird"]).to(device)
     
     with torch.no_grad():
         text_embeds = model.encode_text(text_inputs)   
@@ -130,7 +131,13 @@ if __name__ == "__main__":
 
         probs = torch.empty(n_samples, n_cluster, dtype=torch.float32)
 
-        cv_dl = DataLoader(cv._corevds['train'][_layer][...,:cv_dim], batch_size=bs, num_workers = n_threads)
+        if not cv_dim == None:
+
+            cv_dl = DataLoader(cv._corevds['train'][_layer][...,:cv_dim], batch_size=bs, num_workers = n_threads)
+
+        else:
+
+            cv_dl = DataLoader(cv._corevds['train'][_layer], batch_size=bs, num_workers = n_threads)
         
         start = 0
         
@@ -141,7 +148,7 @@ if __name__ == "__main__":
 
         conf, clusters = torch.max(probs, dim=1)
         
-        for cluster in range(53, 55): # 
+        for cluster in range(20, 50): # 
 
             idx = torch.argwhere((clusters==cluster)).squeeze()
             images = cv._dss['train']['image'][idx]

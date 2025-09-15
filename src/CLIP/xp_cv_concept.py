@@ -324,6 +324,7 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.show()
         plt.savefig(concept_path/'Cluster_population_mask_excl.png', dpi=300)
+        plt.close()
 
         ids_t, counts_t = torch.unique(sel, sorted=True, return_counts=True)  # only non-zero
         ids    = ids_nz.tolist()
@@ -394,3 +395,4 @@ if __name__ == "__main__":
 
             plt.tight_layout()
             fig.savefig(concept_path/f'samples_cluster.{cluster}.png', dpi=200, bbox_inches='tight')
+            plt.close(fig)
