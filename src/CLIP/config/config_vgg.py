@@ -187,6 +187,10 @@ cv_parsers = {
             null_corevectors,
             module = 'features.21'
             ),
+        'features.26': partial(
+            null_corevectors,
+            module = 'features.26'
+            ),
         'features.28': partial(
             null_corevectors,
             module = 'features.28'

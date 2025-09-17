@@ -148,7 +148,7 @@ if __name__ == "__main__":
 
         conf, clusters = torch.max(probs, dim=1)
         
-        for cluster in range(20, 50): # 
+        for cluster in range(50): # 
 
             idx = torch.argwhere((clusters==cluster)).squeeze()
             images = cv._dss['train']['image'][idx]
