@@ -7,25 +7,27 @@ from time import time
 from functools import partial
 
 # Our stuff
-from peepholelib.datasets.cifar import Cifar
-from peepholelib.datasets.transforms import vgg16_cifar100 as ds_transform 
+# model
 from peepholelib.models.model_wrap import ModelWrap 
 
+# dataset
+from peepholelib.datasets.cifar100 import Cifar100
+from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.coreVectors.coreVectors import CoreVectors
+
+# corevecs
 from peepholelib.coreVectors.dimReduction.avgPooling import ChannelWiseMean_conv
 from peepholelib.coreVectors.get_coreVectors import get_out_activations
 
+# peepholes
 from peepholelib.peepholes.parsers import get_images 
 from peepholelib.peepholes.DeepMahalanobisDistance.DMD import DeepMahalanobisDistance as DMD
 from peepholelib.peepholes.peepholes import Peepholes
-
-from peepholelib.utils.samplers import random_subsampling 
 
 # torch stuff
 import torch
 from torchvision.models import vgg16, VGG16_Weights
 from cuda_selector import auto_cuda
-
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -35,13 +37,13 @@ if __name__ == "__main__":
     #--------------------------------
     # Directories definitions
     #--------------------------------
-    ds_path = '/srv/newpenny/dataset/CIFAR100'
+    cifar_path = '/srv/newpenny/dataset/CIFAR100'
+    ds_path = Path.cwd()/'../data/datasets'
 
     # model parameters
-    dataset = 'CIFAR100'
     seed = 29
     bs = 64 
-    n_threads = 32
+    n_threads = 1 
 
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
@@ -64,37 +66,28 @@ if __name__ == "__main__":
             'features.28',
             ]
 
-    #--------------------------------
-    # Dataset 
-    #--------------------------------
+    loaders = [
+            'CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test', 
+            'CIFAR100-C-val-c0', 'CIFAR100-C-test-c0', 
+            ]
 
-    ds = Cifar(
-            data_path = ds_path,
-            dataset=dataset
-            )
-
-    ds.load_data(
-            transform = ds_transform,
-            seed = seed,
-            )
-    
     #--------------------------------
     # Model 
     #--------------------------------
-    
+
     nn = vgg16()
-    n_classes = len(ds.get_classes()) 
+    n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
     model = ModelWrap(
             model=nn,
             device=device
             )
-    
+
     model.update_output(
             output_layer = 'classifier.6', 
             to_n_classes = n_classes,
             overwrite = True 
             )
-    
+
     model.load_checkpoint(
             name = model_name,
             path = model_dir,
@@ -107,10 +100,17 @@ if __name__ == "__main__":
             )
 
     #--------------------------------
+    # Dataset 
+    #--------------------------------
+
+    # Assuming we have a parsed dataset in ds_path
+    datasets = ParsedDataset(
+            path = ds_path,
+            )
+
+    #--------------------------------
     # CoreVectors 
     #--------------------------------
-    random_subsampling(ds, 0.025)
-    
     corevecs = CoreVectors(
             path = cvs_path,
             name = cvs_name,
@@ -124,32 +124,19 @@ if __name__ == "__main__":
             'features.28': ChannelWiseMean_conv,
             }
     
-    with corevecs as cv: 
-        cv.parse_ds(
-                batch_size = bs,
-                datasets = ds,
-                n_threads = n_threads,
+    with datasets as ds, corevecs as cv: 
+        ds.load_only(
+                loaders = loaders,
                 verbose = verbose
                 )
-        
-        '''
-        # This occupies a lot of space. Only do if you need it
-        # copy dataset to coreVect dataset
-        cv.get_activations(
-                batch_size = bs,
-                n_threads = n_threads,
-                save_input = False,
-                save_output = True,
-                verbose = verbose
-                )
-        '''
 
         cv.get_coreVectors(
-                batch_size = bs,
+                datasets = ds,
                 reduction_fns = reduction_fns,
                 activations_parser = get_out_activations,
                 save_input = False,
                 save_output = True,
+                batch_size = bs,
                 n_threads = n_threads,
                 verbose = verbose
                 )
@@ -158,11 +145,6 @@ if __name__ == "__main__":
     # Peepholes
     #--------------------------------
 
-    corevecs = CoreVectors(
-            path = cvs_path,
-            name = cvs_name,
-            )
-    
     # number of channels in a conv layer. Get numbers from `nn`
     feature_sizes = {
             'features.7': 128,
@@ -192,9 +174,14 @@ if __name__ == "__main__":
             )
         
     # fitting classifiers
-    with corevecs as cv:
+    with datasets as ds, corevecs as cv:
+        ds.load_only(
+                loaders = loaders,
+                verbose = verbose
+                )
+
         cv.load_only(
-                loaders = ['train', 'test', 'val'],
+                loaders = loaders,
                 verbose = True
                 ) 
         
@@ -206,8 +193,10 @@ if __name__ == "__main__":
                 t0 = time()
                 print(f'Fitting DMD for {drill_key} time = ', time()-t0)
                 driller.fit(
-                        corevectors = cv._corevds['train'][drill_key], 
-                        dataset = cv._dss['train'], 
+                        dataset = ds, 
+                        corevectors = cv, 
+                        loader = 'CIFAR100-train',
+                        drill_key = drill_key,
                         verbose=verbose
                         )
             
@@ -215,13 +204,19 @@ if __name__ == "__main__":
                 print(f'Saving classifier for {drill_key}')
                 driller.save()
 
-    with corevecs as cv, peepholes as ph:
+    with datasets as ds, corevecs as cv, peepholes as ph:
+        ds.load_only(
+                loaders = loaders,
+                verbose = verbose
+                )
+
         cv.load_only(
-                loaders = ['train', 'test', 'val'],
+                loaders = loaders,
                 verbose = True
                 ) 
 
         ph.get_peepholes(
+                datasets = ds,
                 corevectors = cv,
                 target_modules = target_layers,
                 batch_size = bs,
@@ -229,8 +224,3 @@ if __name__ == "__main__":
                 n_threads = n_threads,
                 verbose = verbose,
                 )
-
-        ph.get_scores(
-            batch_size = bs,
-            verbose=verbose
-            )

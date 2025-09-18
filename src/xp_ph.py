@@ -5,32 +5,34 @@ sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 # python stuff
 from time import time
 from functools import partial
-from matplotlib import pyplot as plt
-
-# Our stuff
-from peepholelib.datasets.cifar import Cifar
-from peepholelib.datasets.transforms import vgg16_cifar100 as ds_transform 
-from peepholelib.models.model_wrap import ModelWrap 
-from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd, conv2d_kernel_svd
-
-from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection, conv2d_kernel_svd_projection
-
-from peepholelib.peepholes.parsers import trim_corevectors, trim_channelwise_corevectors, trim_kernel_corevectors
-from peepholelib.peepholes.classifiers.tkmeans import KMeans as tKMeans 
-from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
-from peepholelib.peepholes.peepholes import Peepholes
-
-from peepholelib.utils.samplers import random_subsampling 
-from peepholelib.utils.scores import conceptogram_protoclass_score as proto_score, model_confidence_score as mconf_score 
-from peepholelib.utils.plots import plot_confidence, plot_calibration, plot_ood 
-from peepholelib.utils.conceptograms import plot_conceptogram
 
 # torch stuff
 import torch
 from torchvision.models import vgg16
 from cuda_selector import auto_cuda
 
+###### Our stuff
+
+# Model
+from peepholelib.models.model_wrap import ModelWrap 
+from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd, conv2d_kernel_svd
+
+# datasets
+from peepholelib.datasets.cifar100 import Cifar100
+from peepholelib.datasets.parsedDataset import ParsedDataset 
+from peepholelib.datasets.functional.parsers import from_dataset
+from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
+from peepholelib.datasets.functional.samplers import random_subsampling 
+
+# corevecs
+from peepholelib.coreVectors.coreVectors import CoreVectors
+from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection, conv2d_kernel_svd_projection
+
+# peepholes
+from peepholelib.peepholes.parsers import trim_corevectors, trim_channelwise_corevectors, trim_kernel_corevectors
+from peepholelib.peepholes.classifiers.tkmeans import KMeans as tKMeans 
+from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
+from peepholelib.peepholes.peepholes import Peepholes
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -40,17 +42,17 @@ if __name__ == "__main__":
     #--------------------------------
     # Directories definitions
     #--------------------------------
-    ds_path = '/srv/newpenny/dataset/CIFAR100'
+    cifar_path = '/srv/newpenny/dataset/CIFAR100'
+    ds_path = Path.cwd()/'../data/datasets'
 
     # model parameters
-    dataset = 'CIFAR100' 
     seed = 29
     bs = 512 
     n_threads = 1
 
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
-    
+     
     svds_path = Path.cwd()/'../data'
     svds_name = 'svds' 
     
@@ -78,55 +80,57 @@ if __name__ == "__main__":
             ]
     
     features24_svd_rank = 3 
-    features26_svd_rank = 6
-    features28_svd_rank = 300
-    classifier_svd_rank = 300 
+    features26_svd_rank = 30 #6
+    features28_svd_rank = 30
+    classifier_svd_rank = 30 
     n_cluster = 200
-    features24_cv_dim = 2
-    features26_cv_dim = 5
-    features28_cv_dim = 150
-    classifier_cv_dim = 150
-    n_conceptograms = 10
-    #--------------------------------
-    # Dataset 
-    #--------------------------------
-
-    ds = Cifar(
-            data_path = ds_path,
-            dataset = dataset
-            )
-
-    ds.load_data(
-            transform = ds_transform,
-            seed = seed,
-            )
+    features24_cv_dim = 1
+    features26_cv_dim = 15 # 1 # if channel_wise=True
+    features28_cv_dim = 15
+    classifier_cv_dim = 15
+    n_conceptograms = 2 
     
+    loaders = [
+            'CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test', 
+            'CIFAR100-C-val-c0', 'CIFAR100-C-test-c0', 
+            ]
+
     #--------------------------------
     # Model 
     #--------------------------------
     
     nn = vgg16()
-    n_classes = len(ds.get_classes()) 
+    n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
+
     model = ModelWrap(
             model = nn,
             device = device
             )
-
+                                            
     model.update_output(
             output_layer = 'classifier.6', 
             to_n_classes = n_classes,
             overwrite = True 
             )
-
+                                            
     model.load_checkpoint(
             name = model_name,
             path = model_dir,
             verbose = verbose
             )
-
+                                            
     model.set_target_modules(
             target_modules = target_layers,
             verbose = verbose
+            )
+
+    #--------------------------------
+    # Datasets 
+    #--------------------------------
+    
+    # Assuming we have a parsed dataset in ds_path
+    datasets = ParsedDataset(
+            path = ds_path,
             )
 
     #--------------------------------
@@ -141,7 +145,8 @@ if __name__ == "__main__":
             'features.26': partial(
                 conv2d_toeplitz_svd, 
                 rank = features26_svd_rank,
-                channel_wise = True,
+                #channel_wise = True, # channelwise not working, issue #82
+                channel_wise = False,
                 device = device,
                 ),
             'features.28': partial(
@@ -168,43 +173,25 @@ if __name__ == "__main__":
             }
 
     t0 = time()
-    model.get_svds(
-            path = svds_path,
-            name = svds_name,
-            target_modules = target_layers,
-            sample_in = ds._dss['train'][0][0],
-            svd_fns = svd_fns,
-            verbose = verbose
-            )
-    print('time: ', time()-t0)
+    with datasets as ds:
+        ds.load_only(
+                loaders = ['CIFAR100-train'],
+                verbose = verbose
+                )
 
-    '''
-    print('\n----------- svds:')
-    for k in model._svds.keys():
-        for kk in model._svds[k].keys():
-            print('svd shapes: ', k, kk, model._svds[k][kk].shape)
-        s = model._svds[k]['s']
-        if len(s.shape) == 1:
-            plt.figure()
-            plt.plot(s, '-')
-            plt.xlabel('Rank')
-            plt.ylabel('EigenVec')
-        else:
-            fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-            _x = torch.linspace(0, s.shape[1]-1, s.shape[1])
-            for r in range(s.shape[0]):
-                plt.plot(xs=_x, ys=s[r,:], zs=r, zdir='y')
-            ax.set_xlabel('Rank')
-            ax.set_ylabel('Channel')
-            ax.set_zlabel('EigenVec')
-        plt.savefig((svds_path/(svds_name+'/'+k+'.png')).as_posix(), dpi=300, bbox_inches='tight')
-        plt.close()
-    '''
+        model.get_svds(
+                path = svds_path,
+                name = svds_name,
+                target_modules = target_layers,
+                sample_in = ds._dss['CIFAR100-train']['image'][0],
+                svd_fns = svd_fns,
+                verbose = verbose
+                )
+    print('time: ', time()-t0)
 
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    random_subsampling(ds, 0.025)
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -255,42 +242,29 @@ if __name__ == "__main__":
                 ),
             }
 
-    with corevecs as cv: 
-        cv.parse_ds(
-                batch_size = bs,
-                datasets = ds,
-                n_threads = n_threads,
+    with datasets as ds, corevecs as cv: 
+        ds.load_only(
+                loaders = loaders,
                 verbose = verbose
                 )
 
-        '''
-        # This occupies a lot of space. Only do if you need it
-        # copy dataset to activatons file
-        cv.get_activations(
-                batch_size = bs,
-                n_threads = n_threads,
-                save_input = True,
-                save_output = False,
-                verbose = verbose
-                )        
-        '''
-
         # computing the corevectors
         cv.get_coreVectors(
-                batch_size = bs,
+                datasets = ds,
                 reduction_fns = reduction_fns,
-                n_threads = n_threads,
                 save_input = True,
                 save_output = False,
+                batch_size = bs,
+                n_threads = n_threads,
                 verbose = verbose
                 )
 
         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
             cv.normalize_corevectors(
-                    wrt = 'train',
+                    wrt = 'CIFAR100-train',
                     to_file = cvs_path/(cvs_name+'.normalization.pt'),
                     #from_file = cvs_path/(cvs_name+'.normalization.pt'),
-                    #loaders = ['ood-c0', 'ood-c1', 'ood-c2', 'ood-c3', 'ood-c4'],
+                    #loaders = ['CIFAR100-val', 'CIFAR100-test'],
                     batch_size = bs,
                     n_threads = n_threads,
                     verbose=verbose
@@ -300,11 +274,6 @@ if __name__ == "__main__":
     # Peepholes
     #--------------------------------
 
-    corevecs = CoreVectors(
-            path = cvs_path,
-            name = cvs_name,
-            )
-
     cv_parsers = {
             'features.24': partial(
                 trim_kernel_corevectors,
@@ -312,7 +281,8 @@ if __name__ == "__main__":
                 cv_dim = features24_cv_dim
                 ),
             'features.26': partial(
-                trim_channelwise_corevectors,
+                #trim_channelwise_corevectors,
+                trim_corevectors,
                 module = 'features.26',
                 cv_dim = features26_cv_dim
                 ),
@@ -343,11 +313,12 @@ if __name__ == "__main__":
             # TODO: get 196 from somewhere
             'features.24': features24_cv_dim*196,
             # for channel_wise corevectors, the size is n_channels * cv_dim
-            'features.26': features26_cv_dim*model._svds['features.26']['Vh'].shape[0],
+            #'features.26': features26_cv_dim*model._svds['features.26']['Vh'].shape[0],
+            'features.26': features26_cv_dim,
             'features.28': features28_cv_dim,
             'classifier.0': classifier_cv_dim,
             'classifier.3': classifier_cv_dim,
-            'classifier.6': 100#classifier_cv_dim,
+            'classifier.6': classifier_cv_dim,
             }
 
     drillers = {}
@@ -369,9 +340,14 @@ if __name__ == "__main__":
             )
 
     # fitting classifiers
-    with corevecs as cv:
+    with datasets as ds, corevecs as cv:
+        ds.load_only(
+                loaders = loaders,
+                verbose = verbose
+                )
+
         cv.load_only(
-                loaders = ['train', 'val', 'test'],
+                loaders = loaders,
                 verbose = verbose 
                 ) 
 
@@ -384,14 +360,15 @@ if __name__ == "__main__":
                 print(f'Fitting classifier for {drill_key}')
                 driller.fit(
                         corevectors = cv,
-                        loader = 'train',
+                        loader = 'CIFAR100-train',
                         verbose=verbose
                         )
                 print(f'Fitting time for {drill_key}  = ', time()-t0)
 
                 driller.compute_empirical_posteriors(
+                        datasets = ds,
                         corevectors = cv,
-                        loader = 'train',
+                        loader = 'CIFAR100-train',
                         batch_size = bs,
                         verbose=verbose
                         )
@@ -400,76 +377,23 @@ if __name__ == "__main__":
                 print(f'Saving classifier for {drill_key}')
                 driller.save()
 
-    with corevecs as cv, peepholes as ph:
+    with datasets as ds, corevecs as cv, peepholes as ph:
+        ds.load_only(
+                loaders = loaders,
+                verbose = verbose
+                )
+
         cv.load_only(
-                loaders = ['train', 'val', 'test'],
+                loaders = loaders,
                 verbose = verbose 
                 ) 
 
         ph.get_peepholes(
+                datasets = ds,
                 corevectors = cv,
                 target_modules = target_layers,
                 batch_size = bs,
                 drillers = drillers,
                 n_threads = n_threads,
                 verbose = verbose
-                )
-
-        # get scores
-        scores, protoclasses = proto_score(
-                peepholes = ph,
-                corevectors = cv,
-                verbose = verbose
-                )
-                                        
-        scores = mconf_score(
-                corevectors = cv,
-                append_scores = scores,
-                verbose = verbose
-                )
-
-        # make plots
-        plot_confidence(
-                corevectors = cv,
-                scores = scores,
-                max_score = 1.,
-                path = plots_path,
-                verbose = verbose
-                )
-                                                                                  
-        plot_calibration(
-                corevectors = cv,
-                scores = scores,
-                calib_bin = 0.1,
-                path = plots_path,
-                verbose = verbose
-                )
-        
-        # plot conceptograms
-        # get `n_conceptograms` random samples for each score interval
-        idx_hh = (scores['test']['Proto-Class'] > 0.90).nonzero().squeeze()[:10]
-        idx_mh = (torch.logical_and(scores['test']['Proto-Class']>0.7, scores['test']['Proto-Class']<0.8)).nonzero().squeeze()[:10]
-        idx_mm = (torch.logical_and(scores['test']['Proto-Class']>0.45, scores['test']['Proto-Class']<0.55)).nonzero().squeeze()[:10]
-        idx_ml = (torch.logical_and(scores['test']['Proto-Class']>0.2, scores['test']['Proto-Class']<0.3)).nonzero().squeeze()[:10]
-        idx_ll = (scores['test']['Proto-Class']<0.1).nonzero().squeeze()[:10]
-        idx = torch.hstack([
-            idx_hh[torch.randperm(idx_hh.shape[0])[:n_conceptograms]],
-            idx_mh[torch.randperm(idx_mh.shape[0])[:n_conceptograms]],
-            idx_mm[torch.randperm(idx_mm.shape[0])[:n_conceptograms]],
-            idx_ml[torch.randperm(idx_ml.shape[0])[:n_conceptograms]],
-            idx_ll[torch.randperm(idx_ll.shape[0])[:n_conceptograms]]
-            ]).tolist()  
-
-        plot_conceptogram(
-                path = plots_path,
-                name = 'conceptogram',
-                corevectors = cv,
-                peepholes = ph,
-                loaders = ['test'],
-                samples = idx,
-                target_modules = target_layers,
-                classes = ds._classes,
-                protoclasses = protoclasses,
-                scores = scores,
-                verbose = verbose,
                 )
