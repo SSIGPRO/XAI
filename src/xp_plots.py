@@ -110,6 +110,7 @@ if __name__ == "__main__":
                 loaders = loaders,
                 verbose = verbose
                 )
+
         # get scores
         scores, protoclasses = proto_score(
                 datasets = ds,
@@ -177,4 +178,3 @@ if __name__ == "__main__":
                 protoclasses = protoclasses,
                 scores = scores,
                 verbose = verbose,
-                )
