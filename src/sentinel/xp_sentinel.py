@@ -35,7 +35,7 @@ if __name__ == "__main__":
     #--------------------------------
     
     sentinel_model = torch.load("/srv/newpenny/XAI/EP/Model_ready/ae1Dregn16_2_ns0_k001.pth",map_location=device, weights_only=False)
-    print(sentinel_model)
+    #print(sentinel_model)
     #print(next(sentinel_model.parameters()).dtype)
     #print(self.data.dtype)
        
