@@ -68,10 +68,14 @@ if __name__ == "__main__":
     
     with sentinel as s:
         s.load_only(
-            loaders = ['val', 'val-c'],
+            loaders = ['test', 'test-c'],
             verbose = verbose
         )
+
+        print(s._dss['test-c']['RW'])
         
+        
+        quit()
         svd_fns = {
             'encoder.linear': partial(
             linear_svd, 

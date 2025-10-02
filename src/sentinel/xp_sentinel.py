@@ -59,8 +59,8 @@ if __name__ == "__main__":
         sentinel_wrap = ds_wrap,
         parsed_path = parsed_path,
         verbose = verbose,
-        model = model
+        model = model,
+        bs=2**20
     )
-    print(parsed_ds)
-    #done parsing
+
 
