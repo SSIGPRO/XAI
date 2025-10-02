@@ -61,5 +61,6 @@ if __name__ == "__main__":
         verbose = verbose,
         model = model
     )
+    print(parsed_ds)
     #done parsing
 
