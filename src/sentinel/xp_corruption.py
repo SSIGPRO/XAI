@@ -52,10 +52,10 @@ if __name__ == "__main__":
     delta = 0.8
     corruptions = {
         'GWN': GWN(delta),
-        'Constant': Constant(delta),
-        'Step': Step(delta),
-        'Impulse': Impulse(delta),
-        'PrincipalSubspaceAlteration': PrincipalSubspaceAlteration(delta)
+        # 'Constant': Constant(delta),
+        # 'Step': Step(delta),
+        # 'Impulse': Impulse(delta),
+        # 'PrincipalSubspaceAlteration': PrincipalSubspaceAlteration(delta)
     }
 
     #--------------------------------
@@ -75,10 +75,10 @@ if __name__ == "__main__":
     
     with sentinel as s:
         s.load_only(
-            loaders = ['train','test', 'val'],
+            loaders = ['val'],
             verbose = verbose
         )
-        s.get_corruptions(loaders = ['train','test', 'val'],
+        s.get_corruptions(loaders = ['val'],
                           model = model,
                           corruptions = corruptions,
                           bs = 2**20)
