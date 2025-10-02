@@ -16,6 +16,8 @@ from peepholelib.datasets.sentinel import SentinelWrap
 from peepholelib.models.model_wrap import ModelWrap
 from peepholelib.models.svd_fns import conv2d_toeplitz_svd, linear_svd
 
+from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
+from peepholelib.peepholes.parsers import trim_corevectors
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection, conv2d_kernel_svd_projection
 
@@ -35,10 +37,14 @@ if __name__ == "__main__":
     cvs_path = Path.cwd()/'../../data/corevectors'
     cvs_name = 'cvs'
 
+    drill_path = Path.cwd()/'../../data/drillers'
+    drill_name = 'drills'
+
     loaders = ['train', 'val', 'test']
     bs = 1024*5*10
     verbose = True 
     input_key = 'data'
+    n_cluster = 5
     #model = "ae1Dregn16_2_ns0_k001.pth"
 
     model_dir = '/srv/newpenny/XAI/EP/Model_ready/ae1Dregn16_2_ns0_k001.pth'
@@ -174,5 +180,31 @@ if __name__ == "__main__":
             plt.close()
             '''
 
-            # drillers 
-            #TODO drillers peepholes
+    # drillers 
+    #TODO see how GMM works from the name seems gaussian mixture  
+    #TODO drillers peepholesthis will be done after implementation of labels
+
+    cv_parsers = {
+        'encoder.linear': partial(
+            trim_corevectors,
+            module = 'encoder.linear',
+            cv_dim = layer_cv_dim
+        )
+    }
+
+    feature_sizes ={
+        'encoder.linear':layer_cv_dim
+    }
+
+    drillers = {}
+    for peep_layer in target_layers:
+        drillers[peep_layer] = tGMM(
+                path = drill_path,
+                name = drill_name+'.'+peep_layer,
+                nl_classifier = n_cluster,
+                nl_model = n_classes,
+                n_features = feature_sizes[peep_layer],
+                parser = cv_parsers[peep_layer],
+                device = device
+                )
+ 
