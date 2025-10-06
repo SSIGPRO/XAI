@@ -17,6 +17,7 @@ def main():
     ).to("cuda")
 
     unet = pipe.unet
+    print(unet)
 
 
 if __name__ == "__main__":
