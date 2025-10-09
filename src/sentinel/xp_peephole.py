@@ -117,7 +117,14 @@ if __name__ == "__main__":
                 'n_classes': len(corruptions.keys()),
                 'class_names': corruptions.keys()
                 },
-            'RW': {
+            'RW_corruption': {
+                'loaders': [f'val-c-RW-{ci}', f'test-c-RW-{ci}'],
+                'empp_fit_key': f'val-c-RW-{ci}', 
+                'label_key': 'corruption',
+                'n_classes': len(corruptions.keys()),
+                'class_names': corruptions.keys() 
+                },
+            'RW_RW': {
                 'loaders': [f'val-c-RW-{ci}', f'test-c-RW-{ci}'],
                 'empp_fit_key': f'val-c-RW-{ci}', 
                 'label_key': 'RW',
@@ -161,7 +168,7 @@ if __name__ == "__main__":
                 for peep_layer in target_layers:
                     drillers[peep_layer] = tGMM(
                             path = drill_path,
-                            name = drill_name+'.'+peep_layer+'.'+test_name,
+                            name = drill_name+'.'+peep_layer+'.'+test_name+'.'+emb_size+'.'+ci,
                             nl_classifier = n_cluster,
                             nl_model = tests[test_name]['n_classes'],
                             n_features = feature_sizes[peep_layer],
@@ -171,7 +178,7 @@ if __name__ == "__main__":
 
                 peepholes = Peepholes(
                         path = phs_path,
-                        name = phs_name+f'.{n_cluster}.{cv_dim}.{test_name}',
+                        name = phs_name+f'.{n_cluster}.{cv_dim}.{test_name}.{emb_size}.{ci}',
                         device = device
                         )
 

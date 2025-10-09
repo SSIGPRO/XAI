@@ -85,6 +85,10 @@ if __name__ == "__main__":
 
         scores = {key: loss(dss['data'], dss['output']).mean(dim=(2,3)) for key, dss in s._dss.items()}
 
+        plt.plot(scores['test'])
+        plt.savefig('score_timeline.png')
+        
+
         for key, score in scores.items(): print(f'{key} {score.mean()}')
 
         print('---------------\n mutliple channel analysis \n-----------------')
@@ -134,7 +138,7 @@ if __name__ == "__main__":
                 axs[j,2].legend()
                 axs[j,2].grid(True)
 
-            fig.savefig(f'AUC-c-{config}-{ci}.png')
+            fig.savefig(f'temp_plots/AUC-c-{config}-{ci}.png')
         
         print('---------------\n RW analysis \n-----------------')
 
@@ -145,8 +149,6 @@ if __name__ == "__main__":
 
             if p == 'val':
                 
-                
-
                 fig, axs = plt.subplots(n_corr*4, 3, figsize=(12, 3 * n_corr*4), squeeze=False)
                 plt.subplots_adjust(wspace=0.28, hspace=0.35)
 
@@ -189,7 +191,7 @@ if __name__ == "__main__":
 
                     count += 1
 
-            fig.savefig(f'AUC-c-RW-{ci}-RW-wise.png')
+            fig.savefig(f'temp_plots/AUC-c-RW-{ci}-RW-wise.png')
 
         print('---------------\n single channel analysis \n-----------------')
 
@@ -213,7 +215,6 @@ if __name__ == "__main__":
                             
                     idx = torch.argwhere((s._dss[key]['corruption']==j) & (s._dss[key]['channel']==k)).squeeze(-1).tolist()
                     score = torch.cat((scores[key][idx], scores[p][idx])).squeeze(dim=1)
-                    print(score.shape)
                     results = torch.cat((torch.ones(len(idx)), torch.zeros(len(scores[p][idx]))))
                     
                     axs[count,i].hist(scores[p][idx], bins=40, density=True, alpha=0.55, label='Original')
@@ -243,7 +244,7 @@ if __name__ == "__main__":
 
                     count += 1
 
-            fig.savefig(f'AUC-c-single-channel-{ci}-single-channel-wise.png')
+            fig.savefig(f'temp_plots/AUC-c-single-channel-{ci}-single-channel-wise.png')
 
 
         

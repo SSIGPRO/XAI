@@ -55,6 +55,7 @@ if __name__ == "__main__":
     seq_len = 16
     kernel = [3, 3]
     lay3 = False   
+    n_samples = 50000
 
     #--------------------------------
     # Model
@@ -93,7 +94,7 @@ if __name__ == "__main__":
                 loaders = ['val', 'test'],
                 model = model,
                 corruptions = corruptions,
-                n_samples = 100,
+                n_samples = n_samples,
                 bs = bs,
                 mode = 'single',
                 suffix = ci,
@@ -104,7 +105,7 @@ if __name__ == "__main__":
                 loaders = ['val', 'test'],
                 model = model,
                 corruptions = corruptions,
-                n_samples = 100,
+                n_samples = n_samples,
                 bs = bs,
                 mode = 'all',
                 suffix = ci,
@@ -115,7 +116,7 @@ if __name__ == "__main__":
                 loaders = ['val', 'test'],
                 model = model,
                 corruptions = corruptions,
-                n_samples = 100,
+                n_samples = n_samples,
                 bs = bs,
                 mode = 'RW',
                 suffix = ci,
