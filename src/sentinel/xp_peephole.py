@@ -60,18 +60,18 @@ if __name__ == "__main__":
     model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
     model_name = "conv2dAE_SENT_L16_K3-3_Emblarge_Lay0_C16_S42.pth"
 
-    parsed_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_prova')
+    parsed_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/datasets')
 
     svds_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/') 
     svds_name = 'svds' 
     
-    cvs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors_prova')
+    cvs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors')
     cvs_name = 'cvs'
 
-    drill_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/drillers_prova')
+    drill_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/drillers')
     drill_name = 'classifier'
 
-    phs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/peepholes_prova')
+    phs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/peepholes')
     phs_name = 'peepholes'
 
     plots_path = Path.cwd()/f'temp_plots'
@@ -255,8 +255,9 @@ if __name__ == "__main__":
 
                                 for loader_n, loader_key in enumerate(tests[test_name]['loaders']):
                                     # the data 
-                                    result = ph._phs[loader_key][_layer]['peepholes']
-                                    label = s._dss[loader_key][tests[test_name]['label_key']]
+                                    idx = s._dss[loader_key]['detection'] == 1
+                                    result = ph._phs[loader_key][_layer]['peepholes'][idx]
+                                    label = s._dss[loader_key][tests[test_name]['label_key']][idx]
                                     
                                     # confusion matrix
                                     cm = confusion_matrix(label, result.argmax(dim=1), normalize='true')
@@ -268,5 +269,5 @@ if __name__ == "__main__":
                                     axs[loader_n].tick_params(axis='x', rotation=45)
                                 fig.suptitle(f'Confusion Matrix {_layer}: cv_dim={cv_dim} & n_cluster={n_cluster}')
                                 plt.tight_layout()
-                                plt.savefig(Path(plots_path)/f"testCM.{fit}.{test_name}.{n_cluster}.{cv_dim}.{emb_size}.{ci}.png", bbox_inches='tight', dpi=300)
+                                plt.savefig(Path(plots_path)/f"CM.{fit}.{test_name}.{n_cluster}.{cv_dim}.{emb_size}.{ci}.png", bbox_inches='tight', dpi=300)
                                 plt.close()

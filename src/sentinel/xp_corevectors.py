@@ -20,20 +20,9 @@ from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--emb_size", required=True, type=str, help="Model type to use")
-parser.add_argument("--ci", required=True, type=str, help="Corruption intensity")
 args = parser.parse_args()
 
 emb_size = args.emb_size
-ci = args.ci
-
-if ci == 'high': 
-    from config_anomalies import ch as corruptions
-elif ci == 'medium':
-    from config_anomalies import cm as corruptions
-elif ci == 'low':
-    from config_anomalies import cl as corruptions
-else:
-    raise RuntimeError('The configuration is not available choose among [low|medium|high]')
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -46,39 +35,67 @@ if __name__ == "__main__":
     model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
     model_name = "conv2dAE_SENT_L16_K3-3_Emblarge_Lay0_C16_S42.pth"
 
-    parsed_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_prova')
+    parsed_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/datasets')
 
     svds_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/') 
     svds_name = 'svds' 
     
-    cvs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors_prova')
+    cvs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors')
     cvs_name = 'cvs'
 
     loaders = [
             'val',
 
-            # f'val-val-c-single-{ci}',
-            # f'val-test-c-single-{ci}',
-            f'test-val-c-single-{ci}',
-            f'test-test-c-single-{ci}',
+            f'val-val-c-single-high',
+            f'val-test-c-single-high',
+            f'test-val-c-single-high',
+            f'test-test-c-single-high',
 
-            # f'val-val-c-all-{ci}',
-            # f'val-test-c-all-{ci}',
-            f'test-val-c-all-{ci}',
-            f'test-test-c-all-{ci}',
+            f'val-val-c-all-high',
+            f'val-test-c-all-high',
+            f'test-val-c-all-high',
+            f'test-test-c-all-high',
 
-            # f'val-val-c-RW-{ci}',
-            # f'val-test-c-RW-{ci}',
-            f'test-val-c-RW-{ci}',
-            f'test-test-c-RW-{ci}',
+            f'val-val-c-RW-high',
+            f'val-test-c-RW-high',
+            f'test-val-c-RW-high',
+            f'test-test-c-RW-high',
+
+            f'val-val-c-single-medium',
+            f'val-test-c-single-medium',
+            f'test-val-c-single-medium',
+            f'test-test-c-single-medium',
+
+            f'val-val-c-all-medium',
+            f'val-test-c-all-medium',
+            f'test-val-c-all-medium',
+            f'test-test-c-all-medium',
+
+            f'val-val-c-RW-medium',
+            f'val-test-c-RW-medium',
+            f'test-val-c-RW-medium',
+            f'test-test-c-RW-medium',
+
+            f'val-val-c-single-low',
+            f'val-test-c-single-low',
+            f'test-val-c-single-low',
+            f'test-test-c-single-low',
+
+            f'val-val-c-all-low',
+            f'val-test-c-all-low',
+            f'test-val-c-all-low',
+            f'test-test-c-all-low',
+
+            f'val-val-c-RW-low',
+            f'val-test-c-RW-low',
+            f'test-val-c-RW-low',
+            f'test-test-c-RW-low',
             ]
 
     bs = 2**18
     verbose = True 
     n_threads = 1
     input_key = 'data'
-
-    n_classes = len(corruptions.keys())
     
     num_sensors = 16
     seq_len = 16
