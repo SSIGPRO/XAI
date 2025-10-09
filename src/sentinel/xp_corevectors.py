@@ -37,7 +37,7 @@ else:
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
+    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -46,22 +46,31 @@ if __name__ == "__main__":
     model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
     model_name = "conv2dAE_SENT_L16_K3-3_Emblarge_Lay0_C16_S42.pth"
 
-    parsed_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/datasets')
+    parsed_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_prova')
 
     svds_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/') 
     svds_name = 'svds' 
     
-    cvs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors')
+    cvs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors_prova')
     cvs_name = 'cvs'
 
     loaders = [
-            'val', 'test',
-            f'val-c-single-{ci}',
-            f'test-c-single-{ci}',
-            f'val-c-all-{ci}',
-            f'test-c-all-{ci}',
-            f'val-c-RW-{ci}',
-            f'test-c-RW-{ci}',
+            'val',
+
+            # f'val-val-c-single-{ci}',
+            # f'val-test-c-single-{ci}',
+            f'test-val-c-single-{ci}',
+            f'test-test-c-single-{ci}',
+
+            # f'val-val-c-all-{ci}',
+            # f'val-test-c-all-{ci}',
+            f'test-val-c-all-{ci}',
+            f'test-test-c-all-{ci}',
+
+            # f'val-val-c-RW-{ci}',
+            # f'val-test-c-RW-{ci}',
+            f'test-val-c-RW-{ci}',
+            f'test-test-c-RW-{ci}',
             ]
 
     bs = 2**18
@@ -158,7 +167,7 @@ if __name__ == "__main__":
                 linear_svd_projection, 
                 svd = model._svds[target_layer], 
                 layer = model._target_modules[target_layer], 
-                use_s = False,
+                use_s = True,
                 device=device
                 )
     }

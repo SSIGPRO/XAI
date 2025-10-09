@@ -43,18 +43,18 @@ if __name__ == "__main__":
     #--------------------------------
     # Directories definitions
     #--------------------------------
-    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets'
+    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_prova'
     configs = ['all', 'single', 'RW']
     cis = ['high', 'medium', 'low']
 
-    loaders = ['val', 'test']
+    loaders = ['val', 'test','val-c-all-high']
     verbose = True 
 
     loaders_c = [f"{p}-c-{config}-{ci}"  for config in configs for ci in cis for p in loaders]
     loaders_RW = [f"{p}-c-RW-{ci}" for ci in cis for p in loaders]
     loaders_single = [f"{p}-c-single-{ci}" for ci in cis for p in loaders]
     
-    loaders += loaders_c
+    #loaders += loaders_c
 
     #--------------------------------
     # Dataset
@@ -85,9 +85,21 @@ if __name__ == "__main__":
 
         scores = {key: loss(dss['data'], dss['output']).mean(dim=(2,3)) for key, dss in s._dss.items()}
 
-        plt.plot(scores['test'])
-        plt.savefig('score_timeline.png')
-        
+        # plt.plot(scores['test'])
+        # plt.savefig('score_timeline.png')
+
+        plt.hist(scores['val'], bins=100, density=True)
+        plt.yscale('log')
+        plt.savefig('pdf.png')
+        plt.close()
+
+        plt.hist(scores['val-c-all-high'], bins=100, density=True)
+        plt.yscale('log')
+        plt.savefig('pdf-c-all.png')
+        plt.close()
+
+        print((scores['val-c-all-high']>0.003).sum()/len(scores['val-c-all-high']))
+        quit()
 
         for key, score in scores.items(): print(f'{key} {score.mean()}')
 

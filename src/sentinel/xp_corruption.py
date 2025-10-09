@@ -36,7 +36,7 @@ else:
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
+    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -45,9 +45,9 @@ if __name__ == "__main__":
     model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
     model_name = "conv2dAE_SENT_L16_K3-3_Emblarge_Lay0_C16_S42.pth"
     
-    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets'
+    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_prova'
 
-    loaders = ['train', 'val', 'test']
+    loaders = ['test']
     bs = 2**18
     verbose = True 
 
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     seq_len = 16
     kernel = [3, 3]
     lay3 = False   
-    n_samples = 50000
+    n_samples = 100
 
     #--------------------------------
     # Model
@@ -86,40 +86,37 @@ if __name__ == "__main__":
     
     with sentinel as s:
         s.load_only(
-            loaders = ['val', 'test'],
+            loaders = loaders,
             verbose = verbose
         )
 
-        s.get_corruptions(
-                loaders = ['val', 'test'],
+        s.get_corruptions_single(
+                loaders = loaders,
                 model = model,
                 corruptions = corruptions,
                 n_samples = n_samples,
                 bs = bs,
-                mode = 'single',
-                suffix = ci,
-                verbose = verbose
+                verbose = verbose,
+                suffix = ci
                 )
 
-        s.get_corruptions(
-                loaders = ['val', 'test'],
+        s.get_corruptions_all(
+                loaders = loaders,
                 model = model,
                 corruptions = corruptions,
                 n_samples = n_samples,
                 bs = bs,
-                mode = 'all',
-                suffix = ci,
-                verbose = verbose
+                verbose = verbose,
+                suffix = ci
                 )
 
-        s.get_corruptions(
-                loaders = ['val', 'test'],
+        s.get_corruptions_RW(
+                loaders = loaders,
                 model = model,
                 corruptions = corruptions,
-                n_samples = n_samples,
+                n_samples = n_samples//4,
                 bs = bs,
-                mode = 'RW',
-                suffix = ci,
-                verbose = verbose
+                verbose = verbose,
+                suffix = ci
                 )
         
