@@ -89,8 +89,8 @@ if __name__ == "__main__":
 
     target_layers = ['encoder.linear']
     
-    cv_dims = [50]#, 2, 10, 100, 200
-    n_clusters = [ 50] #5, 10, 15, 20,
+    cv_dims = [10, 100, 200, 50]#, 2, 
+    n_clusters = [5, 10, 15, 20, 50] #
 
     tests = {
             'single_channel': {
