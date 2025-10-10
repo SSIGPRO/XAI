@@ -12,10 +12,12 @@ import numpy as np
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import torch
 from cuda_selector import auto_cuda
+import argparse
 
 # Our stuff
-from peepholelib.datasets.sentinel import Sentinel
+from peepholelib.models.sentinel.model_sentinel import CONV_AE2D
 from peepholelib.models.model_wrap import ModelWrap
+from peepholelib.datasets.sentinel import Sentinel
 
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.peepholes.parsers import trim_corevectors
@@ -23,17 +25,15 @@ from peepholelib.peepholes.parsers import trim_corevectors
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 from peepholelib.peepholes.peepholes import Peepholes 
 
-from peepholelib.plots.conceptograms import plot_conceptogram
 from peepholelib.utils.topk_acc import compute_top_k_accuracy
 
-from peepholelib.models.sentinel.model_sentinel import CONV_AE2D
-
-import argparse
+from config_cv_ph import *
+#from classify_cps import classify_cps #  moved to bak
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--emb_size", required=True, type=str, help="Model type to use")
 parser.add_argument("--ci", required=True, type=str, help="Corruption intensity")
-parser.add_argument("--fit", required=True, type=str, help="Corruption intensity")
+parser.add_argument("--fit", required=True, type=str, help="'val' or 'test'")
 args = parser.parse_args()
 
 emb_size = args.emb_size
@@ -57,37 +57,8 @@ if __name__ == "__main__":
     #--------------------------------
     # Directories definitions
     #--------------------------------
-    model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
-    model_name = "conv2dAE_SENT_L16_K3-3_Emblarge_Lay0_C16_S42.pth"
 
-    parsed_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/datasets')
-
-    svds_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/') 
-    svds_name = 'svds' 
-    
-    cvs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors')
-    cvs_name = 'cvs'
-
-    drill_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/drillers')
-    drill_name = 'classifier'
-
-    phs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/peepholes')
-    phs_name = 'peepholes'
-
-    plots_path = Path.cwd()/f'temp_plots'
-    plots_path.mkdir(parents=True, exist_ok=True)
-
-    bs = 2**18
-    verbose = True 
-    n_threads = 1
-
-    num_sensors = 16
-    seq_len = 16
-    kernel = [3, 3]
-    lay3 = False  
     norm = mpl.colors.Normalize(vmin=0, vmax=1) 
-
-    target_layers = ['encoder.linear']
     
     cv_dims = [50]#, 2, 10, 100, 200, 
     n_clusters = [50] #5, 10, 15, 20,
@@ -226,51 +197,48 @@ if __name__ == "__main__":
                             # save classifiers
                             print(f'Saving classifier for {drill_key}')
                             driller.save()
-                            plt.imshow(driller._empp.cpu())
-                            plt.savefig(driller._clas_path / f'{drill_key}_empp.png')
                 
-                        with peepholes as ph:
-                            s.load_only(
-                                    loaders = tests[test_name]['loaders'],
-                                    verbose = verbose
-                                    )
+                    with peepholes as ph:
+                        s.load_only(
+                                loaders = tests[test_name]['loaders'],
+                                verbose = verbose
+                                )
 
-                            cv.load_only(
-                                    loaders = tests[test_name]['loaders'],
-                                    verbose = verbose 
-                                    ) 
+                        cv.load_only(
+                                loaders = tests[test_name]['loaders'],
+                                verbose = verbose 
+                                ) 
 
-                            ph.get_peepholes(
-                                    datasets = s,
-                                    corevectors = cv,
-                                    target_modules = target_layers,
-                                    batch_size = bs,
-                                    drillers = drillers,
-                                    n_threads = n_threads,
-                                    verbose = verbose
-                                    )
-                            
-                            for _layer in target_layers:
-                                cns = tests[test_name]['class_names']
-                                
+                        ph.get_peepholes(
+                                datasets = s,
+                                corevectors = cv,
+                                target_modules = target_layers,
+                                batch_size = bs,
+                                n_threads = n_threads,
+                                drillers = drillers,
+                                verbose = verbose
+                                )
+                        
+                        for _layer in target_layers:
+                            cns = tests[test_name]['class_names']
 
-                                for a, c in enumerate(corruptions):
-                                    fig, axs = plt.subplots(1, 2, figsize=(20, 8))
-                                    for loader_n, loader_key in enumerate(tests[test_name]['loaders']):
-                                        # the data 
-                                        idx = (s._dss[loader_key]['detection'] == 1) & (s._dss[loader_key]['corruption']==a)
-                                        result = ph._phs[loader_key][_layer]['peepholes'][idx]
-                                        label = s._dss[loader_key][tests[test_name]['label_key']][idx]
-                                        
-                                        # confusion matrix
-                                        cm = confusion_matrix(label, result.argmax(dim=1), normalize='true')
-                                        disp = ConfusionMatrixDisplay(cm, display_labels=cns)
-                                        disp.plot(ax=axs[loader_n], cmap='Blues', colorbar=False, values_format=".2f", im_kw={'norm': norm})
+                            for a, c in enumerate(corruptions):
+                                fig, axs = plt.subplots(1, 2, figsize=(20, 8))
+                                for loader_n, loader_key in enumerate(tests[test_name]['loaders']):
+                                    result = ph._phs[loader_key][_layer]['peepholes'][idx]
+                                    # the data 
+                                    idx = (s._dss[loader_key]['detection'] == 1) & (s._dss[loader_key]['corruption']==a)
+                                    label = s._dss[loader_key][tests[test_name]['label_key']][idx]
+                                    
+                                    cm = confusion_matrix(label, result.argmax(dim=1), normalize='true')
+                                    # confusion matrix
+                                    disp = ConfusionMatrixDisplay(cm, display_labels=cns)
+                                    disp.plot(ax=axs[loader_n], cmap='Blues', colorbar=False, values_format=".2f", im_kw={'norm': norm})
 
-                                        # text around
-                                        axs[loader_n].set_title(f"{loader_key.capitalize()} set")
-                                        axs[loader_n].tick_params(axis='x', rotation=45)
-                                    fig.suptitle(f'Confusion Matrix {c}: cv_dim={cv_dim} & n_cluster={n_cluster}')
-                                    plt.tight_layout()
-                                    plt.savefig(Path(plots_path)/f"CM.{fit}.{test_name}.{n_cluster}.{cv_dim}.{emb_size}.{ci}.{c}.png", bbox_inches='tight', dpi=300)
-                                    plt.close()
+                                    # text around
+                                    axs[loader_n].set_title(f"{loader_key.capitalize()} set")
+                                    axs[loader_n].tick_params(axis='x', rotation=45)
+                                fig.suptitle(f'Confusion Matrix {c}: cv_dim={cv_dim} & n_cluster={n_cluster}')
+                                plt.tight_layout()
+                                plt.savefig(Path(plots_path)/f"CM.{fit}.{test_name}.{n_cluster}.{cv_dim}.{emb_size}.{ci}.{c}.png", bbox_inches='tight', dpi=300)
+                                plt.close()

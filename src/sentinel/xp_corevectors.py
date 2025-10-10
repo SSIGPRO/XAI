@@ -5,7 +5,6 @@ sys.path.insert(0, (Path.home()/'newpenny/XAI/EP').as_posix())
 
 # Python stuff
 from functools import partial
-from time import time
 import argparse
 import torch
 from cuda_selector import auto_cuda
@@ -13,10 +12,12 @@ from cuda_selector import auto_cuda
 # Our stuff
 from peepholelib.datasets.sentinel import Sentinel
 from peepholelib.models.model_wrap import ModelWrap
-from peepholelib.models.svd_fns import linear_svd
+from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
 from peepholelib.models.sentinel.model_sentinel import CONV_AE2D
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection
+from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
+
+from config_cv_ph import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--emb_size", required=True, type=str, help="Model type to use")
@@ -32,17 +33,6 @@ if __name__ == "__main__":
     #--------------------------------
     # Directories definitions
     #--------------------------------
-    model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
-    model_name = "conv2dAE_SENT_L16_K3-3_Emblarge_Lay0_C16_S42.pth"
-
-    parsed_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/datasets')
-
-    svds_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/') 
-    svds_name = 'svds' 
-    
-    cvs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors')
-    cvs_name = 'cvs'
-
     loaders = [
             'val', 'test_ori'
 
@@ -92,18 +82,8 @@ if __name__ == "__main__":
             # f'test-test-c-RW-low',
             ]
 
-    bs = 2**18
-    verbose = True 
-    n_threads = 1
-    input_key = 'data'
-    
-    num_sensors = 16
-    seq_len = 16
-    kernel = [3, 3]
-    lay3 = False   
-
-    target_layer = 'encoder.linear'
     layer_svd_rank = 300
+    input_key = 'data'
 
     #--------------------------------
     # Model
@@ -129,7 +109,7 @@ if __name__ == "__main__":
             )
 
     model.set_target_modules(
-            target_modules = [target_layer]
+            target_modules = target_layers
             )
 
     #--------------------------------
@@ -149,24 +129,29 @@ if __name__ == "__main__":
             verbose = verbose
         )
         
-        svd_fns = {
-            target_layer: partial(
-            linear_svd, 
-            rank = layer_svd_rank,
-            device = device,
-            ),
-        }
+        svd_fns = {}
+        for _layer in linear_layers: 
+            svd_fns[_layer] = partial(
+                linear_svd, 
+                rank = layer_svd_rank,
+                device = device,
+                )
+        for _layer in conv_layers:   
+            svd_fns[_layer] = partial(
+                conv2d_toeplitz_svd, 
+                rank = layer_svd_rank,
+                channel_wise = False,
+                device = device,
+                )
 
-        t0 = time()
         model.get_svds(
                 path = svds_path,
                 name = svds_name,
-                target_modules = [target_layer],
+                target_modules = target_layers,
                 sample_in = sentinel._dss[loaders[0]][0][input_key],
                 svd_fns = svd_fns,
                 verbose = verbose
                 )
-        print('time: ', time()-t0)
 
     #--------------------------------
     # Corevectors                              
@@ -179,15 +164,23 @@ if __name__ == "__main__":
         model = model,
     )
 
-    reduction_fns = {
-            target_layer: partial(
+    reduction_fns = {}
+    for _layer in linear_layers:
+        reduction_fns[_layer] = partial(
                 linear_svd_projection, 
-                svd = model._svds[target_layer], 
-                layer = model._target_modules[target_layer], 
+                svd = model._svds[_layer], 
+                layer = model._target_modules[_layer], 
                 use_s = True,
                 device=device
                 )
-    }
+    for _layer in conv_layers:
+        reduction_fns[_layer] = partial(
+                conv2d_toeplitz_svd_projection, 
+                svd = model._svds[_layer], 
+                layer = model._target_modules[_layer], 
+                use_s = True,
+                device=device
+                )
 
     with sentinel as s, corevecs as cv:
         s.load_only(
