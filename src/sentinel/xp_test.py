@@ -43,18 +43,18 @@ if __name__ == "__main__":
     #--------------------------------
     # Directories definitions
     #--------------------------------
-    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_prova'
+    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets'
     configs = ['all', 'single', 'RW']
     cis = ['high', 'medium', 'low']
 
-    loaders = ['val', 'test','val-c-all-high']
+    loaders = ['val', 'test']
     verbose = True 
 
-    loaders_c = [f"{p}-c-{config}-{ci}"  for config in configs for ci in cis for p in loaders]
-    loaders_RW = [f"{p}-c-RW-{ci}" for ci in cis for p in loaders]
-    loaders_single = [f"{p}-c-single-{ci}" for ci in cis for p in loaders]
+    loaders_c = [f"test-{p}-c-{config}-{ci}"  for config in configs for ci in cis for p in loaders]
+    loaders_RW = [f"test-{p}-c-RW-{ci}" for ci in cis for p in loaders]
+    loaders_single = [f"test-{p}-c-single-{ci}" for ci in cis for p in loaders]
     
-    #loaders += loaders_c
+    loaders += loaders_c
 
     #--------------------------------
     # Dataset
@@ -88,18 +88,18 @@ if __name__ == "__main__":
         # plt.plot(scores['test'])
         # plt.savefig('score_timeline.png')
 
-        plt.hist(scores['val'], bins=100, density=True)
-        plt.yscale('log')
-        plt.savefig('pdf.png')
-        plt.close()
+        # plt.hist(scores['val'], bins=100, density=True)
+        # plt.yscale('log')
+        # plt.savefig('pdf.png')
+        # plt.close()
 
-        plt.hist(scores['val-c-all-high'], bins=100, density=True)
-        plt.yscale('log')
-        plt.savefig('pdf-c-all.png')
-        plt.close()
+        # plt.hist(scores['val-c-all-high'], bins=100, density=True)
+        # plt.yscale('log')
+        # plt.savefig('pdf-c-all.png')
+        # plt.close()
 
-        print((scores['val-c-all-high']>0.003).sum()/len(scores['val-c-all-high']))
-        quit()
+        # print((scores['val-c-all-high']>0.003).sum()/len(scores['val-c-all-high']))
+        # quit()
 
         for key, score in scores.items(): print(f'{key} {score.mean()}')
 
@@ -107,8 +107,8 @@ if __name__ == "__main__":
 
         for key in tqdm(loaders_c):
             ci = key.split('-')[-1]
-            p = key.split('-')[0]
-            config= key.split('-')[2]
+            p = key.split('-')[1]
+            config= key.split('-')[3]
 
             if p == 'val':
                 
@@ -156,8 +156,8 @@ if __name__ == "__main__":
 
         for key in tqdm(loaders_RW):
             ci = key.split('-')[-1]
-            p = key.split('-')[0]
-            config= key.split('-')[2]
+            p = key.split('-')[1]
+            config= key.split('-')[3]
 
             if p == 'val':
                 
@@ -209,8 +209,8 @@ if __name__ == "__main__":
 
         for key in tqdm(loaders_single):
             ci = key.split('-')[-1]
-            p = key.split('-')[0]
-            config= key.split('-')[2]
+            p = key.split('-')[1]
+            config= key.split('-')[3]
 
             if p == 'val':
 

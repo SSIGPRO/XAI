@@ -89,45 +89,45 @@ if __name__ == "__main__":
 
     target_layers = ['encoder.linear']
     
-    cv_dims = [10, 100, 200, 50]#, 2, 
-    n_clusters = [5, 10, 15, 20, 50] #
+    cv_dims = [50]#, 2, 10, 100, 200, 
+    n_clusters = [50] #5, 10, 15, 20,
 
     tests = {
-            'single_channel': {
-                'loaders': [f'{fit}-val-c-single-{ci}', f'{fit}-test-c-single-{ci}'],
-                'empp_fit_key': f'{fit}-val-c-single-{ci}', 
-                'label_key': 'channel',
-                'n_classes': 16,
-                'class_names': [f'Ch{i}' for i in range(16)] 
-                },
-            'single_corruption': {
-                'loaders': [f'{fit}-val-c-single-{ci}', f'{fit}-test-c-single-{ci}'],
-                'empp_fit_key': f'{fit}-val-c-single-{ci}', 
-                'label_key': 'corruption',
-                'n_classes': len(corruptions.keys()),
-                'class_names': corruptions.keys()
-                },
-            'single_RW': {
-                'loaders': [f'{fit}-val-c-single-{ci}', f'{fit}-test-c-single-{ci}'],
-                'empp_fit_key': f'{fit}-val-c-single-{ci}', 
-                'label_key': 'RW',
-                'n_classes': 4, 
-                'class_names': [f'RW{i}' for i in range(4)] 
-                },
-            'all': {
-                'loaders': [f'{fit}-val-c-all-{ci}', f'{fit}-test-c-all-{ci}'],
-                'empp_fit_key': f'{fit}-val-c-all-{ci}', 
-                'label_key': 'corruption',
-                'n_classes': len(corruptions.keys()),
-                'class_names': corruptions.keys()
-                },
-            'RW_corruption': {
-                'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}'],
-                'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
-                'label_key': 'corruption',
-                'n_classes': len(corruptions.keys()),
-                'class_names': corruptions.keys() 
-                },
+            # 'single_channel': {
+            #     'loaders': [f'{fit}-val-c-single-{ci}', f'{fit}-test-c-single-{ci}'],
+            #     'empp_fit_key': f'{fit}-val-c-single-{ci}', 
+            #     'label_key': 'channel',
+            #     'n_classes': 16,
+            #     'class_names': [f'Ch{i}' for i in range(16)] 
+            #     },
+            # 'single_corruption': {
+            #     'loaders': [f'{fit}-val-c-single-{ci}', f'{fit}-test-c-single-{ci}'],
+            #     'empp_fit_key': f'{fit}-val-c-single-{ci}', 
+            #     'label_key': 'corruption',
+            #     'n_classes': len(corruptions.keys()),
+            #     'class_names': corruptions.keys()
+            #     },
+            # 'single_RW': {
+            #     'loaders': [f'{fit}-val-c-single-{ci}', f'{fit}-test-c-single-{ci}'],
+            #     'empp_fit_key': f'{fit}-val-c-single-{ci}', 
+            #     'label_key': 'RW',
+            #     'n_classes': 4, 
+            #     'class_names': [f'RW{i}' for i in range(4)] 
+            #     },
+            # 'all': {
+            #     'loaders': [f'{fit}-val-c-all-{ci}', f'{fit}-test-c-all-{ci}', 'test_ori'],
+            #     'empp_fit_key': f'{fit}-val-c-all-{ci}', 
+            #     'label_key': 'corruption',
+            #     'n_classes': len(corruptions.keys()),
+            #     'class_names': corruptions.keys()
+            #     },
+            # 'RW_corruption': {
+            #     'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
+            #     'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
+            #     'label_key': 'corruption',
+            #     'n_classes': len(corruptions.keys()),
+            #     'class_names': corruptions.keys() 
+            #     },
             'RW_RW': {
                 'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}'],
                 'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
@@ -204,6 +204,7 @@ if __name__ == "__main__":
                             driller.load()
                             plt.imshow(driller._empp.cpu())
                             plt.savefig(driller._clas_path / f'{drill_key}_empp.png')
+                            plt.close()
                         else:
                             t0 = time()
                             print(f'Fitting classifier for {drill_key}')
@@ -251,23 +252,25 @@ if __name__ == "__main__":
                             
                             for _layer in target_layers:
                                 cns = tests[test_name]['class_names']
-                                fig, axs = plt.subplots(1, 2, figsize=(20, 8))
+                                
 
-                                for loader_n, loader_key in enumerate(tests[test_name]['loaders']):
-                                    # the data 
-                                    idx = s._dss[loader_key]['detection'] == 1
-                                    result = ph._phs[loader_key][_layer]['peepholes'][idx]
-                                    label = s._dss[loader_key][tests[test_name]['label_key']][idx]
-                                    
-                                    # confusion matrix
-                                    cm = confusion_matrix(label, result.argmax(dim=1), normalize='true')
-                                    disp = ConfusionMatrixDisplay(cm, display_labels=cns)
-                                    disp.plot(ax=axs[loader_n], cmap='Blues', colorbar=False, values_format=".2f", im_kw={'norm': norm})
+                                for a, c in enumerate(corruptions):
+                                    fig, axs = plt.subplots(1, 2, figsize=(20, 8))
+                                    for loader_n, loader_key in enumerate(tests[test_name]['loaders']):
+                                        # the data 
+                                        idx = (s._dss[loader_key]['detection'] == 1) & (s._dss[loader_key]['corruption']==a)
+                                        result = ph._phs[loader_key][_layer]['peepholes'][idx]
+                                        label = s._dss[loader_key][tests[test_name]['label_key']][idx]
+                                        
+                                        # confusion matrix
+                                        cm = confusion_matrix(label, result.argmax(dim=1), normalize='true')
+                                        disp = ConfusionMatrixDisplay(cm, display_labels=cns)
+                                        disp.plot(ax=axs[loader_n], cmap='Blues', colorbar=False, values_format=".2f", im_kw={'norm': norm})
 
-                                    # text around
-                                    axs[loader_n].set_title(f"{loader_key.capitalize()} set")
-                                    axs[loader_n].tick_params(axis='x', rotation=45)
-                                fig.suptitle(f'Confusion Matrix {_layer}: cv_dim={cv_dim} & n_cluster={n_cluster}')
-                                plt.tight_layout()
-                                plt.savefig(Path(plots_path)/f"CM.{fit}.{test_name}.{n_cluster}.{cv_dim}.{emb_size}.{ci}.png", bbox_inches='tight', dpi=300)
-                                plt.close()
+                                        # text around
+                                        axs[loader_n].set_title(f"{loader_key.capitalize()} set")
+                                        axs[loader_n].tick_params(axis='x', rotation=45)
+                                    fig.suptitle(f'Confusion Matrix {c}: cv_dim={cv_dim} & n_cluster={n_cluster}')
+                                    plt.tight_layout()
+                                    plt.savefig(Path(plots_path)/f"CM.{fit}.{test_name}.{n_cluster}.{cv_dim}.{emb_size}.{ci}.{c}.png", bbox_inches='tight', dpi=300)
+                                    plt.close()
