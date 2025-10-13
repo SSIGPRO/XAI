@@ -43,7 +43,7 @@ if __name__ == "__main__":
     #--------------------------------
     # Directories definitions
     #--------------------------------
-    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_single'
+    parsed_path = f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}'
     configs = ['all', 'single', 'RW']
     cis = ['high']#, 'medium', 'low']
 
@@ -80,7 +80,8 @@ if __name__ == "__main__":
             loaders = loaders,
             verbose = verbose
         )
-        print(s._dss['val-val-c-RW-high']['data'].shape)
+        print(s._dss['val-val-c-all-high']['data'].shape)
+
         
         
         seed = 42  # choose your seed (or parametrize it)
@@ -91,40 +92,40 @@ if __name__ == "__main__":
         test_idx = perm[100: 2*100]
         print(val_idx)
 
-        for idx in range(80):
-            idx *= 100
+        # for idx in range(80):
+        #     idx *= 100
 
-            c = s._dss['val-val-c-single-high']['data'][idx][0]
-            o = s._dss['val']['data'][115374][0]
+        #     c = s._dss['val-val-c-single-high']['data'][idx][0]
+        #     o = s._dss['val']['data'][115374][0]
             
-            fig, axs = plt.subplots(4, 4, figsize=(8, 8))
-            for i, ax in enumerate(axs.flat):
-                ax.plot(c[i].cpu().numpy(), label='c')
-                ax.plot(o[i].cpu().numpy(), label='o')
-                ax.set_title(f"{i}")
-                ax.legend()
-                ax.axis('tight')
-            plt.tight_layout()
-            plt.savefig(f'c_o{idx}_single.png')
+        #     fig, axs = plt.subplots(4, 4, figsize=(8, 8))
+        #     for i, ax in enumerate(axs.flat):
+        #         ax.plot(c[i].cpu().numpy(), label='c')
+        #         ax.plot(o[i].cpu().numpy(), label='o')
+        #         ax.set_title(f"{i}")
+        #         ax.legend()
+        #         ax.axis('tight')
+        #     plt.tight_layout()
+        #     plt.savefig(f'c_o{idx}_single.png')
 
-        for idx in range(20):
-            idx *= 100
+        # for idx in range(20):
+        #     idx *= 100
 
-            c = s._dss['val-val-c-RW-high']['data'][idx][0]
-            o = s._dss['val']['data'][115374][0]
+        #     c = s._dss['val-val-c-RW-high']['data'][idx][0]
+        #     o = s._dss['val']['data'][115374][0]
             
-            fig, axs = plt.subplots(4, 4, figsize=(8, 8))
-            for i, ax in enumerate(axs.flat):
-                ax.plot(c[i].cpu().numpy(), label='c')
-                ax.plot(o[i].cpu().numpy(), label='o')
-                ax.set_title(f"{i}")
-                ax.legend()
-                ax.axis('tight')
-            plt.tight_layout()
-            plt.savefig(f'c_o{idx}_RW.png')
+        #     fig, axs = plt.subplots(4, 4, figsize=(8, 8))
+        #     for i, ax in enumerate(axs.flat):
+        #         ax.plot(c[i].cpu().numpy(), label='c')
+        #         ax.plot(o[i].cpu().numpy(), label='o')
+        #         ax.set_title(f"{i}")
+        #         ax.legend()
+        #         ax.axis('tight')
+        #     plt.tight_layout()
+        #     plt.savefig(f'c_o{idx}_RW.png')
 
         for idx in range(5):
-            idx *= 100
+            idx *= 10000
 
             c = s._dss['val-val-c-all-high']['data'][idx][0]
             o = s._dss['val']['data'][115374][0]
@@ -137,6 +138,6 @@ if __name__ == "__main__":
                 ax.legend()
                 ax.axis('tight')
             plt.tight_layout()
-            plt.savefig(f'c_o{idx}_RW.png')
+            plt.savefig(f'c_o{idx}_all.png')
 
         

@@ -9,6 +9,7 @@ from time import time
 import argparse
 import torch
 from cuda_selector import auto_cuda
+from matplotlib import pyplot as plt
 
 # Our stuff
 from peepholelib.datasets.sentinel import Sentinel
@@ -33,33 +34,33 @@ if __name__ == "__main__":
     # Directories definitions
     #--------------------------------
     model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
-    model_name = "conv2dAE_SENT_L16_K3-3_Emblarge_Lay0_C16_S42.pth"
+    model_name = f"conv2dAE_SENT_L16_K3-3_Emb{emb_size}_Lay0_C16_S42.pth"
 
-    parsed_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/datasets')
+    parsed_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}')
 
     svds_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/') 
-    svds_name = 'svds' 
+    svds_name = f'svds_{emb_size}' 
     
-    cvs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors')
+    cvs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors_{emb_size}')
     cvs_name = 'cvs'
 
     loaders = [
-            'val', 'test_ori'
+            'val',# 'test_ori'
 
-            # f'val-val-c-single-high',
-            # f'val-test-c-single-high',
-            # f'test-val-c-single-high',
-            # f'test-test-c-single-high',
+            f'val-val-c-single-high',
+            f'val-test-c-single-high',
+            f'test-val-c-single-high',
+            f'test-test-c-single-high',
 
-            # f'val-val-c-all-high',
-            # f'val-test-c-all-high',
-            # f'test-val-c-all-high',
-            # f'test-test-c-all-high',
+            f'val-val-c-all-high',
+            f'val-test-c-all-high',
+            f'test-val-c-all-high',
+            f'test-test-c-all-high',
 
-            # f'val-val-c-RW-high',
-            # f'val-test-c-RW-high',
-            # f'test-val-c-RW-high',
-            # f'test-test-c-RW-high',
+            f'val-val-c-RW-high',
+            f'val-test-c-RW-high',
+            f'test-val-c-RW-high',
+            f'test-test-c-RW-high',
 
             # f'val-val-c-single-medium',
             # f'val-test-c-single-medium',
@@ -167,6 +168,8 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
         print('time: ', time()-t0)
+        plt.plot(model._svds[target_layer]['s'])
+        plt.savefig(Path.cwd()/f'temp_plots_{emb_size}/svd_profile.png')
 
     #--------------------------------
     # Corevectors                              

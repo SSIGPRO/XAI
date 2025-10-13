@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
     cv_dim = 50
     n_cluster = 50
-    ci = 'high'
+    ci = 'medium'
     fit = 'test'
 
 
@@ -301,7 +301,8 @@ if __name__ == "__main__":
                 N = scores['test_ori'].numel()
 
                 offsets = torch.arange(-half, half+1, device=centers.device) 
-                grid = (centers[:, None] + offsets[None, :]).clamp_(0, N-1)  
+                grid = (centers[:, None] + offsets[None, :]).clamp_(0, N-1) 
+                grid = grid[150:200] 
                 print(grid.shape) 
 
                 # ---- gather windows ----
@@ -327,9 +328,8 @@ if __name__ == "__main__":
                     peep_to_show[~is_anomaly,:] = 0
                     axs[17].imshow(peep_to_show.T, aspect='auto', cmap='viridis')
                     axs[17].set_ylabel('Peepholes')
-                    axs[17].set_yticks([tests[test_name]['class_names']])
-                    # fig.suptitle(f'Window {i} - {"ANOMALY" if is_anomaly else "NORMAL"}', 
-                    #                 color='red' if is_anomaly else 'blue', fontsize=14, fontweight='bold')
+                    axs[17].set_yticks(range(len(tests[test_name]['class_names'])))
+                    axs[17].set_yticklabels(tests[test_name]['class_names'])
     
                     plt.tight_layout()
                     fig.savefig(f'window_{i}_{test_name}.png')

@@ -43,9 +43,9 @@ if __name__ == "__main__":
     # Directories definitions
     #--------------------------------
     model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
-    model_name = "conv2dAE_SENT_L16_K3-3_Emblarge_Lay0_C16_S42.pth"
+    model_name = f"conv2dAE_SENT_L16_K3-3_Emb{emb_size}_Lay0_C16_S42.pth"
     
-    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets'
+    parsed_path = f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}'
 
     loaders = ['val', 'test']
     bs = 2**18

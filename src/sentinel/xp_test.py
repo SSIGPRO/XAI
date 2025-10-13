@@ -43,9 +43,9 @@ if __name__ == "__main__":
     #--------------------------------
     # Directories definitions
     #--------------------------------
-    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets'
+    parsed_path = f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}'
     configs = ['all', 'single', 'RW']
-    cis = ['high', 'medium', 'low']
+    cis = ['high']#, 'medium', 'low']
 
     loaders = ['val', 'test']
     verbose = True 
@@ -150,7 +150,7 @@ if __name__ == "__main__":
                 axs[j,2].legend()
                 axs[j,2].grid(True)
 
-            fig.savefig(f'temp_plots/AUC-c-{config}-{ci}.png')
+            fig.savefig(Path.cwd()/f'temp_plots_{emb_size}/AUC-c-{config}-{ci}.png')
         
         print('---------------\n RW analysis \n-----------------')
 
@@ -203,7 +203,7 @@ if __name__ == "__main__":
 
                     count += 1
 
-            fig.savefig(f'temp_plots/AUC-c-RW-{ci}-RW-wise.png')
+            fig.savefig(Path.cwd()/f'temp_plots_{emb_size}/AUC-c-RW-{ci}-RW-wise.png')
 
         print('---------------\n single channel analysis \n-----------------')
 
@@ -256,7 +256,7 @@ if __name__ == "__main__":
 
                     count += 1
 
-            fig.savefig(f'temp_plots/AUC-c-single-channel-{ci}-single-channel-wise.png')
+            fig.savefig(Path.cwd()/f'temp_plots_{emb_size}/AUC-c-single-channel-{ci}-single-channel-wise.png')
 
 
         

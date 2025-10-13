@@ -32,7 +32,7 @@ if __name__ == "__main__":
     model_name = f"conv2dAE_SENT_L16_K3-3_Emb{emb_size}_Lay0_C16_S42.pth"
 
     ds_path = '/srv/newpenny/dataset/TASI/sentinel/sentinel_4s_clean_std'
-    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets'
+    parsed_path = f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}'
 
     seed = 42
     dataset = Sentinel
