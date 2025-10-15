@@ -10,7 +10,11 @@ from matplotlib import pyplot as plt
 import matplotlib as mpl
 import numpy as np
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from tqdm import tqdm
+
+# Torch stuff
 import torch
+from torch.utils.data import DataLoader
 from cuda_selector import auto_cuda
 
 # Our stuff
@@ -49,6 +53,34 @@ elif ci == 'low':
 else:
     raise RuntimeError('The configuration is not available choose among [low|medium|high]')
 
+# def emp_single_label(**kwargs):
+#     '''
+#     New function for the implementation of new empirical posterior
+#     '''
+
+#     dss = kwargs.get('datasets')
+#     cvs = kwargs.get('corevectors')
+#     loader = kwargs.get('loader', 'train')
+#     bs = kwargs.get('batch_size', 64)
+#     verbose = kwargs.get('verbose', False)
+#     nl_class = kwargs('n_cluster')
+#     nl_model = kwargs('n_clasess')
+#     parser = kwargs('parser')
+#     driller = kwargs('driller')
+#     device = kwargs('device')
+
+#     _empp = torch.zeros(nl_model, 2, nl_class)
+
+#     dss_dl = DataLoader(dss._dss[loader], batch_size=bs, collate_fn=lambda x: x, shuffle=False)
+#     cvs_dl = DataLoader(cvs._corevds[loader], batch_size=bs, collate_fn=lambda x: x, shuffle=False)
+
+#     if verbose: print('Computing empirical posterior')
+#     for _dss, _cvs in tqdm(zip(dss_dl, cvs_dl), disable=not verbose):
+#         data, label = parser(cvs=_cvs, dss=_dss)
+#         data, label = data.to(device), label.to(device)
+#         label_one_hot = torch.functional.one_hot(label, num_classes=nl_model)
+#         preds = driller.predict(data)
+
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
@@ -60,24 +92,24 @@ if __name__ == "__main__":
     model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
     model_name = f"conv2dAE_SENT_L16_K3-3_Emb{emb_size}_Lay0_C16_S42.pth"
 
-    parsed_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}')
+    parsed_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}_RW')
 
     svds_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/') 
     svds_name = f'svds_{emb_size}' 
     
-    cvs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors_{emb_size}')
+    cvs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors_{emb_size}_RW')
     cvs_name = 'cvs'
 
-    drill_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/drillers_{emb_size}')
+    drill_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/drillers_{emb_size}_RW')
     drill_name = 'classifier'
 
-    phs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/peepholes_{emb_size}')
+    phs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/peepholes_{emb_size}_RW')
     phs_name = 'peepholes'
 
     plots_path = Path.cwd()/f'temp_plots_{emb_size}'
     plots_path.mkdir(parents=True, exist_ok=True)
 
-    bs = 2**18
+    bs = 2**20
     verbose = True 
     n_threads = 1
 
@@ -131,8 +163,8 @@ if __name__ == "__main__":
             'RW_RW': {
                 'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
                 'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
-                'label_key': 'RW',
-                'n_classes': 4,
+                'label_key': ['RW0','RW1', 'RW2', 'RW3'],
+                'n_classes': 2,
                 'class_names': [f'RW{i}' for i in range(4)] 
                 },
             }
@@ -156,80 +188,43 @@ if __name__ == "__main__":
     for cv_dim in cv_dims:
         for n_cluster in n_clusters:
             for test_name in tests:
-                # parsers and shit
-                cv_parsers = {
-                        _layer: partial(
-                            trim_corevectors,
-                            module = _layer,
-                            cv_dim = cv_dim,
-                            label_key = tests[test_name]['label_key'] 
-                            ) for _layer in target_layers
-                        }
 
-                feature_sizes = {_layer: cv_dim for _layer in target_layers}
+                for label_key in tests[test_name]['label_key']:
+                    print(label_key)
 
-                drillers = {}
-                for peep_layer in target_layers:
-                    drillers[peep_layer] = tGMM(
-                            path = drill_path,
-                            name = drill_name+f'.{fit}.{peep_layer}.{test_name}.{emb_size}.{ci}',
-                            nl_classifier = n_cluster,
-                            nl_model = tests[test_name]['n_classes'],
-                            n_features = feature_sizes[peep_layer],
-                            parser = cv_parsers[peep_layer],
+                    # parsers and shit
+                    cv_parsers = {
+                            _layer: partial(
+                                trim_corevectors,
+                                module = _layer,
+                                cv_dim = cv_dim,
+                                label_key = label_key
+                                ) for _layer in target_layers
+                            }
+
+                    feature_sizes = {_layer: cv_dim for _layer in target_layers}
+
+                    drillers = {}
+                    for peep_layer in target_layers:
+                        drillers[peep_layer] = tGMM(
+                                path = drill_path,
+                                name = drill_name+f'.{fit}.{peep_layer}.{test_name}.{emb_size}.{ci}',
+                                nl_classifier = n_cluster,
+                                nl_model = tests[test_name]['n_classes'],
+                                n_features = feature_sizes[peep_layer],
+                                parser = cv_parsers[peep_layer],
+                                device = device,
+                                label_key = label_key
+                                )
+
+                    peepholes = Peepholes(
+                            path = phs_path,
+                            name = phs_name+f'.{fit}.{n_cluster}.{cv_dim}.{test_name}.{emb_size}.{ci}.{label_key}',
                             device = device
                             )
 
-                peepholes = Peepholes(
-                        path = phs_path,
-                        name = phs_name+f'.{fit}.{n_cluster}.{cv_dim}.{test_name}.{emb_size}.{ci}',
-                        device = device
-                        )
-
-                # get peepholes
-                with sentinel as s, corevecs as cv:
-                    s.load_only(
-                            loaders = tests[test_name]['loaders'],
-                            verbose = verbose
-                            )
-
-                    cv.load_only(
-                            loaders = tests[test_name]['loaders'],
-                            verbose = verbose 
-                            ) 
-
-                    for drill_key, driller in drillers.items():
-                        if (driller._empp_file).exists():
-                            print(f'Loading Classifier for {drill_key}') 
-                            driller.load()
-                            plt.imshow(driller._empp.cpu())
-                            plt.savefig(driller._clas_path / f'{drill_key}_empp.png')
-                            plt.close()
-                        else:
-                            t0 = time()
-                            print(f'Fitting classifier for {drill_key}')
-                            driller.fit(
-                                    corevectors = cv,
-                                    loader = tests[test_name]['empp_fit_key'],
-                                    verbose=verbose
-                                    )
-                            print(f'Fitting time for {drill_key}  = ', time()-t0)
-
-                            driller.compute_empirical_posteriors(
-                                    datasets = s,
-                                    corevectors = cv,
-                                    loader = tests[test_name]['empp_fit_key'],
-                                    batch_size = bs,
-                                    verbose=verbose
-                                    )
-                    
-                            # save classifiers
-                            print(f'Saving classifier for {drill_key}')
-                            driller.save()
-                            plt.imshow(driller._empp.cpu())
-                            plt.savefig(driller._clas_path / f'{drill_key}_empp.png')
-                
-                    with peepholes as ph:
+                    # get peepholes
+                    with sentinel as s, corevecs as cv:
                         s.load_only(
                                 loaders = tests[test_name]['loaders'],
                                 verbose = verbose
@@ -240,48 +235,109 @@ if __name__ == "__main__":
                                 verbose = verbose 
                                 ) 
 
-                        ph.get_peepholes(
-                                datasets = s,
-                                corevectors = cv,
-                                target_modules = target_layers,
-                                batch_size = bs,
-                                drillers = drillers,
-                                n_threads = n_threads,
-                                verbose = verbose
-                                )
-                        
-                        for _layer in target_layers:
+                        for drill_key, driller in drillers.items():
 
-                            for a, c in enumerate(corruptions):
-                                
-                                cns = tests[test_name]['class_names']
+                            if (driller._clas_path).exists():
+                                print(driller._clas_path)
+                                if (driller._empp_file).exists():
+                                    print(driller._empp_file)
+                                    print(f'Loading Classifier for {drill_key}') 
+                                    driller.load()
+                                else:
+                                    print(f'Loading Classifier for {drill_key}') 
+                                    driller.load_without_empp()
 
-                                loader_key = tests[test_name]['loaders'][1]
-                                
-                                idx = (s._dss[loader_key]['detection'] == 1) & (s._dss[loader_key]['corruption']==a) #s._dss[loader_key]['detection'] == 1  
-                                result = ph._phs[loader_key][_layer]['peepholes'][idx]
-                                label = s._dss[loader_key][tests[test_name]['label_key']][idx]
-                                
-                                # confusion matrix
-                                cm = confusion_matrix(label, result.argmax(dim=1), normalize='true')
-                                disp = ConfusionMatrixDisplay(cm, display_labels=cns)
-                                disp.plot(cmap='Blues', colorbar=False, values_format=".2f", im_kw={'norm': norm})
+                                    print(f'Fitting time for {drill_key}  = ', time()-t0)
 
-                                # text around
-                                for text in disp.text_.ravel():   # all the text objects (numbers in cells)
-                                    text.set_fontsize(14) 
-
-                                disp.ax_.tick_params(axis='x', labelsize=14)
-                                disp.ax_.tick_params(axis='y', labelsize=14)
-                                disp.ax_.set_xlabel('Predicted label', fontsize=16, labelpad=10)
-                                disp.ax_.set_ylabel('True label', fontsize=16, labelpad=10)
-                                    
-                                #disp.ax_.set_title(f'Confusion Matrix : cv_dim={cv_dim} & n_cluster={n_cluster}')
-                                plt.tight_layout()
-
-                                # save and close
-                                plt.savefig(Path(plots_path)/f"CM.{fit}.{test_name}.{n_cluster}.{cv_dim}.{emb_size}.{ci}.{c}_only_test.png", bbox_inches='tight', dpi=300)
+                                    driller.compute_empirical_posteriors(
+                                            datasets = s,
+                                            corevectors = cv,
+                                            loader = tests[test_name]['empp_fit_key'],
+                                            batch_size = bs,
+                                            verbose=verbose
+                                            )
+                                    driller.save()
+                                plt.imshow(driller._empp.cpu())
+                                plt.savefig(driller._clas_path / f'{drill_key}_empp_{label_key}.png')
                                 plt.close()
+
+                            else:
+                                t0 = time()
+                                print(f'Fitting classifier for {drill_key}')
+                                driller.fit(
+                                        corevectors = cv,
+                                        loader = tests[test_name]['empp_fit_key'],
+                                        verbose=verbose
+                                        )
+                                print(f'Fitting time for {drill_key}  = ', time()-t0)
+
+                                driller.compute_empirical_posteriors(
+                                        datasets = s,
+                                        corevectors = cv,
+                                        loader = tests[test_name]['empp_fit_key'],
+                                        batch_size = bs,
+                                        verbose=verbose
+                                        )
+                        
+                                # save classifiers
+                                print(f'Saving classifier for {drill_key}')
+                                driller.save()
+                                plt.imshow(driller._empp.cpu())
+                                plt.savefig(driller._clas_path / f'{drill_key}_empp_{label_key}.png')
+                    
+                        with peepholes as ph:
+                            s.load_only(
+                                    loaders = tests[test_name]['loaders'],
+                                    verbose = verbose
+                                    )
+
+                            cv.load_only(
+                                    loaders = tests[test_name]['loaders'],
+                                    verbose = verbose 
+                                    ) 
+
+                            ph.get_peepholes(
+                                    datasets = s,
+                                    corevectors = cv,
+                                    target_modules = target_layers,
+                                    batch_size = bs,
+                                    drillers = drillers,
+                                    n_threads = n_threads,
+                                    verbose = verbose
+                                    )
+                        
+                        # for _layer in target_layers:
+
+                        #     for a, c in enumerate(corruptions):
+                                
+                        #         cns = tests[test_name]['class_names']
+
+                        #         loader_key = tests[test_name]['loaders'][1]
+                                
+                        #         idx = (s._dss[loader_key]['detection'] == 1) & (s._dss[loader_key]['corruption']==a) #s._dss[loader_key]['detection'] == 1  
+                        #         result = ph._phs[loader_key][_layer]['peepholes'][idx]
+                        #         label = s._dss[loader_key][tests[test_name]['label_key']][idx]
+                                
+                        #         # confusion matrix
+                        #         cm = confusion_matrix(label, result.argmax(dim=1), normalize='true')
+                        #         disp = ConfusionMatrixDisplay(cm, display_labels=cns)
+                        #         disp.plot(cmap='Blues', colorbar=False, values_format=".2f", im_kw={'norm': norm})
+
+                        #         # text around
+                        #         for text in disp.text_.ravel():   # all the text objects (numbers in cells)
+                        #             text.set_fontsize(14) 
+
+                        #         disp.ax_.tick_params(axis='x', labelsize=14)
+                        #         disp.ax_.tick_params(axis='y', labelsize=14)
+                        #         disp.ax_.set_xlabel('Predicted label', fontsize=16, labelpad=10)
+                        #         disp.ax_.set_ylabel('True label', fontsize=16, labelpad=10)
+                                    
+                        #         #disp.ax_.set_title(f'Confusion Matrix : cv_dim={cv_dim} & n_cluster={n_cluster}')
+                        #         plt.tight_layout()
+
+                        #         # save and close
+                        #         plt.savefig(Path(plots_path)/f"CM.{fit}.{test_name}.{n_cluster}.{cv_dim}.{emb_size}.{ci}.{c}_only_test.png", bbox_inches='tight', dpi=300)
+                        #         plt.close()
 
                             # disp.tick_params(axis='x', rotation=45)
                             # disp.title(f'Confusion Matrix : cv_dim={cv_dim} & n_cluster={n_cluster}')

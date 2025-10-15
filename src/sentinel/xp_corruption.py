@@ -45,7 +45,7 @@ if __name__ == "__main__":
     model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
     model_name = f"conv2dAE_SENT_L16_K3-3_Emb{emb_size}_Lay0_C16_S42.pth"
     
-    parsed_path = f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}'
+    parsed_path = f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}_RW'
 
     loaders = ['val', 'test']
     bs = 2**18
@@ -90,33 +90,33 @@ if __name__ == "__main__":
             verbose = verbose
         )
 
-        s.get_corruptions_single(
-                loaders = loaders,
-                model = model,
-                corruptions = corruptions,
-                n_samples = 1500,
-                bs = bs,
-                verbose = verbose,
-                suffix = ci,
-                thr = 0.003
-                )
+        # s.get_corruptions_single(
+        #         loaders = loaders,
+        #         model = model,
+        #         corruptions = corruptions,
+        #         n_samples = 1500,
+        #         bs = bs,
+        #         verbose = verbose,
+        #         suffix = ci,
+        #         thr = 0.003
+        #         )
 
-        s.get_corruptions_all(
-                loaders = loaders,
-                model = model,
-                corruptions = corruptions,
-                n_samples = 10**4,
-                bs = bs,
-                verbose = verbose,
-                suffix = ci,
-                thr = 0.003
-                )
+        # s.get_corruptions_all(
+        #         loaders = loaders,
+        #         model = model,
+        #         corruptions = corruptions,
+        #         n_samples = 10**4,
+        #         bs = bs,
+        #         verbose = verbose,
+        #         suffix = ci,
+        #         thr = 0.003
+        #         )
 
         s.get_corruptions_RW(
                 loaders = loaders,
                 model = model,
                 corruptions = corruptions,
-                n_samples = 1500,
+                n_samples = 2000,
                 bs = bs,
                 verbose = verbose,
                 suffix = ci,

@@ -171,25 +171,24 @@ if __name__ == "__main__":
                 'n_classes': len(corruptions),
                 'class_names': corruptions
                 },
-            # 'RW_corruption': {
-            #     'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
-            #     'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
-            #     'label_key': 'corruption',
-            #     'n_classes': len(corruptions),
-            #     'class_names': corruptions 
-            #     },
-            # 'RW_RW': {
-            #     'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
-            #     'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
-            #     'label_key': 'RW',
-            #     'n_classes': 4,
-            #     'class_names': [f'RW{i}' for i in range(4)] 
-            #     },
+            'RW_corruption': {
+                'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
+                'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
+                'label_key': 'corruption',
+                'n_classes': len(corruptions),
+                'class_names': corruptions 
+                },
+            'RW_RW': {
+                'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
+                'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
+                'label_key': 'RW',
+                'n_classes': 4,
+                'class_names': [f'RW{i}' for i in range(4)] 
+                },
             }
     
     font_size = 50
 
-    
     for idx in tqdm(peaks):
         start = wr_pre * ws
         end   = (wr_pre + 1) * ws

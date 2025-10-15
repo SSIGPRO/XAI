@@ -36,16 +36,16 @@ if __name__ == "__main__":
     model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
     model_name = f"conv2dAE_SENT_L16_K3-3_Emb{emb_size}_Lay0_C16_S42.pth"
 
-    parsed_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}')
+    parsed_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}_RW')
 
     svds_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/') 
     svds_name = f'svds_{emb_size}' 
     
-    cvs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors_{emb_size}')
+    cvs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors_{emb_size}_RW')
     cvs_name = 'cvs'
 
     loaders = [
-            'val', 'test_ori'
+            'val', 'test_ori',
 
             # f'val-val-c-single-high',
             # f'val-test-c-single-high',
@@ -57,10 +57,10 @@ if __name__ == "__main__":
             # f'test-val-c-all-high',
             # f'test-test-c-all-high',
 
-            # f'val-val-c-RW-high',
-            # f'val-test-c-RW-high',
-            # f'test-val-c-RW-high',
-            # f'test-test-c-RW-high',
+            f'val-val-c-RW-high',
+            f'val-test-c-RW-high',
+            f'test-val-c-RW-high',
+            f'test-test-c-RW-high',
 
             # f'val-val-c-single-medium',
             # f'val-test-c-single-medium',
