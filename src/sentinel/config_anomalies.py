@@ -10,7 +10,7 @@ ch = {
         #'DeadZone': DeadZone(1),
 
         ### Increasing
-        'Constant': Constant(1),
+        'Offset': Constant(1),
         'Step': Step(1),
         'Impulse': Impulse(1),
         'GWN': GWN(1),
@@ -31,7 +31,7 @@ cl = {
         #'DeadZone': DeadZone(0.1),
 
         ### Increasing
-        'Constant': Constant(0.1),
+        'Offset': Constant(0.1),
         'Step': Step(0.1),
         'Impulse': Impulse(0.1),
         'GWN': GWN(0.1),
@@ -52,7 +52,7 @@ cm = {
         #'DeadZone': DeadZone(0.5),
 
         ### Increasing
-        'Constant': Constant(0.5),
+        'Offset': Constant(0.5),
         'Step': Step(0.5),
         'Impulse': Impulse(0.5),
         'GWN': GWN(0.5),

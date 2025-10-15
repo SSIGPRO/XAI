@@ -45,22 +45,22 @@ if __name__ == "__main__":
     cvs_name = 'cvs'
 
     loaders = [
-            'val',# 'test_ori'
+            'val', 'test_ori'
 
-            f'val-val-c-single-high',
-            f'val-test-c-single-high',
-            f'test-val-c-single-high',
-            f'test-test-c-single-high',
+            # f'val-val-c-single-high',
+            # f'val-test-c-single-high',
+            # f'test-val-c-single-high',
+            # f'test-test-c-single-high',
 
-            f'val-val-c-all-high',
-            f'val-test-c-all-high',
-            f'test-val-c-all-high',
-            f'test-test-c-all-high',
+            # f'val-val-c-all-high',
+            # f'val-test-c-all-high',
+            # f'test-val-c-all-high',
+            # f'test-test-c-all-high',
 
-            f'val-val-c-RW-high',
-            f'val-test-c-RW-high',
-            f'test-val-c-RW-high',
-            f'test-test-c-RW-high',
+            # f'val-val-c-RW-high',
+            # f'val-test-c-RW-high',
+            # f'test-val-c-RW-high',
+            # f'test-test-c-RW-high',
 
             # f'val-val-c-single-medium',
             # f'val-test-c-single-medium',

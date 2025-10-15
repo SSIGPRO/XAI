@@ -10,6 +10,9 @@ from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 sys.path.insert(0, (Path.home()/'newpenny/XAI/EP').as_posix())
 from tqdm import tqdm
+import matplotlib.patches as patches
+from math import floor
+import pandas as pd
 
 #wombats stuff
 
@@ -31,131 +34,27 @@ args = parser.parse_args()
 
 emb_size = args.emb_size
 
+def draw_group_box(fig, axs_group, label=None, color='black', pad=0.006):
+    # make sure positions are computed
+    fig.canvas.draw()
+    # union of axes bboxes (in figure coords)
+    bboxes = [ax.get_position() for ax in axs_group]
+    left   = min(bb.x0 for bb in bboxes) - pad
+    right  = max(bb.x1 for bb in bboxes) + pad
+    bottom = min(bb.y0 for bb in bboxes) - pad
+    top    = max(bb.y1 for bb in bboxes) + pad
 
-def visualize_anomaly_telemetry(score_win, data_win, peep_win, lab_win, run_idx=0):
-    """
-    Visualize anomaly detection results with score, telemetry channels, and peepholes.
-    
-    Parameters:
-    -----------
-    score_win : torch.Tensor [R, W]
-        Anomaly scores for each window
-    data_win : torch.Tensor [R, W, 16, 16]
-        Telemetry data (window × time × channels)
-    peep_win : torch.Tensor [R, W, ...]
-        Peephole values
-    lab_win : torch.Tensor [R, W]
-        Boolean mask indicating anomalies
-    run_idx : int
-        Which run to visualize (default: 0)
-    """
-    
-    # Convert to numpy if needed
-    if hasattr(score_win, 'cpu'):
-        score_win = score_win.cpu().numpy()
-        data_win = data_win.cpu().numpy()
-        peep_win = peep_win.cpu().numpy()
-        lab_win = lab_win.cpu().numpy()
-    
-    # Extract data for the selected run
-    scores = score_win[run_idx]  # [W]
-    data = data_win[run_idx]      # [W, 16, 16]
-    peeps = peep_win[run_idx]     # [W, ...]
-    labels = lab_win[run_idx]     # [W]
-    
-    W = len(scores)
-    num_channels = data.shape[2]  # Should be 16
-    
-    # Create figure with multiple subplots
-    fig = plt.figure(figsize=(20, 14))
-    gs = fig.add_gridspec(4, 4, hspace=0.4, wspace=0.3)
-    
-    # ===== 1. Score plot with anomaly highlighting =====
-    ax_score = fig.add_subplot(gs[0, :])
-    x_indices = np.arange(W)
-    
-    # Plot score line
-    ax_score.plot(x_indices, scores, 'b-', linewidth=2, label='Anomaly Score')
-    
-    # Highlight anomaly regions in red
-    anomaly_regions = []
-    in_anomaly = False
-    start_idx = 0
-    
-    for i, is_anom in enumerate(labels):
-        if is_anom and not in_anomaly:
-            start_idx = i
-            in_anomaly = True
-        elif not is_anom and in_anomaly:
-            anomaly_regions.append((start_idx, i-1))
-            in_anomaly = False
-    if in_anomaly:
-        anomaly_regions.append((start_idx, len(labels)-1))
-    
-    # Fill anomaly regions
-    for start, end in anomaly_regions:
-        ax_score.axvspan(start, end, alpha=0.3, color='red', label='Anomaly' if start == anomaly_regions[0][0] else '')
-        ax_score.scatter(x_indices[start:end+1], scores[start:end+1], c='red', s=30, zorder=5)
-    
-    ax_score.set_xlabel('Window Index', fontsize=12)
-    ax_score.set_ylabel('Score', fontsize=12)
-    ax_score.set_title(f'Anomaly Score Timeline (Run {run_idx})', fontsize=14, fontweight='bold')
-    ax_score.legend(loc='upper right')
-    ax_score.grid(True, alpha=0.3)
-    
-    # ===== 2. Telemetry channels visualization =====
-    # Reshape data from [W, 16, 16] to [W, 16, 16] where first 16 is time, second is channels
-    # data[w, t, ch] = value at window w, time step t, channel ch
-    
-    # Create 4x4 grid for 16 channels
-    for ch in range(num_channels):
-        row = 1 + ch // 4
-        col = ch % 4
-        ax = fig.add_subplot(gs[row, col])
-        
-        # Extract channel data across time for middle window
-        middle_window = W // 2
-        channel_timeseries = data[middle_window, :, ch]  # [16] time steps
-        
-        time_steps = np.arange(len(channel_timeseries))
-        ax.plot(time_steps, channel_timeseries, 'g-', linewidth=2, marker='o', markersize=4)
-        
-        # Highlight if this window is anomalous
-        if labels[middle_window]:
-            ax.set_facecolor('#ffcccc')
-        
-        ax.set_title(f'Ch {ch}', fontsize=10, fontweight='bold')
-        ax.set_xlabel('Time', fontsize=8)
-        ax.set_ylabel('Value', fontsize=8)
-        ax.grid(True, alpha=0.3)
-        ax.tick_params(labelsize=8)
-    
-    # ===== 3. Peephole visualization =====
-    ax_peep = fig.add_subplot(gs[3, :])
-    
-    # Assuming peeps has shape [W, num_features] or [W]
-    if len(peeps.shape) == 1:
-        # Single peephole value per window
-        ax_peep.plot(x_indices, peeps, 'purple', linewidth=2, marker='o', markersize=4)
-        ax_peep.set_ylabel('Peephole Value', fontsize=12)
-    else:
-        # Multiple peephole features - show as heatmap
-        im = ax_peep.imshow(peeps.T, aspect='auto', cmap='viridis', interpolation='nearest')
-        ax_peep.set_ylabel('Peephole Feature', fontsize=12)
-        plt.colorbar(im, ax=ax_peep, label='Value')
-    
-    # Highlight anomaly regions in peephole plot
-    for start, end in anomaly_regions:
-        ax_peep.axvspan(start, end, alpha=0.2, color='red')
-    
-    ax_peep.set_xlabel('Window Index', fontsize=12)
-    ax_peep.set_title('Peephole Values', fontsize=14, fontweight='bold')
-    ax_peep.grid(True, alpha=0.3)
-    
-    plt.suptitle(f'Anomaly Detection Analysis - Run {run_idx}', fontsize=16, fontweight='bold', y=0.995)
-    plt.tight_layout()
-    
-    return fig
+    rect = patches.Rectangle(
+        (left, bottom), right-left, top-bottom,
+        transform=fig.transFigure, fill=False,
+        edgecolor=color, linewidth=2, clip_on=False, zorder=10
+    )
+    fig.add_artist(rect)
+
+    if label is not None:
+        fig.text(left - 0.004, (bottom+top)/2, label,
+                 rotation=90, va='center', ha='right',
+                 color=color, fontsize=20, fontweight='bold')
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -170,9 +69,9 @@ if __name__ == "__main__":
     #--------------------------------
     # Directories definitions
     #--------------------------------
-    parsed_path = '/srv/newpenny/XAI/generated_data/AE_sentinel/datasets'
+    parsed_path = f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}'
 
-    phs_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/peepholes')
+    phs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/peepholes_{emb_size}')
     phs_name = 'peepholes'
 
     configs = ['all', 'single', 'RW']
@@ -182,6 +81,30 @@ if __name__ == "__main__":
     verbose = True 
 
     #--------------------------------
+    # TimeStamps
+    #--------------------------------
+
+    ws = 16
+
+    test_file = Path('/srv/newpenny/dataset/TASI/sentinel/sentinel_4s_clean_std/test_data.pkl')
+    data_test_std = pd.read_pickle(test_file.as_posix())
+
+    _data = torch.tensor(data_test_std.values, dtype=torch.float32)
+    nw = floor(_data.shape[0]/ws) # num windows
+
+    data = _data[:ws*nw]
+    data = data.reshape(-1, ws, data.shape[-1]) # 16 is the number of signals
+    data = data.permute(0, 2, 1).unsqueeze(dim=1) ## B, 1, nc, nw
+
+    idx = data.isnan().any(dim=(2,3)).logical_not()#used dim instead of axis
+
+    time_stamps = data_test_std.index.to_numpy()
+    time_stamps = time_stamps[:ws*nw]
+    time_stamps = time_stamps.reshape(-1, ws)
+    
+    time_stamps = time_stamps[idx.squeeze(dim=1).numpy()]
+
+    #--------------------------------
     # Dataset
     #--------------------------------
 
@@ -189,22 +112,35 @@ if __name__ == "__main__":
         path = parsed_path
     )
 
-    column_names = ['RW1_motcurr', 'RW1_therm', 'RW1_cmd_volt', 'RW1_speed', 'RW2_motcurr',
-                'RW2_therm', 'RW2_cmd_volt', 'RW2_speed', 'RW3_motcurr', 'RW3_therm',
-                'RW3_cmd_volt', 'RW3_speed', 'RW4_motcurr', 'RW4_therm', 'RW4_cmd_volt',
-                'RW4_speed']
+    column_names = ['RW0_motcurr', 'RW0_therm', 'RW0_cmd_volt', 'RW0_speed', 'RW1_motcurr',
+                'RW1_therm', 'RW1_cmd_volt', 'RW1_speed', 'RW2_motcurr', 'RW2_therm',
+                'RW2_cmd_volt', 'RW2_speed', 'RW3_motcurr', 'RW3_therm', 'RW3_cmd_volt',
+                'RW3_speed']
+    
+    RW_labels = ['RW0', 'RW1', 'RW2', 'RW3']
+
+    peaks = [
+            #  24766,
+            #  134493,
+            #  143991,
+             172863,
+            #  180000,
+            #  240753
+             ]
     
     rw = range(4)
     c = range(16)
+
+    wr_pre = 10
+    wr_post = 60
     
-    corruptions = ['Constant', 'Step', 'Impulse', 'GWN','PSA']
+    corruptions = ['Offset', 'Step', 'Impulse', 'GWN','PSA']
     n_corr = len(corruptions)
 
     cv_dim = 50
     n_cluster = 50
-    ci = 'medium'
+    ci = 'high'
     fit = 'test'
-
 
     tests = {
             # 'single_channel': {
@@ -235,102 +171,147 @@ if __name__ == "__main__":
                 'n_classes': len(corruptions),
                 'class_names': corruptions
                 },
-            'RW_corruption': {
-                'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
-                'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
-                'label_key': 'corruption',
-                'n_classes': len(corruptions),
-                'class_names': corruptions 
-                },
-            'RW_RW': {
-                'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
-                'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
-                'label_key': 'RW',
-                'n_classes': 4,
-                'class_names': [f'RW{i}' for i in range(4)] 
-                },
+            # 'RW_corruption': {
+            #     'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
+            #     'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
+            #     'label_key': 'corruption',
+            #     'n_classes': len(corruptions),
+            #     'class_names': corruptions 
+            #     },
+            # 'RW_RW': {
+            #     'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
+            #     'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
+            #     'label_key': 'RW',
+            #     'n_classes': 4,
+            #     'class_names': [f'RW{i}' for i in range(4)] 
+            #     },
             }
     
+    font_size = 50
 
-    for test_name in tests:
-
-        peepholes = Peepholes(
-                            path = phs_path,
-                            name = phs_name+f'.{fit}.{n_cluster}.{cv_dim}.{test_name}.{emb_size}.{ci}',
-                            device = device
-                            )
-        
-        with sentinel as s, peepholes as p:
-            s.load_only(
-                loaders = loaders,
-                verbose = verbose
-            )
-
-            p.load_only(
-                loaders = loaders,
-                verbose = verbose
-            )
-
-            loss = torch.nn.MSELoss(reduction='none')        
-
-            scores = {key: loss(dss['data'], dss['output']).mean(dim=(2,3)) for key, dss in s._dss.items()}
-            peep = p._phs['test_ori']['encoder.linear']['peepholes']
-            mask = (s._dss['test_ori']['label'] == 0).all(dim=(1, 2))
-            peep[mask] = 0
-
-            pos_mask = (s._dss['test_ori']['label'] == 1).any(dim=(1,2))      # [N] bool
-            idx = torch.where(pos_mask)[0]              
-            if idx.numel() == 0:
-                print("No positives found.")
-            else:
-                idx = idx.sort().values
-
-                diffs  = idx[1:] - idx[:-1]
-                breaks = torch.nonzero(diffs > 1, as_tuple=False).squeeze(-1)
-
-                run_starts = torch.cat([idx.new_zeros(1), breaks + 1])
-                run_ends   = torch.cat([breaks, idx.new_tensor([idx.numel()-1])])
-
-                # choose middle element of each run as the center
-                center_pos = (run_starts + run_ends) // 2
-                centers = idx[center_pos]               
-
-                # ---- build window grid around centers ----
-                half = 50                                
-                W = 2*half + 1
-                N = scores['test_ori'].numel()
-
-                offsets = torch.arange(-half, half+1, device=centers.device) 
-                grid = (centers[:, None] + offsets[None, :]).clamp_(0, N-1) 
-                grid = grid[150:200] 
-                print(grid.shape) 
-
-                # ---- gather windows ----
-                score_win = scores['test_ori'][grid]            
-                data_win  = s._dss['test_ori']['data'][grid]              
-                peep_win  = p._phs['test_ori']['encoder.linear']['peepholes'][grid]               
-                lab_win   = pos_mask[grid]               
-
-                # ---- visualize per window ----
-                for i in range(grid.size(0)):
-                    fig, axs = plt.subplots(18, 1, figsize=(50,50))
-                    is_anomaly = lab_win[i]
-                    print(~is_anomaly)
-
-                    for j in range(16):
-                        
-                        axs[j].plot(data_win[i,0,...].reshape(-1, data_win.shape[-1])[j])
-                        axs[j].set_ylabel(f'C {j}')
-                    
-                    axs[16].plot(score_win[i])
-                    axs[16].set_ylabel('Score')
-                    peep_to_show = peep_win[i].clone()  # Make a copy
-                    peep_to_show[~is_anomaly,:] = 0
-                    axs[17].imshow(peep_to_show.T, aspect='auto', cmap='viridis')
-                    axs[17].set_ylabel('Peepholes')
-                    axs[17].set_yticks(range(len(tests[test_name]['class_names'])))
-                    axs[17].set_yticklabels(tests[test_name]['class_names'])
     
-                    plt.tight_layout()
-                    fig.savefig(f'window_{i}_{test_name}.png')
+    for idx in tqdm(peaks):
+        start = wr_pre * ws
+        end   = (wr_pre + 1) * ws
+        window = torch.arange(idx - wr_pre, idx + wr_post).tolist()
+
+        for test_name in tqdm(tests):
+
+            peepholes = Peepholes(
+                                path = phs_path,
+                                name = phs_name+f'.{fit}.{n_cluster}.{cv_dim}.{test_name}.{emb_size}.{ci}',
+                                device = device
+                                )
+            
+            with sentinel as s, peepholes as p:
+                s.load_only(
+                    loaders = loaders,
+                    verbose = verbose
+                )
+
+                # plt.figure(figsize=(12, 4))
+                # plt.plot(s._dss['test_ori']['data'][172864-wr:172864+wr,0,8,:].reshape(-1))
+                # plt.tight_layout()
+                # plt.savefig('RW2_motocurr')
+                # plt.close()
+                # plt.figure(figsize=(12, 4))
+                # plt.plot(s._dss['test_ori']['data'][172864-ws:172864+ws,0,9,:].reshape(-1))
+                # plt.savefig('RW2_temp')
+                # plt.tight_layout()
+                # plt.close()
+
+                p.load_only(
+                    loaders = loaders,
+                    verbose = verbose
+                )
+
+                loss = torch.nn.MSELoss(reduction='none')        
+
+                scores = {key: loss(dss['data'], dss['output']).mean(dim=(2,3)) for key, dss in s._dss.items()}
+
+                sample_mask = (s._dss['test_ori']['label'] == 0).all(dim=(1,2))
+
+                data = s._dss['test_ori']['data'][sample_mask][window].squeeze(dim=1).permute(0,2,1)
+                data = data.reshape(-1, data.size(2)) 
+                
+                sc = scores['test_ori'][sample_mask][window]
+ 
+                num_points = data.shape[0]
+                thr = 0.003
+
+                sc_expanded = sc.repeat_interleave(ws)
+
+                fig = plt.figure(figsize=(70, 70))
+                # 16 signal rows + 3 spacer rows + AE + Peephole
+                ratios = [1,1,1,1,  0.3,   1,1,1,1,  0.3,   1,1,1,1,  0.3,   1,1,1,1, 0.3, 2, 0.3, 2]
+                gs = fig.add_gridspec(nrows=len(ratios), ncols=1, height_ratios=ratios, hspace=0.25)
+
+                axs = []
+                r = 0
+                for i in range(16):
+                    if i in {4,8,12}:  # skip spacer rows after each group of 4
+                        r += 1
+                    ax = fig.add_subplot(gs[r, 0])
+                    axs.append(ax)
+                    r += 1
+
+                ae_row = len(ratios) - 3   # AE score row (after adding the spacer)
+                ph_row = len(ratios) - 1   # Peephole row
+
+                ax_score = fig.add_subplot(gs[ae_row, 0])
+                axs.append(ax_score)              
+                ax_ph = fig.add_subplot(gs[-1, 0])   # Peephole (tallest)
+                axs.append(ax_ph)
+
+                for i in range(16):
+                    
+                    axs[i].plot(data[:,i], linewidth=5)
+                    
+                    axs[i].axvline(x=start, color='green', linestyle='--', linewidth=1.5)
+                    axs[i].axvline(x=end,   color='green', linestyle='--', linewidth=1.5)
+
+                    if i % 4 == 0:
+                        axs[i].set_title(f'RW{i//4}', fontsize=font_size, fontweight='bold')
+
+                    axs[i].set_xticks([])
+                    axs[i].set_yticks([])
+
+                axs[16].plot(sc_expanded, linewidth=5)
+                axs[16].axhline(y=thr, color='red', linestyle='--', linewidth=1.5)
+                axs[16].axvline(x=start, color='green', linestyle='--', linewidth=1.5)
+                axs[16].axvline(x=end,   color='green', linestyle='--', linewidth=1.5)
+                
+                axs[16].set_title('AE score', fontsize=font_size, fontweight='bold')
+                axs[16].set_xticks([])
+                axs[16].tick_params(axis='y', labelsize=font_size)  # set font size
+                for label in axs[16].get_yticklabels():      # make labels bold
+                    label.set_fontweight('bold')
+
+                fig.subplots_adjust(hspace=0.25)
+
+                mask = sc > thr
+
+                pm = p._phs['test_ori']['encoder.linear']['peepholes'][window].detach().cpu().numpy()
+                
+                pm[~mask.squeeze(1)] = np.nan
+
+                pm_expanded = np.repeat(pm, ws, axis=0)
+                
+                axs[17].imshow(pm_expanded.T, aspect='auto', interpolation='none')
+                axs[17].axvline(x=start, color='green', linestyle='--', linewidth=1.5)
+                axs[17].axvline(x=end,   color='green', linestyle='--', linewidth=1.5)
+                
+                ypos = np.arange(len(tests[test_name]['class_names']))
+                axs[17].set_yticks(ypos, labels=tests[test_name]['class_names'], fontsize=font_size, fontweight='bold')
+                axs[17].set_title('Peephole', fontsize=font_size, fontweight='bold')
+                axs[17].tick_params(axis='x', labelsize=font_size)  # set font size
+                for label in axs[17].get_xticklabels():      # make labels bold
+                    label.set_fontweight('bold')
+                axs[17].set_xlabel('time index', fontsize=font_size, fontweight='bold')
+
+                for ax in axs:
+                    ax.set_xlim(0, len(data[:,0])) 
+
+                plt.savefig(f'anomaly_{idx}_{test_name}.png', bbox_inches='tight', dpi=300)
+                plt.close(fig)
                     

@@ -89,8 +89,8 @@ if __name__ == "__main__":
 
     target_layers = ['encoder.linear']
     
-    cv_dims = [5, 10, 50]#, 2, 10, 100, 200, 
-    n_clusters = [4, 16, 20,50] #5, 10, 15, 20,
+    cv_dims = [50]#, 2, 10, 100, 200, 
+    n_clusters = [50] #5, 10, 15, 20,
 
     tests = {
             # 'single_channel': {
@@ -114,22 +114,22 @@ if __name__ == "__main__":
             #     'n_classes': 4, 
             #     'class_names': [f'RW{i}' for i in range(4)] 
             #     },
-            'all': {
-                'loaders': [f'{fit}-val-c-all-{ci}', f'{fit}-test-c-all-{ci}'],
-                'empp_fit_key': f'{fit}-val-c-all-{ci}', 
-                'label_key': 'corruption',
-                'n_classes': len(corruptions.keys()),
-                'class_names': corruptions.keys()
-                },
-            'RW_corruption': {
-                'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}'],
-                'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
-                'label_key': 'corruption',
-                'n_classes': len(corruptions.keys()),
-                'class_names': corruptions.keys() 
-                },
+            # 'all': {
+            #     'loaders': [f'{fit}-val-c-all-{ci}', f'{fit}-test-c-all-{ci}', 'test_ori'],
+            #     'empp_fit_key': f'{fit}-val-c-all-{ci}', 
+            #     'label_key': 'corruption',
+            #     'n_classes': len(corruptions.keys()),
+            #     'class_names': corruptions.keys()
+            #     },
+            # 'RW_corruption': {
+            #     'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
+            #     'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
+            #     'label_key': 'corruption',
+            #     'n_classes': len(corruptions.keys()),
+            #     'class_names': corruptions.keys() 
+            #     },
             'RW_RW': {
-                'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}'],
+                'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
                 'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
                 'label_key': 'RW',
                 'n_classes': 4,
@@ -252,36 +252,36 @@ if __name__ == "__main__":
                         
                         for _layer in target_layers:
 
-                            # for a, c in enumerate(corruptions):
+                            for a, c in enumerate(corruptions):
                                 
-                            cns = tests[test_name]['class_names']
+                                cns = tests[test_name]['class_names']
 
-                            loader_key = tests[test_name]['loaders'][1]
-                            
-                            idx = s._dss[loader_key]['detection'] == 1 #(s._dss[loader_key]['detection'] == 1) & (s._dss[loader_key]['corruption']==a) 
-                            result = ph._phs[loader_key][_layer]['peepholes'][idx]
-                            label = s._dss[loader_key][tests[test_name]['label_key']][idx]
-                            
-                            # confusion matrix
-                            cm = confusion_matrix(label, result.argmax(dim=1), normalize='true')
-                            disp = ConfusionMatrixDisplay(cm, display_labels=cns)
-                            disp.plot(cmap='Blues', colorbar=False, values_format=".2f", im_kw={'norm': norm})
-
-                            # text around
-                            for text in disp.text_.ravel():   # all the text objects (numbers in cells)
-                                text.set_fontsize(14) 
-
-                            disp.ax_.tick_params(axis='x', labelsize=14)
-                            disp.ax_.tick_params(axis='y', labelsize=14)
-                            disp.ax_.set_xlabel('Predicted label', fontsize=16, labelpad=10)
-                            disp.ax_.set_ylabel('True label', fontsize=16, labelpad=10)
+                                loader_key = tests[test_name]['loaders'][1]
                                 
-                            disp.ax_.set_title(f'Confusion Matrix : cv_dim={cv_dim} & n_cluster={n_cluster}')
-                            plt.tight_layout()
+                                idx = (s._dss[loader_key]['detection'] == 1) & (s._dss[loader_key]['corruption']==a) #s._dss[loader_key]['detection'] == 1  
+                                result = ph._phs[loader_key][_layer]['peepholes'][idx]
+                                label = s._dss[loader_key][tests[test_name]['label_key']][idx]
+                                
+                                # confusion matrix
+                                cm = confusion_matrix(label, result.argmax(dim=1), normalize='true')
+                                disp = ConfusionMatrixDisplay(cm, display_labels=cns)
+                                disp.plot(cmap='Blues', colorbar=False, values_format=".2f", im_kw={'norm': norm})
 
-                            # save and close
-                            plt.savefig(Path(plots_path)/f"CM.{fit}.{test_name}.{n_cluster}.{cv_dim}.{emb_size}.{ci}_only_test.png", bbox_inches='tight', dpi=300)
-                            plt.close()
+                                # text around
+                                for text in disp.text_.ravel():   # all the text objects (numbers in cells)
+                                    text.set_fontsize(14) 
+
+                                disp.ax_.tick_params(axis='x', labelsize=14)
+                                disp.ax_.tick_params(axis='y', labelsize=14)
+                                disp.ax_.set_xlabel('Predicted label', fontsize=16, labelpad=10)
+                                disp.ax_.set_ylabel('True label', fontsize=16, labelpad=10)
+                                    
+                                #disp.ax_.set_title(f'Confusion Matrix : cv_dim={cv_dim} & n_cluster={n_cluster}')
+                                plt.tight_layout()
+
+                                # save and close
+                                plt.savefig(Path(plots_path)/f"CM.{fit}.{test_name}.{n_cluster}.{cv_dim}.{emb_size}.{ci}.{c}_only_test.png", bbox_inches='tight', dpi=300)
+                                plt.close()
 
                             # disp.tick_params(axis='x', rotation=45)
                             # disp.title(f'Confusion Matrix : cv_dim={cv_dim} & n_cluster={n_cluster}')

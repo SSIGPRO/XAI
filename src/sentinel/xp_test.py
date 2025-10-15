@@ -10,6 +10,8 @@ from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 sys.path.insert(0, (Path.home()/'newpenny/XAI/EP').as_posix())
 from tqdm import tqdm
+import pandas as pd
+from math import floor 
 
 #wombats stuff
 
@@ -40,6 +42,26 @@ if __name__ == "__main__":
     device = torch.device(f"cuda:{cuda_index}" if use_cuda else "cpu")
     print(f"Using {device} device")
 
+    ws = 16
+
+    test_file = Path('/srv/newpenny/dataset/TASI/sentinel/sentinel_4s_clean_std/test_data.pkl')
+    data_test_std = pd.read_pickle(test_file.as_posix())
+
+    _data = torch.tensor(data_test_std.values, dtype=torch.float32)
+    nw = floor(_data.shape[0]/ws) # num windows
+
+    data = _data[:ws*nw]
+    data = data.reshape(-1, ws, data.shape[-1]) # 16 is the number of signals
+    data = data.permute(0, 2, 1).unsqueeze(dim=1) ## B, 1, nc, nw
+
+    idx = data.isnan().any(dim=(2,3)).logical_not()#used dim instead of axis
+
+    time_stamps = data_test_std.index.to_numpy()
+    time_stamps = time_stamps[:ws*nw]
+    time_stamps = time_stamps.reshape(-1, ws)
+    
+    time_stamps = time_stamps[idx.squeeze(dim=1).numpy()]
+
     #--------------------------------
     # Directories definitions
     #--------------------------------
@@ -47,14 +69,14 @@ if __name__ == "__main__":
     configs = ['all', 'single', 'RW']
     cis = ['high']#, 'medium', 'low']
 
-    loaders = ['val', 'test']
+    loaders = ['val', 'test', 'test_ori']
     verbose = True 
 
     loaders_c = [f"test-{p}-c-{config}-{ci}"  for config in configs for ci in cis for p in loaders]
     loaders_RW = [f"test-{p}-c-RW-{ci}" for ci in cis for p in loaders]
     loaders_single = [f"test-{p}-c-single-{ci}" for ci in cis for p in loaders]
     
-    loaders += loaders_c
+   # loaders += loaders_c
 
     #--------------------------------
     # Dataset
@@ -85,178 +107,22 @@ if __name__ == "__main__":
 
         scores = {key: loss(dss['data'], dss['output']).mean(dim=(2,3)) for key, dss in s._dss.items()}
 
-        # plt.plot(scores['test'])
-        # plt.savefig('score_timeline.png')
-
-        # plt.hist(scores['val'], bins=100, density=True)
-        # plt.yscale('log')
-        # plt.savefig('pdf.png')
-        # plt.close()
-
-        # plt.hist(scores['val-c-all-high'], bins=100, density=True)
-        # plt.yscale('log')
-        # plt.savefig('pdf-c-all.png')
-        # plt.close()
-
-        # print((scores['val-c-all-high']>0.003).sum()/len(scores['val-c-all-high']))
-        # quit()
-
-        for key, score in scores.items(): print(f'{key} {score.mean()}')
-
-        print('---------------\n mutliple channel analysis \n-----------------')
-
-        for key in tqdm(loaders_c):
-            ci = key.split('-')[-1]
-            p = key.split('-')[1]
-            config= key.split('-')[3]
-
-            if p == 'val':
-                
-                fig, axs = plt.subplots(n_corr, 3, figsize=(12, 3 * n_corr), squeeze=False)
-                plt.subplots_adjust(wspace=0.28, hspace=0.35)
-                i = 0
-
-            else: i = 1
-                
-            for j, corruption in enumerate(corr_names):
-                            
-                idx = torch.argwhere(s._dss[key]['corruption']==j).squeeze(-1).tolist()
-                score = torch.cat((scores[key][idx], scores[p][idx])).squeeze(dim=1)
-                results = torch.cat((torch.ones(len(idx)), torch.zeros(len(scores[p][idx]))))
-                
-                axs[j,i].hist(scores[p][idx], bins=40, density=True, alpha=0.55, label='Original')
-                axs[j,i].hist(scores[key][idx], bins=40, density=True, alpha=0.55, label='Corrupted')
-                
-                if j == 0: axs[j, i].set_title(p, fontsize=12)
-
-                if j == len(corr_names) - 1: axs[j,i].set_xlabel('score')
-                if i ==0: axs[j, i].set_ylabel(corruption, fontsize=11, rotation=0, labelpad=45, va='center')
-                axs[j, i].set_yscale('log')
-                axs[j, i].set_xscale('log')
-                axs[j,i].legend(fontsize=8)
-
-                roc_metric = BinaryROC()   # returns fpr, tpr, thresholds
-                fpr, tpr, thresholds = roc_metric(score, results.int())
-
-                auc_metric = BinaryAUROC()
-                auc_value = auc_metric(score, results.int()).item()
-
-                # Plot
-                axs[j,2].plot(fpr, tpr, lw=2, label=f'{corruption} ({p}) AUC={auc_value:.3f}')
-                axs[j,2].plot([0, 1], [0, 1], 'k--', lw=1)
-                if j == len(corr_names) - 1: axs[j,2].set_xlabel('False Positive Rate')
-                axs[j,2].set_ylabel('True Positive Rate')
-                if j == 0: axs[j,2].set_title(f'ROC')
-                axs[j,2].legend()
-                axs[j,2].grid(True)
-
-            fig.savefig(Path.cwd()/f'temp_plots_{emb_size}/AUC-c-{config}-{ci}.png')
+        sample_mask = (s._dss['test_ori']['label'] == 0).all(dim=(1,2))
         
-        print('---------------\n RW analysis \n-----------------')
+        sc = scores['test_ori'][sample_mask]
 
-        for key in tqdm(loaders_RW):
-            ci = key.split('-')[-1]
-            p = key.split('-')[1]
-            config= key.split('-')[3]
+        # Indices and values
+        peak_idx = [24766, 134493, 143991, 172864, 240753]
+        peak_vals = sc[peak_idx]
+        peak_timestamps = time_stamps[peak_idx]
+        peak_dates = [pd.to_datetime(ts[0]).strftime('%m.%d') for ts in peak_timestamps]
 
-            if p == 'val':
-                
-                fig, axs = plt.subplots(n_corr*4, 3, figsize=(12, 3 * n_corr*4), squeeze=False)
-                plt.subplots_adjust(wspace=0.28, hspace=0.35)
+        print("peak indices:", peak_idx)
+        print("peak values:", peak_vals)
+        print(time_stamps[peak_idx])
 
-                i = 0
-            else: i = 1
+        plt.plot(sc)
+        plt.scatter(peak_idx, peak_vals, color='red', s=50)
+        plt.xticks(peak_idx, peak_dates, fontsize=8)
 
-            count = 0
-                
-            for j, corruption in enumerate(corr_names):
-                for k in rw:
-                            
-                    idx = torch.argwhere((s._dss[key]['corruption']==j) & (s._dss[key]['RW']==k)).squeeze(-1).tolist()
-                    score = torch.cat((scores[key][idx], scores[p][idx])).squeeze(dim=1)
-                    results = torch.cat((torch.ones(len(idx)), torch.zeros(len(scores[p][idx]))))
-                    
-                    axs[count,i].hist(scores[p][idx], bins=40, density=True, alpha=0.55, label='Original')
-                    axs[count,i].hist(scores[key][idx], bins=40, density=True, alpha=0.55, label='Corrupted')
-                    
-                    if count == 0: axs[j, i].set_title(p, fontsize=12)
-
-                    if count == len(corr_names) - 1: axs[count,i].set_xlabel('score')
-                    if i ==0: axs[count,i].set_ylabel(corruption+f'-RW{k}', fontsize=11, rotation=0, labelpad=45, va='center')
-                    axs[count,i].set_yscale('log')
-                    axs[count,i].legend(fontsize=8)
-
-                    roc_metric = BinaryROC()   # returns fpr, tpr, thresholds
-                    fpr, tpr, thresholds = roc_metric(score, results.int())
-
-                    auc_metric = BinaryAUROC()
-                    auc_value = auc_metric(score, results.int()).item()
-
-                    # Plot
-                    axs[count,2].plot(fpr, tpr, lw=2, label=f'{corruption} ({p}) AUC={auc_value:.3f}')
-                    axs[count,2].plot([0, 1], [0, 1], 'k--', lw=1)
-                    if count == len(corr_names) - 1: axs[count,2].set_xlabel('False Positive Rate')
-                    axs[count,2].set_ylabel('True Positive Rate')
-                    if count == 0: axs[count,2].set_title(f'ROC')
-                    axs[count,2].legend()
-                    axs[count,2].grid(True)
-
-                    count += 1
-
-            fig.savefig(Path.cwd()/f'temp_plots_{emb_size}/AUC-c-RW-{ci}-RW-wise.png')
-
-        print('---------------\n single channel analysis \n-----------------')
-
-        for key in tqdm(loaders_single):
-            ci = key.split('-')[-1]
-            p = key.split('-')[1]
-            config= key.split('-')[3]
-
-            if p == 'val':
-
-                fig, axs = plt.subplots(n_corr*16, 3, figsize=(12, 3 * n_corr*16), squeeze=False)
-                plt.subplots_adjust(wspace=0.28, hspace=0.35)
-
-                i = 0
-            else: i = 1
-
-            count = 0
-                
-            for j, corruption in enumerate(corr_names):
-                for k in c:
-                            
-                    idx = torch.argwhere((s._dss[key]['corruption']==j) & (s._dss[key]['channel']==k)).squeeze(-1).tolist()
-                    score = torch.cat((scores[key][idx], scores[p][idx])).squeeze(dim=1)
-                    results = torch.cat((torch.ones(len(idx)), torch.zeros(len(scores[p][idx]))))
-                    
-                    axs[count,i].hist(scores[p][idx], bins=40, density=True, alpha=0.55, label='Original')
-                    axs[count,i].hist(scores[key][idx], bins=40, density=True, alpha=0.55, label='Corrupted')
-                    
-                    if count == 0: axs[j, i].set_title(p, fontsize=12)
-
-                    if count == len(corr_names) - 1: axs[count,i].set_xlabel('score')
-                    if i ==0: axs[count,i].set_ylabel(corruption+f'-channel{k}', fontsize=11, rotation=0, labelpad=45, va='center')
-                    axs[count,i].set_yscale('log')
-                    axs[count,i].legend(fontsize=8)
-
-                    roc_metric = BinaryROC()   # returns fpr, tpr, thresholds
-                    fpr, tpr, thresholds = roc_metric(score, results.int())
-
-                    auc_metric = BinaryAUROC()
-                    auc_value = auc_metric(score, results.int()).item()
-
-                    # Plot
-                    axs[count,2].plot(fpr, tpr, lw=2, label=f'{corruption} ({p}) AUC={auc_value:.3f}')
-                    axs[count,2].plot([0, 1], [0, 1], 'k--', lw=1)
-                    if count == len(corr_names) - 1: axs[count,2].set_xlabel('False Positive Rate')
-                    axs[count,2].set_ylabel('True Positive Rate')
-                    if count == 0: axs[count,2].set_title(f'ROC')
-                    axs[count,2].legend()
-                    axs[count,2].grid(True)
-
-                    count += 1
-
-            fig.savefig(Path.cwd()/f'temp_plots_{emb_size}/AUC-c-single-channel-{ci}-single-channel-wise.png')
-
-
-        
+        plt.savefig('score_ori_cleaned.png')
