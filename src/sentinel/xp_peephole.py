@@ -53,33 +53,41 @@ elif ci == 'low':
 else:
     raise RuntimeError('The configuration is not available choose among [low|medium|high]')
 
-# def emp_single_label(**kwargs):
-#     '''
-#     New function for the implementation of new empirical posterior
-#     '''
+def emp_single_label(**kwargs):
+    '''
+    New function for the implementation of new empirical posterior
+    '''
 
-#     dss = kwargs.get('datasets')
-#     cvs = kwargs.get('corevectors')
-#     loader = kwargs.get('loader', 'train')
-#     bs = kwargs.get('batch_size', 64)
-#     verbose = kwargs.get('verbose', False)
-#     nl_class = kwargs('n_cluster')
-#     nl_model = kwargs('n_clasess')
-#     parser = kwargs('parser')
-#     driller = kwargs('driller')
-#     device = kwargs('device')
+    dss = kwargs.get('datasets')
+    cvs = kwargs.get('corevectors')
+    loader = kwargs.get('loader', 'train')
+    bs = kwargs.get('batch_size', 64)
+    verbose = kwargs.get('verbose', False)
+    nl_class = kwargs('n_cluster')
+    nl_model = kwargs('n_clasess')
+    parser = kwargs('parser')
+    driller = kwargs('driller')
+    device = kwargs('device')
 
-#     _empp = torch.zeros(nl_model, 2, nl_class)
+    _empp = torch.zeros(nl_model, 2, nl_class)
 
-#     dss_dl = DataLoader(dss._dss[loader], batch_size=bs, collate_fn=lambda x: x, shuffle=False)
-#     cvs_dl = DataLoader(cvs._corevds[loader], batch_size=bs, collate_fn=lambda x: x, shuffle=False)
+    dss_dl = DataLoader(dss._dss[loader], batch_size=bs, collate_fn=lambda x: x, shuffle=False)
+    cvs_dl = DataLoader(cvs._corevds[loader], batch_size=bs, collate_fn=lambda x: x, shuffle=False)
 
-#     if verbose: print('Computing empirical posterior')
-#     for _dss, _cvs in tqdm(zip(dss_dl, cvs_dl), disable=not verbose):
-#         data, label = parser(cvs=_cvs, dss=_dss)
-#         data, label = data.to(device), label.to(device)
-#         label_one_hot = torch.functional.one_hot(label, num_classes=nl_model)
-#         preds = driller.predict(data)
+    if verbose: print('Computing empirical posterior')
+    for _dss, _cvs in tqdm(zip(dss_dl, cvs_dl), disable=not verbose):
+        data, label = parser(cvs=_cvs, dss=_dss)
+        data, label = data.to(device), label.to(device)
+        label_one_hot = torch.functional.one_hot(label, num_classes=nl_model)
+        print(label_one_hot)
+        preds = driller.predict(data)
+
+        for loh, p in zip(label_one_hot, preds):
+            for i, c in enumerate(loh):
+                _empp[i, c, p] += 1
+
+        _empp = _empp[:, 1, :].reshape()
+
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -92,18 +100,18 @@ if __name__ == "__main__":
     model_path = '/srv/newpenny/SPACE/FIORIRE2_Maurizio/src/Artifacts'
     model_name = f"conv2dAE_SENT_L16_K3-3_Emb{emb_size}_Lay0_C16_S42.pth"
 
-    parsed_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}_RW')
+    parsed_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/datasets_{emb_size}_all')
 
     svds_path = Path('/srv/newpenny/XAI/generated_data/AE_sentinel/') 
     svds_name = f'svds_{emb_size}' 
     
-    cvs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors_{emb_size}_RW')
+    cvs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/corevectors_{emb_size}_all')
     cvs_name = 'cvs'
 
-    drill_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/drillers_{emb_size}_RW')
+    drill_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/drillers_{emb_size}_all')
     drill_name = 'classifier'
 
-    phs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/peepholes_{emb_size}_RW')
+    phs_path = Path(f'/srv/newpenny/XAI/generated_data/AE_sentinel/peepholes_{emb_size}_all')
     phs_name = 'peepholes'
 
     plots_path = Path.cwd()/f'temp_plots_{emb_size}'
@@ -146,13 +154,13 @@ if __name__ == "__main__":
             #     'n_classes': 4, 
             #     'class_names': [f'RW{i}' for i in range(4)] 
             #     },
-            # 'all': {
-            #     'loaders': [f'{fit}-val-c-all-{ci}', f'{fit}-test-c-all-{ci}', 'test_ori'],
-            #     'empp_fit_key': f'{fit}-val-c-all-{ci}', 
-            #     'label_key': 'corruption',
-            #     'n_classes': len(corruptions.keys()),
-            #     'class_names': corruptions.keys()
-            #     },
+            'all': {
+                'loaders': [f'{fit}-val-c-all-{ci}', f'{fit}-test-c-all-{ci}', 'test_ori'],
+                'empp_fit_key': f'{fit}-val-c-all-{ci}', 
+                'label_key': [f'corruption{i}' for i in range(len(corruptions.keys()))],
+                'n_classes': 2,#len(corruptions.keys()),
+                'class_names': corruptions.keys()
+                },
             # 'RW_corruption': {
             #     'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
             #     'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
@@ -160,13 +168,13 @@ if __name__ == "__main__":
             #     'n_classes': len(corruptions.keys()),
             #     'class_names': corruptions.keys() 
             #     },
-            'RW_RW': {
-                'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
-                'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
-                'label_key': ['RW0','RW1', 'RW2', 'RW3'],
-                'n_classes': 2,
-                'class_names': [f'RW{i}' for i in range(4)] 
-                },
+            # 'RW_RW': {
+            #     'loaders': [f'{fit}-val-c-RW-{ci}', f'{fit}-test-c-RW-{ci}', 'test_ori'],
+            #     'empp_fit_key': f'{fit}-val-c-RW-{ci}', 
+            #     'label_key': ['RW0','RW1', 'RW2', 'RW3'],
+            #     'n_classes': 2,
+            #     'class_names': [f'RW{i}' for i in range(4)] 
+            #     },
             }
 
     #--------------------------------
