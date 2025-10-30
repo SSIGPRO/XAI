@@ -12,7 +12,6 @@ from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, con
 # torch stuff
 import torch
 from torchvision.models import vgg16 as Model
-from torchvision.models import VGG16_Weights 
 from cuda_selector import auto_cuda
 
 use_cuda = torch.cuda.is_available()
@@ -22,20 +21,23 @@ print(f"Using {device} device")
 #--------------------------------
 # Directories definitions
 #--------------------------------
-#ds_path = '/srv/newpenny/XAI/generated_data/parsed_datasets/VGG16'
-ds_path = Path.cwd()/'../../data/parsed_datasets/ImageNet_VGG16'
+#ds_path = '/srv/newpenny/XAI/generated_data/TPAMI/parsed_datasets/CIFAR100_VGG16'
+ds_path = Path.cwd()/'../../data/parsed_datasets/CIFAR100_VGG16'
 
 # model parameters
-bs = 2**10
+bs = 2**10 
 n_threads = 1
-n_classes = 1000
+n_classes = 100
 
-# svds_path = Path('/srv/newpenny/XAI/generated_data/svds/ImageNet_vgg16')
-svds_path = Path.cwd()/'../../data/CLIP/svds/ImageNet_VGG16'
+model_dir = '/srv/newpenny/XAI/models'
+model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
+
+# svds_path = Path('/srv/newpenny/XAI/generated_data/TPAMI/svds/CIFAR100_VGG16')
+svds_path = Path.cwd()/'../../data/svds/CIFAR100_VGG16'
 svds_name = 'svds' 
 
-#cvs_path = Path('/srv/newpenny/XAI/generated_data/corevectors/CIFAR100_VGG16')
-cvs_path = Path.cwd()/'../../data/CLIP/corevectors/ImageNet_VGG16'
+cvs_path = Path('/srv/newpenny/XAI/generated_data/TPAMI/corevectors/CIFAR100_VGG16')
+cvs_path = Path.cwd()/'../../data/corevectors/CIFAR100_VGG16'
 cvs_name = 'corevectors'
 
 verbose = True 
@@ -45,28 +47,28 @@ save_output = False
 
 # Peepholelib
 target_layers = [
-        # 'model.features.7',
-        # 'model.features.10',
-        # 'model.features.12',
-        # 'model.features.14',
-        # 'model.features.17',
-        # 'model.features.19',
-        #'model.features.21',
-        # 'model.features.24',
-        # 'model.features.26',
-        # 'model.features.28',
-        # 'model.classifier.0',
-        'model.classifier.3',
-        # 'model.classifier.6',
+        # 'features.7',
+        # 'features.10',
+        # 'features.12',
+        # 'features.14',
+        # 'features.17',
+        # 'features.19',
+        # 'features.21',
+        # 'features.24',
+        # 'features.26',
+        # 'features.28',
+        # 'classifier.0',
+        'classifier.3',
+        # 'classifier.6',
         ]
 
-svd_rank = 300 
+svd_rank = 500 
 output_layer = 'classifier.6'
 
 loaders = [
-        'ImageNet-train',
-        'ImageNet-val',
-        # 'CIFAR100-test',
+        'CIFAR100-train',
+        'CIFAR100-val',
+        'CIFAR100-test',
         # 'CIFAR100-C-val-c0',
         # 'CIFAR100-C-test-c0',
         # 'CIFAR100-C-val-c1',
@@ -125,13 +127,4 @@ for _layer in target_layers:
                 use_s = True,
                 device=device
                 )
-        
-
-dataset_name = 'imagenet'
-weights = VGG16_Weights.DEFAULT
-verbose = True 
-
-output_layer = 'classifier.6'
-
-model = Model(weights=weights)
     

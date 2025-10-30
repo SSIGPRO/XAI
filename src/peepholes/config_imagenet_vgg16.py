@@ -9,7 +9,7 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 
 # overwrite for final evaluation
 #phs_path = Path('/srv/newpenny/XAI/generated_data/peepholes_post_tune/CIFAR100_vgg16')
-phs_path = Path.cwd()/'../../data/peepholes/ImageNet_VGG16'
+phs_path = Path.cwd()/'../../data/CLIP/peepholes/ImageNet_VGG16'
 phs_name = 'peepholes'
 
 # overwrite verbose
@@ -23,12 +23,12 @@ n_classifier = {
         # 'features.17': 773,
         # 'features.19': 1326,
         # 'features.21': 851,
-        'model.features.24': 1035,
-        'model.features.26': 838,
-        'model.features.28': 1481,
-        'model.classifier.0': 1717,
+        # 'model.features.24': 1035,
+        # 'model.features.26': 838,
+        # 'model.features.28': 1481,
+        # 'model.classifier.0': 1717,
         'model.classifier.3': 1627,
-        'model.classifier.6': 1706,
+        # 'model.classifier.6': 1706,
         }
 
 peep_size = {
@@ -39,12 +39,12 @@ peep_size = {
         # 'features.17': 356,
         # 'features.19': 499,
         # 'features.21': 489,
-        'model.features.24': 50,
-        'model.features.26': 50,
-        'model.features.28': 50,
-        'model.classifier.0': 50,
+        # 'model.features.24': 50,
+        # 'model.features.26': 50,
+        # 'model.features.28': 50,
+        # 'model.classifier.0': 50,
         'model.classifier.3': 53,
-        'model.classifier.6': 51,
+        # 'model.classifier.6': 51,
         }
 
 drillers = {}

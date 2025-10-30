@@ -4,7 +4,7 @@ sys.path.insert(1, (Path.cwd()/'..').as_posix())
 from corevectors.config_imagenet_vgg16 import *
 
 # drill_path = Path('/srv/newpenny/XAI/generated_data/drillers/ImageNet_vgg16')
-drill_path =Path.cwd()/'../../data/drillers/ImageNet_VGG16'
+drill_path =Path.cwd()/'../../data/CLIP/drillers/ImageNet_VGG16'
 drill_name = 'classifier'
                                                 
 # phs_path = Path('/srv/newpenny/XAI/generated_data/peepholes/ImageNet_vgg16')
