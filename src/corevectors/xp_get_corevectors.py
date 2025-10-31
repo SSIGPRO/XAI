@@ -6,6 +6,7 @@ sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.models.model_wrap import ModelWrap, means, stds 
 from peepholelib.coreVectors.coreVectors import CoreVectors
+from peepholelib.coreVectors.get_coreVectors import get_out_activations
 
 import matplotlib.pyplot as plt
 
@@ -68,7 +69,7 @@ if __name__ == "__main__":
         model.get_svds(
                 path = svds_path,
                 name = svds_name,
-                target_modules = target_layers,
+                target_modules = target_layers_svd,
                 sample_in = ds._dss['ImageNet-train']['image'][0],
                 svd_fns = svd_fns,
                 verbose = verbose
@@ -87,9 +88,11 @@ if __name__ == "__main__":
         with corevecs as cv: 
             # add svd to reduction_fns
             for _layer in reduction_fns:
-                if 'features' in _layer:
-                    reduction_fns[_layer].keywords['layer'] = model._target_modules[_layer]
-                reduction_fns[_layer].keywords['svd'] = model._svds[_layer] 
+                if 'classifier' in _layer:
+                    reduction_fns[_layer].keywords['svd'] = model._svds[_layer]
+                # if 'features' in _layer:
+                #     reduction_fns[_layer].keywords['layer'] = model._target_modules[_layer]
+                # reduction_fns[_layer].keywords['svd'] = model._svds[_layer] 
             
             # computing the corevectors
             cv.get_coreVectors(

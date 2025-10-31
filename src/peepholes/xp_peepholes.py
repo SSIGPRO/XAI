@@ -41,11 +41,11 @@ if __name__ == "__main__":
                 verbose = verbose 
                 ) 
 
-        peepholes = Peepholes(
-                path = phs_path,
-                name = phs_name,
-                device = device
-                )
+        # peepholes = Peepholes(
+        #         path = phs_path,
+        #         name = phs_name,
+        #         device = device
+        #         )
         for drill_key, driller in drillers.items():
             if (driller._empp_file).exists():
                 print(f'Loading Classifier for {drill_key}') 
@@ -72,14 +72,14 @@ if __name__ == "__main__":
                 print(f'Saving classifier for {drill_key}')
                 driller.save()
 
-        with peepholes as ph:
-            ph.get_peepholes(
-                datasets = ds,
-                corevectors = cv,
-                target_modules = target_layers,
-                batch_size = bs,
-                drillers = drillers,
-                n_threads = 1,
-                verbose = verbose 
-                )
+        # with peepholes as ph:
+        #     ph.get_peepholes(
+        #         datasets = ds,
+        #         corevectors = cv,
+        #         target_modules = target_layers,
+        #         batch_size = bs,
+        #         drillers = drillers,
+        #         n_threads = 1,
+        #         verbose = verbose 
+        #         )
             

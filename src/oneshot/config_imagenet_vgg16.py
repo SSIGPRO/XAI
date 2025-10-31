@@ -4,13 +4,10 @@ sys.path.insert(1, (Path.cwd()/'..').as_posix())
 from tuning_methods.config_imagenet_vgg16 import *
 
 # Our stuff
-from peepholelib.peepholes.parsers import trim_corevectors, null_corevectors
+from peepholelib.peepholes.parsers import trim_corevectors
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 
-# overwrite for final evaluation
-#phs_path = Path('/srv/newpenny/XAI/generated_data/peepholes_post_tune/CIFAR100_vgg16')
-phs_path = Path.cwd()/'../../data/CLIP/peepholes/ImageNet_VGG16'
-phs_name = 'peepholes'
+dataset_name = 'imagenet'
 
 # overwrite verbose
 verbose = True
@@ -31,12 +28,12 @@ n_classifier = {
         'model.classifier.6': 1706,
         }
 
-cv_size = {
+peep_size = {
         # 'features.7': 500,
         # 'features.10': 479,
         # 'features.12': 442,
         # 'features.14': 496,
-        # 'model.features.17': 512,
+        # 'features.17': 356,
         'model.features.19': 512,
         'model.features.21': 512,
         'model.features.24': 512,
@@ -49,27 +46,20 @@ cv_size = {
 
 drillers = {}
 for _layer in target_layers:
-
-    if 'features' in _layer:    
-        parser_cv = partial(
-                        null_corevectors,
-                        module = _layer
-                        )
-    elif 'classifier' in _layer:
-        parser_cv = partial(
-                trim_corevectors,
-                module = _layer,
-                cv_dim = cv_size[_layer],
-                )
+    parser_cv = partial(
+            trim_corevectors,
+            module = _layer,
+            cv_dim = peep_size[_layer],
+            )
 
     drillers[_layer] = tGMM(
             path = drill_path,
             name = drill_name+'.'+_layer,
             nl_classifier = n_classifier[_layer],
             nl_model = 1000,
-            n_features = cv_size[_layer], 
+            n_features = peep_size[_layer], 
             parser = parser_cv,
             device = device
             )
-                                                                     
-#     drillers[_layer].load()
+                                                             
+    drillers[_layer].load()

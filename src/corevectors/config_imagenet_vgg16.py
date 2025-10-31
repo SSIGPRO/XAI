@@ -7,7 +7,8 @@ from functools import partial
 
 # Our stuff
 from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
-from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
+from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection
+from peepholelib.coreVectors.dimReduction.avgPooling import ChannelWiseMean_conv
 
 # torch stuff
 import torch
@@ -23,7 +24,7 @@ print(f"Using {device} device")
 # Directories definitions
 #--------------------------------
 #ds_path = '/srv/newpenny/XAI/generated_data/parsed_datasets/VGG16'
-ds_path = Path.cwd()/'../../data/parsed_datasets/ImageNet_VGG16'
+ds_path = Path.cwd()/'../../data/CLIP/parsed_datasets/ImageNet_VGG16'
 
 # model parameters
 bs = 2**10
@@ -44,20 +45,26 @@ save_input = True
 save_output = False
 
 # Peepholelib
+target_layers_svd = [
+        'model.classifier.0',
+        'model.classifier.3',
+        'model.classifier.6',
+        ]
+
 target_layers = [
         # 'model.features.7',
         # 'model.features.10',
         # 'model.features.12',
         # 'model.features.14',
         # 'model.features.17',
-        # 'model.features.19',
-        #'model.features.21',
-        # 'model.features.24',
-        # 'model.features.26',
-        # 'model.features.28',
-        # 'model.classifier.0',
+        'model.features.19',
+        'model.features.21',
+        'model.features.24',
+        'model.features.26',
+        'model.features.28',
+        'model.classifier.0',
         'model.classifier.3',
-        # 'model.classifier.6',
+        'model.classifier.6',
         ]
 
 svd_rank = 300 
@@ -95,7 +102,7 @@ loaders = [
 # SVDs 
 #--------------------------------
 svd_fns = {}
-for _layer in target_layers:
+for _layer in target_layers_svd:
     if 'features' in _layer:
         svd_fns[_layer] = partial(
                 conv2d_toeplitz_svd, 
@@ -114,18 +121,18 @@ for _layer in target_layers:
 reduction_fns = {}
 for _layer in target_layers:
     if 'features' in _layer:
-        reduction_fns[_layer] = partial(
-                conv2d_toeplitz_svd_projection, 
-                use_s = True,
-                device=device
-                )
+        reduction_fns[_layer] = ChannelWiseMean_conv
+        # reduction_fns[_layer] = partial(
+        #         conv2d_toeplitz_svd_projection, 
+        #         use_s = True,
+        #         device=device
+        #         )
     elif 'classifier' in _layer:
         reduction_fns[_layer] = partial(
                 linear_svd_projection,
                 use_s = True,
                 device=device
-                )
-        
+                )    
 
 dataset_name = 'imagenet'
 weights = VGG16_Weights.DEFAULT

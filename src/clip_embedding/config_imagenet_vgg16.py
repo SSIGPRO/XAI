@@ -23,7 +23,7 @@ print(f"Using {device} device")
 # Directories definitions
 #--------------------------------
 #ds_path = '/srv/newpenny/XAI/generated_data/parsed_datasets/VGG16'
-ds_path = Path.cwd()/'../../data/parsed_datasets/ImageNet_VGG16'
+ds_path = Path.cwd()/'../../data/CLIP/parsed_datasets/ImageNet_VGG16'
 
 # model parameters
 bs = 2**10
