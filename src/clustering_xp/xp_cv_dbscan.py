@@ -2,6 +2,8 @@ import sys
 from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
+import cuml
+cuml.accel.install()
 
 # torch stuff
 import torch
@@ -65,56 +67,28 @@ if __name__ == "__main__":
     device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     torch.cuda.empty_cache()
 
-    ds_path = Path.cwd()/'../data/datasets'
+    ds_path = Path.cwd()/'../../data/datasets'
 
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
 
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
 
-    cvs_path = Path.cwd()/'../data/corevectors'
+    cvs_path = Path.cwd()/'../../data/corevectors'
     cvs_name = 'corevectors'
 
     plots_path = Path.cwd()/'temp_plots/coverage/'
 
     target_layers = [
-        'features.7', 'features.10', 'features.12', 'features.14', 'features.17',
-        'features.19', 'features.21', 'features.24', 'features.26', 'features.28',
-        'classifier.0', 'classifier.3', 'classifier.6',
+        #'features.7', 'features.10', 'features.12', 'features.14', 'features.17',
+        #'features.19', 'features.21', 'features.24', 'features.26', 'features.28',
+        #'classifier.0', 'classifier.3',
+        'classifier.6',
     ]
 
     loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test']
 
     verbose = True
-
-    #--------------------------------
-    # Model 
-    #--------------------------------
-    
-    nn = vgg16()
-    n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
-
-    model = ModelWrap(
-            model = nn,
-            device = device
-            )
-                                            
-    model.update_output(
-            output_layer = 'classifier.6', 
-            to_n_classes = n_classes,
-            overwrite = True 
-            )
-                                            
-    model.load_checkpoint(
-            name = model_name,
-            path = model_dir,
-            verbose = verbose
-            )
-                                            
-    model.set_target_modules(
-            target_modules = target_layers,
-            verbose = verbose
-            )
 
     #--------------------------------
     # Dataset and CoreVectors 
@@ -127,7 +101,6 @@ if __name__ == "__main__":
     corevecs = CoreVectors(
         path=cvs_path,
         name=cvs_name,
-        model=model,
     )
 
     drillers = {}
@@ -178,7 +151,6 @@ if __name__ == "__main__":
                     convert_dtype=False,
                 )
                 pred_labels = torch.tensor(pred_labels)
-
             # just to see whats up
             n_noise = (pred_labels == -1).sum().item()
             print(f"[{layer}] Noise points before reassignment: {n_noise}")
@@ -188,6 +160,7 @@ if __name__ == "__main__":
             if noise_mask.sum() > 0:
                 pred_labels[noise_mask] = soft_membership[noise_mask].argmax(dim=1)
 
+    '''
             empp = compute_empp_hdbscan(
                 hard_labels=pred_labels,
                 soft_membership=soft_membership,
@@ -206,3 +179,4 @@ if __name__ == "__main__":
         save_path=plots_path,
         file_name='coverage_dbscan_eom.png'
     )
+    '''
