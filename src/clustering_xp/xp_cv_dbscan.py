@@ -9,17 +9,27 @@ from torchvision.models import vgg16
 from cuda_selector import auto_cuda
 
 ###### Our stuff
-
+from peepholelib.models.model_wrap import ModelWrap 
+from peepholelib.datasets.cifar100 import Cifar100
 
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
 
-from cuml.cluster.hdbscan import HDBSCAN
+#from cuml.cluster.hdbscan import HDBSCAN
 
 
 if __name__ == "__main__":
-    
+
+    use_cuda = torch.cuda.is_available()
+    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    torch.cuda.empty_cache()
+
+    model_dir = '/srv/newpenny/XAI/models'
+    model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
+
+    cifar_path = '/srv/newpenny/dataset/CIFAR100'
+
     cvs_path = Path.cwd()/'../data/corevectors'
     cvs_name = 'corevectors'
 
@@ -32,8 +42,41 @@ if __name__ == "__main__":
     ]
 
     loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test']
+    
+    verbose = True
 
+    #--------------------------------
+    # Model 
+    #--------------------------------
+    
+    nn = vgg16()
     n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
+
+    model = ModelWrap(
+            model = nn,
+            device = device
+            )
+                                            
+    model.update_output(
+            output_layer = 'classifier.6', 
+            to_n_classes = n_classes,
+            overwrite = True 
+            )
+                                            
+    model.load_checkpoint(
+            name = model_name,
+            path = model_dir,
+            verbose = verbose
+            )
+                                            
+    model.set_target_modules(
+            target_modules = target_layers,
+            verbose = verbose
+            )
+
+    #--------------------------------
+    # CoreVectors 
+    #--------------------------------
 
     corevecs = CoreVectors(
         path=cvs_path,
@@ -56,7 +99,10 @@ if __name__ == "__main__":
             X_np = X.cpu().numpy()
 
             y = cv._corevds['CIFAR100-train']['targets'][:]  # adjust if needed
+            print(y)
             y_np = y.cpu().numpy()
+
+            quit()
 
             hdb = HDBSCAN(
                 alpha=1.0,
@@ -107,8 +153,6 @@ if __name__ == "__main__":
                 "y": y_np,
             }
 
-
-    # Compute coverage over hard labels OR soft membership
     coverage = empp_coverage_scores(
         drillers=drillers,
         threshold=0.8,
