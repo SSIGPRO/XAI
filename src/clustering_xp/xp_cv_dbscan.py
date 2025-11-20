@@ -12,18 +12,60 @@ from cuda_selector import auto_cuda
 from peepholelib.models.model_wrap import ModelWrap 
 from peepholelib.datasets.cifar100 import Cifar100
 
+from peepholelib.datasets.parsedDataset import ParsedDataset 
+
+
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
 
-#from cuml.cluster.hdbscan import HDBSCAN
+from cuml.cluster.hdbscan import HDBSCAN, membership_vector, approximate_predict
 
+
+def compute_empp_hdbscan(hard_labels, soft_membership, y, n_classes):
+    """
+    hard_labels: tensor[N]  (after noise reassignment)
+    soft_membership: tensor[N, C]
+    y: tensor[N] class labels
+    """
+
+    hard_labels = torch.tensor(hard_labels)
+    soft_membership = torch.tensor(soft_membership)
+    y = torch.tensor(y)
+
+    n_clusters = soft_membersment.shape[1]
+    empp = torch.zeros((n_clusters, n_classes))
+
+    # compute P(class = s | c)
+    for c in range(n_clusters):
+        in_cluster = (hard_labels == c)  # samples assigned to cluster c
+
+        if in_cluster.sum() == 0:
+            continue
+
+        # weight contributions by soft-membership score
+        weights = soft_membership[in_cluster, c] 
+        labels = y[in_cluster]                   
+
+        # accumulate weighted counts
+        for s in range(n_classes):
+            mask_s = (labels == s)
+            empp[c, s] = weights[mask_s].sum()
+
+        # normalize 
+        total = empp[c].sum()
+        if total > 0:
+            empp[c] /= total
+
+    return empp
 
 if __name__ == "__main__":
 
     use_cuda = torch.cuda.is_available()
     device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     torch.cuda.empty_cache()
+
+    ds_path = Path.cwd()/'../data/datasets'
 
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
@@ -42,7 +84,7 @@ if __name__ == "__main__":
     ]
 
     loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test']
-    
+
     verbose = True
 
     #--------------------------------
@@ -75,8 +117,12 @@ if __name__ == "__main__":
             )
 
     #--------------------------------
-    # CoreVectors 
+    # Dataset and CoreVectors 
     #--------------------------------
+    
+    dataset = ParsedDataset(
+            path = ds_path,
+            )
 
     corevecs = CoreVectors(
         path=cvs_path,
@@ -86,7 +132,11 @@ if __name__ == "__main__":
 
     drillers = {}
 
-    with corevecs as cv:
+    with corevecs as cv, dataset as ds:
+        ds.load_only(
+            loaders = loaders,
+            verbose = verbose
+            )
 
         cv.load_only(
             loaders=loaders,
@@ -98,11 +148,9 @@ if __name__ == "__main__":
             X = cv._corevds['CIFAR100-train'][layer][:]
             X_np = X.cpu().numpy()
 
-            y = cv._corevds['CIFAR100-train']['targets'][:]  # adjust if needed
-            print(y)
+            y = ds._dss["CIFAR100-train"][:]["label"]  
             y_np = y.cpu().numpy()
 
-            quit()
 
             hdb = HDBSCAN(
                 alpha=1.0,
@@ -111,29 +159,25 @@ if __name__ == "__main__":
                 cluster_selection_method='eom',
                 prediction_data=True
             )
+            with cuml.accel.profile():
+                # Fit model on corevectors
+                hdb.fit(X_np)
+                hdb.generate_prediction_data()
 
-            # Fit model on corevectors
-            hdb.fit(X_np)
+                soft_membership = membership_vector(
+                    clusterer=hdb,
+                    points_to_predict=X_np,
+                    batch_size=4096,
+                    convert_dtype=False,
+                )
+                soft_membership = torch.tensor(soft_membership)  
 
-            hdb.generate_prediction_data()
-
-            # Hard labels for training points
-            hard_labels = hdb.labels_.copy()
-
-            soft_membership = membership_vector(
-                clusterer=hdb,
-                points_to_predict=X_np,
-                batch_size=4096,
-                convert_dtype=False,
-            )
-            soft_membership = torch.tensor(soft_membership)  
-
-            pred_labels, _ = approximate_predict(
-                clusterer=hdb,
-                points_to_predict=X_np,
-                convert_dtype=False,
-            )
-            pred_labels = torch.tensor(pred_labels)
+                pred_labels, _ = approximate_predict(
+                    clusterer=hdb,
+                    points_to_predict=X_np,
+                    convert_dtype=False,
+                )
+                pred_labels = torch.tensor(pred_labels)
 
             # just to see whats up
             n_noise = (pred_labels == -1).sum().item()
@@ -144,15 +188,17 @@ if __name__ == "__main__":
             if noise_mask.sum() > 0:
                 pred_labels[noise_mask] = soft_membership[noise_mask].argmax(dim=1)
 
-            after_noise = (pred_labels == -1).sum().item()
-            print(f"[{layer}] Noise points after reassignment: {after_noise}")
+            empp = compute_empp_hdbscan(
+                hard_labels=pred_labels,
+                soft_membership=soft_membership,
+                y=y_np,
+                n_classes=n_classes
+            )
 
             drillers[layer] = {
-                "labels": pred_labels.numpy(),
-                "soft_membership": soft_membership.numpy(),
-                "y": y_np,
+                "_empp": empp
             }
-
+    quit()
     coverage = empp_coverage_scores(
         drillers=drillers,
         threshold=0.8,
