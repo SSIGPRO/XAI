@@ -35,7 +35,7 @@ def compute_empp_hdbscan(hard_labels, soft_membership, y, n_classes):
     soft_membership = torch.tensor(soft_membership)
     y = torch.tensor(y)
 
-    n_clusters = soft_membersment.shape[1]
+    n_clusters = soft_membership.shape[1]
     empp = torch.zeros((n_clusters, n_classes))
 
     # compute P(class = s | c)
@@ -67,26 +67,28 @@ if __name__ == "__main__":
     device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
     torch.cuda.empty_cache()
 
-    ds_path = Path.cwd()/'../../data/datasets'
+    ds_path = Path.cwd()/'../data/datasets'
 
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
 
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
 
-    cvs_path = Path.cwd()/'../../data/corevectors'
+    cvs_path = Path.cwd()/'../data/corevectors'
     cvs_name = 'corevectors'
 
     plots_path = Path.cwd()/'temp_plots/coverage/'
 
     target_layers = [
-        #'features.7', 'features.10', 'features.12', 'features.14', 'features.17',
-        #'features.19', 'features.21', 'features.24', 'features.26', 'features.28',
-        #'classifier.0', 'classifier.3',
+        'features.7', 'features.10', 'features.12', 'features.14', 'features.17',
+        'features.19', 'features.21', 'features.24', 'features.26', 'features.28',
+        'classifier.0', 'classifier.3',
         'classifier.6',
     ]
 
     loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test']
+    n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
+
 
     verbose = True
 
@@ -127,9 +129,9 @@ if __name__ == "__main__":
 
             hdb = HDBSCAN(
                 alpha=1.0,
-                min_cluster_size=30,
-                min_samples=10,
-                cluster_selection_method='eom',
+                min_cluster_size=5,
+                min_samples=5,
+                cluster_selection_method='leaf',
                 prediction_data=True
             )
             with cuml.accel.profile():
@@ -143,7 +145,10 @@ if __name__ == "__main__":
                     batch_size=4096,
                     convert_dtype=False,
                 )
-                soft_membership = torch.tensor(soft_membership)  
+                soft_membership = torch.tensor(soft_membership)
+
+                if soft_membership.ndim == 1: # in the case that only one cluster was found
+                    soft_membership = soft_membership.unsqueeze(1)
 
                 pred_labels, _ = approximate_predict(
                     clusterer=hdb,
@@ -153,14 +158,13 @@ if __name__ == "__main__":
                 pred_labels = torch.tensor(pred_labels)
             # just to see whats up
             n_noise = (pred_labels == -1).sum().item()
-            print(f"[{layer}] Noise points before reassignment: {n_noise}")
+            print(f"[{layer}] Noise points before reassignment: {n_noise} / {len(pred_labels)}")
 
             # reassign noise to argmax of membership vector
             noise_mask = pred_labels == -1
             if noise_mask.sum() > 0:
-                pred_labels[noise_mask] = soft_membership[noise_mask].argmax(dim=1)
+                pred_labels[noise_mask] = soft_membership[noise_mask].argmax(dim=1).to(pred_labels.dtype)
 
-    '''
             empp = compute_empp_hdbscan(
                 hard_labels=pred_labels,
                 soft_membership=soft_membership,
@@ -177,6 +181,6 @@ if __name__ == "__main__":
         threshold=0.8,
         plot=True,
         save_path=plots_path,
-        file_name='coverage_dbscan_eom.png'
+        file_name='coverage_dbscan_leaf.png'
     )
-    '''
+
