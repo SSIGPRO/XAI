@@ -2,9 +2,6 @@ import sys
 from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
-import cuml
-cuml.accel.install()
-
 # torch stuff
 import torch
 from torchvision.models import vgg16
@@ -21,12 +18,10 @@ from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
 
-from peepholelib.utils.viz_empp import *
+from sklearn.mixture import BayesianGaussianMixture
 
 
-from cuml.cluster.hdbscan import HDBSCAN, membership_vector, approximate_predict
-
-def compute_empp_hdbscan(hard_labels, soft_membership, y, n_classes):
+def compute_empp_dpmm(hard_labels, soft_membership, y, n_classes):
     """
     hard_labels: tensor[N]  (after noise reassignment)
     soft_membership: tensor[N, C]
@@ -123,64 +118,57 @@ if __name__ == "__main__":
         for layer in target_layers:
 
             X = cv._corevds['CIFAR100-train'][layer][:]
-            X_reduced = X[:, :4]
+            X_np = X.cpu().numpy()
+
             y = ds._dss["CIFAR100-train"][:]["label"]  
+            y_np = y.cpu().numpy()
 
-
-            hdb = HDBSCAN(
-                alpha=1.0,
-                min_cluster_size=10,
-                min_samples=10,
-                cluster_selection_method='eom',
-                prediction_data=True
+            dpmm = BayesianGaussianMixture(
+                n_components=50,
+                weight_concentration_prior_type='dirichlet_process',
+                weight_concentration_prior=1e-2,
+                max_iter=500,
+                init_params='kmeans',
+                random_state=0,
             )
-            with cuml.accel.profile():
-                # Fit model on corevectors
-                hdb.fit(X=X_reduced.detach().cpu().numpy())
-                hdb.generate_prediction_data()
 
-                soft_membership = membership_vector(
-                    clusterer=hdb,
-                    points_to_predict=X_reduced.detach().cpu().numpy(),
-                    batch_size=4096,
-                    convert_dtype=False,
-                )
+            # Fit model on corevectors
+            dpmm.fit(X_np)
 
-                soft_membership = torch.tensor(soft_membership)
+            soft_membership = torch.tensor(soft_membership)
 
-                if soft_membership.ndim == 1: # in the case that only one cluster was found
-                    soft_membership = soft_membership.unsqueeze(1)
+            pred_labels = torch.tensor(gmm.predict(X_np), dtype=torch.int64)
 
-                pred_labels, _ = approximate_predict(
-                    clusterer=hdb,
-                    points_to_predict=X_reduced.detach().cpu().numpy(),
-                    convert_dtype=False,
-                )
-                pred_labels = torch.tensor(pred_labels)
-            # just to see whats up
-            n_noise = (pred_labels == -1).sum().item()
-            print(f"[{layer}] Noise points before reassignment: {n_noise} / {len(pred_labels)}")
 
-            # reassign noise to argmax of membership vector
-            noise_mask = pred_labels == -1
-            if noise_mask.sum() > 0:
-                pred_labels[noise_mask] = soft_membership[noise_mask].argmax(dim=1).to(pred_labels.dtype)
-
-            empp = compute_empp_hdbscan(
+            empp = compute_empp_dpmm(
                 hard_labels=pred_labels,
                 soft_membership=soft_membership,
-                y=y.detach().int().cpu().numpy(),
+                y=y_np,
                 n_classes=n_classes
             )
 
             drillers[layer] = {
                 "_empp": empp
             }
+
+            # just to see whats up
+            num_active = (soft_membership.sum(0) > 1e-6).sum().item()
+            print(f"[{layer}] Active clusters: {num_active}")
+
+            cluster_sizes = torch.bincount(pred_labels)
+            print(f"[{layer}] Cluster sizes:", cluster_sizes.tolist())
+
+            max_probs = soft_membership.max(dim=1).values
+            print(f"[{layer}] Avg soft confidence: {max_probs.mean():.4f}")
+            print(f"[{layer}] Min soft confidence: {max_probs.min():.4f}")
+
+
+    quit()
     coverage = empp_coverage_scores(
         drillers=drillers,
         threshold=0.8,
         plot=True,
         save_path=plots_path,
-        file_name='coverage_dbscan_eom.png'
+        file_name='coverage_dbscan_leaf.png'
     )
 
