@@ -23,42 +23,43 @@ from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, con
 
 from peepholelib.utils.viz_empp import *
 
-from sklearn.metrics import pairwise_distances
-from cuml.cluster import DBSCAN 
-import cupy as cp
-import numpy as np
-from scipy.spatial import distance
 
+from cuml.cluster.hdbscan import HDBSCAN, membership_vector, approximate_predict
 
-
-
-def compute_empp_dbscan(hard_labels, y, n_classes):
+def compute_empp_hdbscan(hard_labels, soft_membership, y, n_classes):
     """
     hard_labels: tensor[N]  (after noise reassignment)
+    soft_membership: tensor[N, C]
     y: tensor[N] class labels
     """
 
-    hard_labels = torch.tensor(hard_labels, dtype=torch.long)
-    y = torch.tensor(y, dtype=torch.long)
+    hard_labels = torch.tensor(hard_labels)
+    soft_membership = torch.tensor(soft_membership)
+    y = torch.tensor(y)
 
-    # Map cluster labels to 0..n_clusters-1
-    unique_clusters = hard_labels.unique()
-    mapping = {old.item(): new for new, old in enumerate(unique_clusters)}
-    mapped_labels = hard_labels.clone()
-    for old, new in mapping.items():
-        mapped_labels[hard_labels == old] = new
-
-    n_clusters = len(unique_clusters)
+    n_clusters = soft_membership.shape[1]
     empp = torch.zeros((n_clusters, n_classes))
 
-    # Count class frequencies per cluster
+    # compute P(class = s | c)
     for c in range(n_clusters):
-        mask = mapped_labels == c
-        if mask.sum() == 0:
+        in_cluster = (hard_labels == c)  # samples assigned to cluster c
+
+        if in_cluster.sum() == 0:
             continue
-        cluster_classes = y[mask]
-        counts = torch.bincount(cluster_classes, minlength=n_classes)
-        empp[c] = counts.float() / counts.sum()  # normalize to sum=1
+
+        # weight contributions by soft-membership score
+        weights = soft_membership[in_cluster, c] 
+        labels = y[in_cluster]                   
+
+        # accumulate weighted counts
+        for s in range(n_classes):
+            mask_s = (labels == s)
+            empp[c, s] = weights[mask_s].sum()
+
+        # normalize 
+        total = empp[c].sum()
+        if total > 0:
+            empp[c] /= total
 
     return empp
 
@@ -122,31 +123,45 @@ if __name__ == "__main__":
         for layer in target_layers:
 
             X = cv._corevds['CIFAR100-train'][layer][:]
-            X_reduced = X[:, :50]
+            X_reduced = X[:, :4]
             y = ds._dss["CIFAR100-train"][:]["label"]  
 
-            db = DBSCAN(
-                eps=10,
-                min_samples=10,
-                metric = 'precomputed',
 
+            hdb = HDBSCAN(
+                alpha=1.0,
+                min_cluster_size=2,
+                min_samples=50,
+                cluster_selection_method='leaf',
+                prediction_data=True
             )
-            # using a custom distance metrix  (manhattan)
-            # X_distance = cp.array(X_reduced.detach().cpu().numpy())
-            # dist_matrix = cp.array(pairwise_distances(X_distance.get(), metric='manhattan'))
-
-            X = X_reduced.detach().cpu().numpy()  
-            VI = np.linalg.inv(np.cov(X, rowvar=False))
-            dist_matrix = distance.cdist(X, X, metric='mahalanobis', VI=VI)
-
             with cuml.accel.profile():
                 # Fit model on corevectors
-                pred_labels = db.fit_predict(dist_matrix)
+                hdb.fit(X=X_reduced.detach().cpu().numpy())
+                hdb.generate_prediction_data()
 
-                if hasattr(pred_labels, "to_array"):  
-                    pred_labels = labels.to_array()
-                pred_labels = torch.tensor(np.array(pred_labels, copy=False), dtype=torch.long)
+                soft_membership = membership_vector(
+                    clusterer=hdb,
+                    points_to_predict=X_reduced.detach().cpu().numpy(),
+                    batch_size=4096,
+                    convert_dtype=False,
+                )
 
+                soft_membership = torch.tensor(soft_membership)
+
+                if soft_membership.ndim == 1: # in the case that only one cluster was found
+                    soft_membership = soft_membership.unsqueeze(1)
+
+                pred_labels, _ = approximate_predict(
+                    clusterer=hdb,
+                    points_to_predict=X_reduced.detach().cpu().numpy(),
+                    convert_dtype=False,
+                )
+                pred_labels = torch.tensor(pred_labels)
+
+            # reassign noise to argmax of membership vector
+            noise_mask = pred_labels == -1
+            if noise_mask.sum() > 0:
+                pred_labels[noise_mask] = soft_membership[noise_mask].argmax(dim=1).to(pred_labels.dtype)
 
             # map labels to do the empirical posterior
             unique_labels = pred_labels.unique()
@@ -157,8 +172,9 @@ if __name__ == "__main__":
 
             pred_labels = pred_labels_remapped
 
-            empp = compute_empp_dbscan(
+            empp = compute_empp_hdbscan(
                 hard_labels=pred_labels,
+                soft_membership=soft_membership,
                 y=y.detach().int().cpu().numpy(),
                 n_classes=n_classes
             )
@@ -191,5 +207,6 @@ if __name__ == "__main__":
     coverage = empp_coverage_scores(
         drillers=drillers,
         threshold=0.8,
+
     )
 

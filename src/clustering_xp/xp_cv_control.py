@@ -32,13 +32,14 @@ from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, con
 from peepholelib.peepholes.parsers import trim_corevectors
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
+from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
 
 
 if __name__ == "__main__":
         use_cuda = torch.cuda.is_available()
-        #device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
-        device = torch.device('cuda:1') 
+        device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+        #device = torch.device('cuda:1') 
         torch.cuda.empty_cache()
 
         #device = torch.device("cpu")
@@ -52,7 +53,7 @@ if __name__ == "__main__":
 
         # model parameters
         seed = 29
-        bs = 256
+        bs = 512
         n_threads = 1
 
         model_dir = '/srv/newpenny/XAI/models'
@@ -64,7 +65,7 @@ if __name__ == "__main__":
         cvs_path = Path.cwd()/'../data/corevectors'
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'../data/drillers'
+        drill_path = Path.cwd()/'../data/drillers_all/drillers_550'
         drill_name = 'classifier'
 
         phs_path = Path.cwd()/'../data/peepholes'
@@ -76,13 +77,14 @@ if __name__ == "__main__":
         
         # Peepholelib
         target_layers = [ 'features.7', 'features.10', 'features.12', 'features.14', 'features.17', 'features.19', 'features.21',
-                                'features.24','features.26','features.28','classifier.0','classifier.3', 'classifier.6',
+                                'features.24','features.26','features.28','classifier.0','classifier.3', 
+                                'classifier.6',
                         ]
         features24_svd_rank = 100 
         features26_svd_rank = 100 
         features28_svd_rank = 100
         classifier_svd_rank = 100 
-        n_cluster = 100
+        n_cluster = 550
         features_cv_dim = 100
 
         n_conceptograms = 2 
@@ -197,6 +199,8 @@ if __name__ == "__main__":
                         svd_fns = svd_fns,
                         verbose = verbose
                         )
+                viz_singular_values_2(model, svds_path)
+                quit()
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -285,31 +289,31 @@ if __name__ == "__main__":
                 ),
                 }
 
-        with datasets as ds, corevecs as cv: 
-                ds.load_only(
-                        loaders = loaders,
-                        verbose = verbose
-                        )
+        # with datasets as ds, corevecs as cv: 
+        #         ds.load_only(
+        #                 loaders = loaders,
+        #                 verbose = verbose
+        #                 )
 
-                # computing the corevectors
-                cv.get_coreVectors(
-                        datasets = ds,
-                        reduction_fns = reduction_fns,
-                        save_input = True,
-                        save_output = False,
-                        batch_size = bs,
-                        n_threads = n_threads,
-                        verbose = verbose
-                        )
+        #         # computing the corevectors
+        #         cv.get_coreVectors(
+        #                 datasets = ds,
+        #                 reduction_fns = reduction_fns,
+        #                 save_input = True,
+        #                 save_output = False,
+        #                 batch_size = bs,
+        #                 n_threads = n_threads,
+        #                 verbose = verbose
+        #                 )
 
-                if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
-                        cv.normalize_corevectors(
-                                wrt = 'CIFAR100-train',
-                                to_file = cvs_path/(cvs_name+'.normalization.pt'),
-                                batch_size = bs,
-                                n_threads = n_threads,
-                                verbose=verbose
-                                )
+        #         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
+        #                 cv.normalize_corevectors(
+        #                         wrt = 'CIFAR100-train',
+        #                         to_file = cvs_path/(cvs_name+'.normalization.pt'),
+        #                         batch_size = bs,
+        #                         n_threads = n_threads,
+        #                         verbose=verbose
+        #                         )
 
     #--------------------------------
     # Peepholes
@@ -457,10 +461,17 @@ if __name__ == "__main__":
                         datasets = ds,
                         corevectors = cv,
                         target_modules = target_layers,
-                        batch_size = bs
+                        batch_size = bs,
                         drillers = drillers,
                         n_threads = n_threads,
                         verbose = verbose
                         )
         
-                coverage = empp_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots')
+                #coverage = empp_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_550clusters.png')
+                #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
+                compare_relative_coverage_all_clusters(
+                        root_dir = '/home/claranunesbarrancos/repos/XAI/data/drillers_all',
+                        threshold=0.8,
+                        )
+
+

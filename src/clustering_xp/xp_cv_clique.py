@@ -1,10 +1,3 @@
-
-import os
-os.environ["OPENBLAS_NUM_THREADS"] = "64"
-os.environ["OMP_NUM_THREADS"] = "64"
-os.environ["MKL_NUM_THREADS"] = "64"
-os.environ["NUMEXPR_NUM_THREADS"] = "64"
-
 import sys
 from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
@@ -24,41 +17,56 @@ from peepholelib.datasets.parsedDataset import ParsedDataset
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
-from peepholelib.utils.viz_empp import *
+
+import numpy as np
+
+from pyclustering.cluster.clique import clique
 
 
-from sklearn.mixture import BayesianGaussianMixture
-
-
-def compute_empp_dpmm(hard_labels, y, n_classes):
+def compute_empp_clique(hard_labels, y, n_classes):
     """
-    hard_labels: tensor[N]  (after noise reassignment)
-    y: tensor[N] class labels
+    Computes EM–PP for CLIQUE clustering.
+    
+    hard_labels: numpy array or tensor of shape [N], with noise = -1
+    y:           true labels, shape [N]
+    n_classes:   number of true classes
     """
-
     hard_labels = torch.tensor(hard_labels, dtype=torch.long)
     y = torch.tensor(y, dtype=torch.long)
 
-    # Map cluster labels to 0..n_clusters-1
-    unique_clusters = hard_labels.unique()
-    mapping = {old.item(): new for new, old in enumerate(unique_clusters)}
-    mapped_labels = hard_labels.clone()
-    for old, new in mapping.items():
-        mapped_labels[hard_labels == old] = new
+    # ignore noise (-1)
+    valid = hard_labels >= 0
+    valid_labels = hard_labels[valid]
+    valid_y = y[valid]
 
-    n_clusters = len(unique_clusters)
-    empp = torch.zeros((n_clusters, n_classes))
+    if len(valid_labels) == 0:
+        raise ValueError("CLIQUE produced no valid clusters (all points marked noise).")
 
-    # Count class frequencies per cluster
+    # number of clusters = highest label + 1
+    n_clusters = int(valid_labels.max().item() + 1)
+
+    empp = torch.zeros((n_clusters, n_classes), dtype=torch.float32)
+
     for c in range(n_clusters):
-        mask = mapped_labels == c
-        if mask.sum() == 0:
+        in_cluster = (valid_labels == c)
+
+        if in_cluster.sum() == 0:
             continue
-        cluster_classes = y[mask]
-        counts = torch.bincount(cluster_classes, minlength=n_classes)
-        empp[c] = counts.float() / counts.sum()  # normalize to sum=1
+
+        labels = valid_y[in_cluster]
+
+        # count class frequencies
+        for s in range(n_classes):
+            empp[c, s] = (labels == s).sum().item()
+
+        # normalize to form probability distribution
+        total = empp[c].sum()
+        if total > 0:
+            empp[c] /= total
 
     return empp
+
+
 
 if __name__ == "__main__":
 
@@ -119,30 +127,35 @@ if __name__ == "__main__":
 
         for layer in target_layers:
 
-            X = cv._corevds['CIFAR100-train'][layer][:]
-            X_np = X.cpu().numpy()
-            X_reduced = X[:, :51]
+            X = cv._corevds['CIFAR100-train'][layer]
+            X_reduced = X[:, :10]
+                    
+            X_np = X_reduced.cpu().numpy()
 
             y = ds._dss["CIFAR100-train"][:]["label"]  
             y_np = y.cpu().numpy()
 
-            dpmm = BayesianGaussianMixture(
-                n_components=100,
-                weight_concentration_prior_type='dirichlet_process',
-                weight_concentration_prior=1e-2,
-                max_iter=500,
-                init_params='kmeans',
-                random_state=0,
+            # -----------------------------
+            # CLIQUE 
+            # -----------------------------
+
+            clique = clique(
+                    data = X_np,
+                    amount_intervals = 10, # grid bins per dimension.
+                    density_threshold = 10 # min points required in a grid cell for it to be considered dense
             )
 
-            # Fit model on corevectors
-            dpmm.fit(X_reduced)
+            clique.process()
+            clusters = clique.get_clusters() 
+            noise = clique.get_noise()
 
+            pred = np.full(len(X_np), -1, dtype=int)
+            for cid, pts in enumerate(clusters):
+                pred[np.array(pts, dtype=int)] = cid
 
-            pred_labels = torch.tensor(dpmm.predict(X_reduced), dtype=torch.int64)
+            pred_labels = torch.tensor(pred, dtype=torch.long)
 
-
-            empp = compute_empp_dpmm(
+            empp = compute_empp_clique(
                 hard_labels=pred_labels,
                 y=y_np,
                 n_classes=n_classes
@@ -152,21 +165,7 @@ if __name__ == "__main__":
                 "_empp": empp
             }
 
-            # just to see whats up
-            unique_clusters = pred_labels.unique()
-            print(f"\n=== Layer: {layer} ===")
-            print(f"Number of clusters: {len(unique_clusters)}")
-            
-            # Cluster sizes
-            for c in unique_clusters:
-                mask = pred_labels == c
-                top_class = torch.mode(torch.tensor(y_np)[mask])[0].item()
-                print(f"Cluster {c.item()}: size={mask.sum().item()}, top class={top_class}")
-
-
-    coverage = empp_coverage_scores(
-        drillers=drillers,
-        threshold=0.8,
-
-    )
-
+            # just to see whatsup
+            unique, counts = torch.unique(pred_labels, return_counts=True)
+            for u, c in zip(unique.tolist(), counts.tolist()):
+                print(f"Cluster {u}: {c} points")
