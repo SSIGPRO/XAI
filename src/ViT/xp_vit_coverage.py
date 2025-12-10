@@ -52,6 +52,40 @@ def get_st_list(state_dict):
                                                 'heads' in layer]
     return filtered_layers
 
+def load_all_drillers(**kwargs):
+    n_cluster_list = kwargs.get('n_cluster_list', None)
+    target_layers = kwargs.get('target_layers', None)
+    device = kwargs.get('device', None)
+    feature_sizes = kwargs.get('feature_sizes', None)
+    cv_parsers = kwargs.get('cv_parsers', None)
+    base_drill_path = kwargs.get('drill_path', None) 
+
+    all_drillers = {}
+    for n_cluster in n_cluster_list:
+        # assuming u have a folder with all the drillers and u name it like drillers_{n_cluster}
+        drill_path = base_drill_path / f"drillers_{n_cluster}" 
+
+        drillers = {}
+        for peep_layer in target_layers:
+            drillers[peep_layer] = tGMM(
+                path=drill_path,
+                name=f"classifier.{peep_layer}",  
+                nl_classifier=n_cluster,
+                nl_model=n_classes,
+                n_features=feature_sizes[peep_layer],
+                parser=cv_parsers[peep_layer],
+                device=device
+            )
+
+        for drill_key, driller in drillers.items():
+            if driller._empp_file.exists():
+                print(f'Loading Classifier for {drill_key}')
+                driller.load()
+
+        all_drillers[n_cluster] = drillers
+
+    return all_drillers
+
 if __name__ == "__main__":
         use_cuda = torch.cuda.is_available()
         device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
@@ -80,10 +114,9 @@ if __name__ == "__main__":
         cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/corevectors'
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/drillers_all/drillers_50'
+        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/drillers_all'
         drill_name = 'classifier'
 
-        plots_path = Path.cwd()/'temp_plots'
         plots_path = Path.cwd()/'temp_plots/coverage/'
         
         verbose = True 
@@ -91,7 +124,7 @@ if __name__ == "__main__":
         # Peepholelib
         
 
-        n_cluster = 50
+        n_cluster = 550
 
         n_conceptograms = 2 
         
@@ -160,7 +193,7 @@ if __name__ == "__main__":
                         svd_fns = svd_fns,
                         verbose = verbose
                         )
-                #viz_singular_values_2(model, svds_path)
+                viz_singular_values_2(model, svds_path)
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -218,7 +251,7 @@ if __name__ == "__main__":
         feature_sizes = {}
         for layer in target_layers:
 
-                if layer == "classifier.1":
+                if layer == "heads.head":
                         features_cv_dim = 100
                 else:
                         features_cv_dim = 200
@@ -228,54 +261,40 @@ if __name__ == "__main__":
                 feature_sizes[layer] = features_cv_dim
 
 
-        drillers = {}
-        for peep_layer in target_layers:
-                drillers[peep_layer] = tGMM(
-                        path = drill_path,
-                        name = drill_name+'.'+peep_layer,
-                        nl_classifier = n_cluster,
-                        nl_model = n_classes,
-                        n_features = feature_sizes[peep_layer],
-                        parser = cv_parsers[peep_layer],
-                        device = device
-                        )
+        drillers_dict = load_all_drillers(
+            n_cluster_list = [10, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550],  
+            target_layers = target_layers,
+            drill_path = drill_path,
+            device = device,
+            feature_sizes = feature_sizes,
+            cv_parsers = cv_parsers
+            )
 
-        # fitting classifiers
-        with datasets as ds, corevecs as cv:
-                ds.load_only(
-                        loaders = loaders,
-                        verbose = verbose
-                        )
+        # peepholes = Peepholes(
+        #         path = phs_path,
+        #         name = phs_name,
+        #         device = device
+        #         )
+       
+        with corevecs as cv:
 
                 cv.load_only(
                         loaders = loaders,
                         verbose = verbose 
                         ) 
-
-                for drill_key, driller in drillers.items():
-                        if (driller._empp_file).exists():
-                                print(f'Loading Classifier for {drill_key}') 
-                                driller.load()
-                        else:
-                                t0 = time()
-                                print(f'Fitting classifier for {drill_key}')
-                                driller.fit(
-                                        corevectors = cv,
-                                        loader = 'CIFAR100-train',
-                                        verbose=verbose
-                                        )
-                                print(f'Fitting time for {drill_key}  = ', time()-t0)
-
-                                driller.compute_empirical_posteriors(
-                                        datasets = ds,
-                                        corevectors = cv,
-                                        loader = 'CIFAR100-train',
-                                        batch_size = bs,
-                                        verbose=verbose
-                                        )
+                # layer = "features.13.conv.1.0"
+                # X = cv._corevds['train'][layer]
+                # X_reduced = X[:, :10]
                         
-                                # save classifiers
-                                print(f'Saving classifier for {drill_key}')
-                                driller.save()
+                # X_np = X_reduced.cpu().numpy()
+
+                # plot_tsne(X_np = X_np, 
+                #         save_path = plots_path,
+                #         file_name = "features13conv10_mobilenet_tsne")
+                # quit()
+                #coverage = empp_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_550clusters.png')
+                #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
+                compare_relative_coverage_all_clusters(all_drillers = drillers_dict,
+                        threshold=0.8, plot= True, save_path=plots_path, file_name='relative_coverage_all_clusters_vit.png')
 
 

@@ -8,15 +8,14 @@ from functools import partial
 
 # torch stuff
 import torch
+from torchvision.models import vgg16
 from cuda_selector import auto_cuda
-import torchvision
-
 
 ###### Our stuff
 
 # Model
 from peepholelib.models.model_wrap import ModelWrap 
-from peepholelib.models.svd_fns import linear_svd
+from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
 
 # datasets
 from peepholelib.datasets.cifar100 import Cifar100
@@ -27,7 +26,7 @@ from peepholelib.datasets.functional.samplers import random_subsampling
 
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, linear_svd_projection_ViT
+from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
 
 # peepholes
 from peepholelib.peepholes.parsers import trim_corevectors
@@ -36,25 +35,11 @@ from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
 
-def get_st_list(state_dict):
-    '''
-    Return a clean list of the layers of the model
-
-    Args:
-    - state_dict: state dict of the model
-    '''
-    state_dict_list = list(state_dict)
-
-    # remove .weight and .bias from the strings in the state_dict list
-    st_clean = [s.replace(".bias", "").replace(".weight", "") for s in state_dict]
-    filtered_layers = [layer for layer in st_clean if 'mlp.0' in layer or 
-                                                'mlp.3' in layer or 
-                                                'heads' in layer]
-    return filtered_layers
 
 if __name__ == "__main__":
         use_cuda = torch.cuda.is_available()
         device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+        #device = torch.device('cuda:1') 
         torch.cuda.empty_cache()
 
         #device = torch.device("cpu")
@@ -72,26 +57,35 @@ if __name__ == "__main__":
         n_threads = 1
 
         model_dir = '/srv/newpenny/XAI/models'
-        model_name = 'SV_model=vit_b_16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau_withInfo.pth'        
+        model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
         
-        svds_path = '/srv/newpenny/XAI/CN/vit_data'
+        svds_path = Path.cwd()/'../data'
         svds_name = 'svds' 
         
-        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/corevectors'
+        cvs_path = Path.cwd()/'../data/corevectors'
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/drillers_all/drillers_50'
+        drill_path = Path.cwd()/'../data/drillers_all/drillers_550'
         drill_name = 'classifier'
 
-        plots_path = Path.cwd()/'temp_plots'
+        phs_path = Path.cwd()/'../data/peepholes'
+        phs_name = 'peepholes'
+
         plots_path = Path.cwd()/'temp_plots/coverage/'
         
         verbose = True 
         
         # Peepholelib
-        
-
-        n_cluster = 50
+        target_layers = [ 'features.7', 'features.10', 'features.12', 'features.14', 'features.17', 'features.19', 'features.21',
+                                'features.24','features.26','features.28','classifier.0','classifier.3', 
+                                'classifier.6',
+                        ]
+        features24_svd_rank = 100 
+        features26_svd_rank = 100 
+        features28_svd_rank = 100
+        classifier_svd_rank = 100 
+        n_cluster = 550
+        features_cv_dim = 100
 
         n_conceptograms = 2 
         
@@ -101,10 +95,8 @@ if __name__ == "__main__":
     # Model 
     #--------------------------------
     
-        nn = torchvision.models.vit_b_16()
+        nn = vgg16()
         n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
-        target_layers = get_st_list(nn.state_dict().keys())
-        print(f'Target layers: {target_layers}')
 
         model = ModelWrap(
                 model = nn,
@@ -112,7 +104,7 @@ if __name__ == "__main__":
                 )
                                                 
         model.update_output(
-                output_layer = 'heads.head', 
+                output_layer = 'classifier.6', 
                 to_n_classes = n_classes,
                 overwrite = True 
                 )
@@ -135,16 +127,63 @@ if __name__ == "__main__":
     #--------------------------------
     # SVDs 
     #--------------------------------
-
-        svd_fns = {}
-
-        for layer in target_layers:
-                svd_fns[layer] = partial(linear_svd,
-                        layer = layer,
-                        rank = 200,
-                        device=device
-                )
-
+        svd_fns = {
+                'features.7': partial(conv2d_toeplitz_svd, 
+                        rank = features24_svd_rank,
+                        device = device,
+                ),
+                'features.10': partial(conv2d_toeplitz_svd, 
+                        rank = features24_svd_rank,
+                        device = device,
+                ),
+                'features.12': partial(conv2d_toeplitz_svd, 
+                        rank = features24_svd_rank,
+                        device = device,
+                ),
+                'features.14': partial(conv2d_toeplitz_svd, 
+                        rank = features24_svd_rank,
+                        device = device,
+                ),
+                'features.17': partial(conv2d_toeplitz_svd, 
+                        rank = features24_svd_rank,
+                        device = device,
+                ),
+                'features.19': partial(conv2d_toeplitz_svd, 
+                        rank = features24_svd_rank,
+                        device = device,
+                ),
+                'features.21': partial(conv2d_toeplitz_svd, 
+                        rank = features24_svd_rank,
+                        device = device,
+                ),
+                'features.24': partial(conv2d_toeplitz_svd,   
+                        rank = features24_svd_rank,
+                        channel_wise = False,
+                        device = device,
+                ),
+                'features.26': partial(conv2d_toeplitz_svd, 
+                        rank = features26_svd_rank,
+                        channel_wise = False,
+                        device = device,
+                ),
+                'features.28': partial(conv2d_toeplitz_svd, 
+                        rank = features26_svd_rank,
+                        channel_wise = False,
+                        device = device,
+                ),
+                'classifier.0': partial(linear_svd,
+                        rank = classifier_svd_rank,
+                        device = device,
+                ),
+                'classifier.3': partial(linear_svd,
+                        rank = classifier_svd_rank,
+                        device = device,
+                ),
+                'classifier.6': partial(linear_svd,
+                        rank = classifier_svd_rank,
+                        device = device,
+                ),
+                }
 
         with datasets as ds:
                 ds.load_only(
@@ -160,7 +199,6 @@ if __name__ == "__main__":
                         svd_fns = svd_fns,
                         verbose = verbose
                         )
-                #viz_singular_values_2(model, svds_path)
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -169,14 +207,9 @@ if __name__ == "__main__":
                 name = cvs_name,
                 model = model,
                 )
-        
         # define a dimensionality reduction function for each layer
         reduction_fns = {}
         for layer in target_layers:
-                if layer == "heads.head":
-                        fn = linear_svd_projection  
-                else:
-                        fn = linear_svd_projection_ViT
 
                 reduction_fns[layer] = partial(fn,
                         svd=model._svds[layer],
@@ -213,20 +246,13 @@ if __name__ == "__main__":
     #--------------------------------
     # Peepholes
     #--------------------------------
-
         cv_parsers = {}
         feature_sizes = {}
         for layer in target_layers:
-
-                if layer == "classifier.1":
-                        features_cv_dim = 100
-                else:
-                        features_cv_dim = 200
                 cv_parsers[layer] = partial(trim_corevectors,
                         module = layer,
-                        cv_dim = features_cv_dim)
-                feature_sizes[layer] = features_cv_dim
-
+                        cv_dim = 100)
+                feature_sizes[layer] = 100
 
         drillers = {}
         for peep_layer in target_layers:
@@ -239,6 +265,12 @@ if __name__ == "__main__":
                         parser = cv_parsers[peep_layer],
                         device = device
                         )
+
+        peepholes = Peepholes(
+                path = phs_path,
+                name = phs_name,
+                device = device
+                )
 
         # fitting classifiers
         with datasets as ds, corevecs as cv:
@@ -277,5 +309,33 @@ if __name__ == "__main__":
                                 # save classifiers
                                 print(f'Saving classifier for {drill_key}')
                                 driller.save()
+
+        with datasets as ds, corevecs as cv, peepholes as ph:
+                ds.load_only(
+                        loaders = loaders,
+                        verbose = verbose
+                        )
+
+                cv.load_only(
+                        loaders = loaders,
+                        verbose = verbose 
+                        ) 
+
+                ph.get_peepholes(
+                        datasets = ds,
+                        corevectors = cv,
+                        target_modules = target_layers,
+                        batch_size = bs,
+                        drillers = drillers,
+                        n_threads = n_threads,
+                        verbose = verbose
+                        )
+        
+                #coverage = empp_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_550clusters.png')
+                #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
+                compare_relative_coverage_all_clusters(
+                        root_dir = '/home/claranunesbarrancos/repos/XAI/data/drillers_all',
+                        threshold=0.8,
+                        )
 
 

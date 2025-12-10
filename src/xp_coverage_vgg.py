@@ -277,6 +277,6 @@ if __name__ == "__main__":
                 #coverage = empp_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_550clusters.png')
                 #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
                 compare_relative_coverage_all_clusters( all_drillers = drillers_dict,
-                        threshold=0.8, plot= True, save_path=plots_path, file_name='relative_coverage_all_clusters_vgg.png')
+                        threshold=0.8, plot= True, save_path=plots_path, file_name='relative_cluster_coverage_all_clusters_vgg.png')
 
 

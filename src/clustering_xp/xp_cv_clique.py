@@ -11,7 +11,7 @@ from cuda_selector import auto_cuda
 ###### Our stuff
 from peepholelib.models.model_wrap import ModelWrap 
 from peepholelib.datasets.cifar100 import Cifar100
-from peepholelib.utils.viz_tsne import plot_tsne
+from peepholelib.utils.viz_corevecs import plot_tsne, plot_corevec2D
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 
 
@@ -126,10 +126,10 @@ if __name__ == "__main__":
     plots_path = Path.cwd()/'temp_plots'
 
     target_layers = [
-         'features.7', #'features.10', 'features.12', 'features.14', 'features.17',
+        #'features.7', #'features.10', 'features.12', 'features.14', 'features.17',
         # 'features.19', 'features.21', 'features.24', 'features.26', 'features.28',
         # 'classifier.0', 'classifier.3',
-        #'classifier.6',
+        'classifier.6',
     ]
 
     loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test']
@@ -164,6 +164,14 @@ if __name__ == "__main__":
             verbose=verbose
         )
 
+        plot_corevec2D(corevector = cv, 
+            layer = 'features.7',
+            save_path = plots_path,
+            file_name = "features7_cv_with_labels.png",
+            ds = ds,
+            loader = 'CIFAR100-train')
+        quit()
+
         for layer in target_layers:
 
             X = cv._corevds['CIFAR100-train'][layer]
@@ -173,11 +181,6 @@ if __name__ == "__main__":
 
             y = ds._dss["CIFAR100-train"][:]["label"]  
             y_np = y.cpu().numpy()
-
-            plot_tsne(X_np = X_np, 
-                save_path = plots_path,
-                file_name = "classifier6_tsne")
-            quit()
 
             # -----------------------------
             # CLIQUE 

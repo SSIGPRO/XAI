@@ -8,15 +8,14 @@ from functools import partial
 
 # torch stuff
 import torch
-from cuda_selector import auto_cuda
 import torchvision
-
+from cuda_selector import auto_cuda
 
 ###### Our stuff
 
 # Model
 from peepholelib.models.model_wrap import ModelWrap 
-from peepholelib.models.svd_fns import linear_svd
+from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
 
 # datasets
 from peepholelib.datasets.cifar100 import Cifar100
@@ -27,7 +26,7 @@ from peepholelib.datasets.functional.samplers import random_subsampling
 
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, linear_svd_projection_ViT
+from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
 
 # peepholes
 from peepholelib.peepholes.parsers import trim_corevectors
@@ -36,25 +35,10 @@ from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
 
-def get_st_list(state_dict):
-    '''
-    Return a clean list of the layers of the model
-
-    Args:
-    - state_dict: state dict of the model
-    '''
-    state_dict_list = list(state_dict)
-
-    # remove .weight and .bias from the strings in the state_dict list
-    st_clean = [s.replace(".bias", "").replace(".weight", "") for s in state_dict]
-    filtered_layers = [layer for layer in st_clean if 'mlp.0' in layer or 
-                                                'mlp.3' in layer or 
-                                                'heads' in layer]
-    return filtered_layers
-
 if __name__ == "__main__":
         use_cuda = torch.cuda.is_available()
         device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+        #device = torch.device('cuda:1') 
         torch.cuda.empty_cache()
 
         #device = torch.device("cpu")
@@ -64,7 +48,7 @@ if __name__ == "__main__":
         # Directories definitions
         #--------------------------------
         cifar_path = '/srv/newpenny/dataset/CIFAR100'
-        ds_path = Path.cwd()/'../data/datasets'
+        ds_path = '/srv/newpenny/XAI/CN/data/corevectors'
 
         # model parameters
         seed = 29
@@ -72,39 +56,54 @@ if __name__ == "__main__":
         n_threads = 1
 
         model_dir = '/srv/newpenny/XAI/models'
-        model_name = 'SV_model=vit_b_16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau_withInfo.pth'        
+        model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
         
-        svds_path = '/srv/newpenny/XAI/CN/vit_data'
+        svds_path = '/srv/newpenny/XAI/CN/data'
         svds_name = 'svds' 
         
-        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/corevectors'
+        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/data/corevectors'
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/drillers_all/drillers_50'
+        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/data/drillers_all/drillers_50'
         drill_name = 'classifier'
 
+        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/data/peepholes'
+        phs_name = 'peepholes'
+
         plots_path = Path.cwd()/'temp_plots'
-        plots_path = Path.cwd()/'temp_plots/coverage/'
         
         verbose = True 
         
-        # Peepholelib
-        
+        target_layers = [ 'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2',
+        'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2',
+        'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
+        'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
+        'features.6.conv.0.0','features.6.conv.1.0', 'features.6.conv.2',
+        'features.7.conv.0.0', 'features.7.conv.1.0','features.7.conv.2',
+        'features.8.conv.0.0', 'features.8.conv.1.0', 'features.8.conv.2',
+        'features.9.conv.0.0', 'features.9.conv.1.0', 'features.9.conv.2',  
+        'features.10.conv.0.0', 'features.10.conv.1.0', 'features.10.conv.2',
+        'features.11.conv.0.0', 'features.11.conv.1.0', 'features.11.conv.2',
+        'features.12.conv.0.0', 'features.12.conv.1.0',  'features.12.conv.2',
+        'features.13.conv.0.0', 'features.13.conv.1.0', 'features.13.conv.2',
+        'features.14.conv.0.0', 'features.14.conv.1.0', 'features.14.conv.2',
+        'features.15.conv.0.0', 'features.15.conv.1.0', 'features.15.conv.2',
+        'features.16.conv.0.0', 'features.16.conv.1.0', 'features.16.conv.2', 
+        'features.17.conv.0.0', 'features.17.conv.1.0', 'features.17.conv.2',
+        'features.18.0', 'classifier.1',
+               ]
 
+        
+        loaders = ['train', 'val', 'test']
         n_cluster = 50
-
-        n_conceptograms = 2 
-        
-        loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test']
 
     #--------------------------------
     # Model 
     #--------------------------------
     
-        nn = torchvision.models.vit_b_16()
+        nn = torchvision.models.mobilenet_v2(pretrained=True)
+
         n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
-        target_layers = get_st_list(nn.state_dict().keys())
-        print(f'Target layers: {target_layers}')
 
         model = ModelWrap(
                 model = nn,
@@ -112,7 +111,7 @@ if __name__ == "__main__":
                 )
                                                 
         model.update_output(
-                output_layer = 'heads.head', 
+                output_layer = 'classifier.1', 
                 to_n_classes = n_classes,
                 overwrite = True 
                 )
@@ -135,11 +134,15 @@ if __name__ == "__main__":
     #--------------------------------
     # SVDs 
     #--------------------------------
-
         svd_fns = {}
 
         for layer in target_layers:
-                svd_fns[layer] = partial(linear_svd,
+            if 'classifier' in layer:
+                svd_type = linear_svd
+            else:
+                svd_type = conv2d_toeplitz_svd
+
+            svd_fns[layer] = partial(svd_type,
                         layer = layer,
                         rank = 200,
                         device=device
@@ -156,11 +159,11 @@ if __name__ == "__main__":
                         path = svds_path,
                         name = svds_name,
                         target_modules = target_layers,
-                        sample_in = ds._dss['CIFAR100-train']['image'][0],
+                        sample_in = ds._dss['train']['image'][0],
                         svd_fns = svd_fns,
                         verbose = verbose
                         )
-                #viz_singular_values_2(model, svds_path)
+
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -169,14 +172,14 @@ if __name__ == "__main__":
                 name = cvs_name,
                 model = model,
                 )
-        
-        # define a dimensionality reduction function for each layer
+
+    # define a dimensionality reduction function for each layer
         reduction_fns = {}
         for layer in target_layers:
-                if layer == "heads.head":
+                if layer == "classifier.1":
                         fn = linear_svd_projection  
                 else:
-                        fn = linear_svd_projection_ViT
+                        fn = conv2d_toeplitz_svd_projection
 
                 reduction_fns[layer] = partial(fn,
                         svd=model._svds[layer],
@@ -210,10 +213,10 @@ if __name__ == "__main__":
                                 verbose=verbose
                                 )
 
+
     #--------------------------------
     # Peepholes
     #--------------------------------
-
         cv_parsers = {}
         feature_sizes = {}
         for layer in target_layers:
@@ -221,12 +224,11 @@ if __name__ == "__main__":
                 if layer == "classifier.1":
                         features_cv_dim = 100
                 else:
-                        features_cv_dim = 200
+                        features_cv_dim = 300
                 cv_parsers[layer] = partial(trim_corevectors,
                         module = layer,
                         cv_dim = features_cv_dim)
                 feature_sizes[layer] = features_cv_dim
-
 
         drillers = {}
         for peep_layer in target_layers:
@@ -240,6 +242,13 @@ if __name__ == "__main__":
                         device = device
                         )
 
+
+        peepholes = Peepholes(
+                path = phs_path,
+                name = phs_name,
+                device = device
+                )
+       
         # fitting classifiers
         with datasets as ds, corevecs as cv:
                 ds.load_only(
@@ -261,7 +270,7 @@ if __name__ == "__main__":
                                 print(f'Fitting classifier for {drill_key}')
                                 driller.fit(
                                         corevectors = cv,
-                                        loader = 'CIFAR100-train',
+                                        loader = 'train',
                                         verbose=verbose
                                         )
                                 print(f'Fitting time for {drill_key}  = ', time()-t0)
@@ -269,7 +278,7 @@ if __name__ == "__main__":
                                 driller.compute_empirical_posteriors(
                                         datasets = ds,
                                         corevectors = cv,
-                                        loader = 'CIFAR100-train',
+                                        loader = 'train',
                                         batch_size = bs,
                                         verbose=verbose
                                         )
@@ -277,5 +286,3 @@ if __name__ == "__main__":
                                 # save classifiers
                                 print(f'Saving classifier for {drill_key}')
                                 driller.save()
-
-
