@@ -8,7 +8,7 @@ from functools import partial
 
 # torch stuff
 import torch
-from torchvision.models import vgg16
+from torchvision.models import vit_b_16 
 from cuda_selector import auto_cuda
 
 ###### Our stuff
@@ -22,9 +22,8 @@ from peepholelib.datasets.parsedDataset import ParsedDataset
 
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
+from peepholelib.coreVectors.dimReduction.svds.vit_linear_svd import ViTLinearSVD
 from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
-from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
-from peepholelib.coreVectors.dimReduction.svds.conv2d_kernel_svd import Conv2dKernelSVD
 
 # peepholes
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
@@ -39,57 +38,50 @@ if __name__ == "__main__":
     # Directories definitions
     #--------------------------------
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
-    ds_path = Path.cwd()/'../data/datasets'
+    ds_path = Path.cwd()/'../../data/datasets'
 
     # model parameters
     bs = 512 
     n_threads = 1
 
     model_dir = '/srv/newpenny/XAI/models'
-    model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
+    model_name = 'SV_model=vit_b_16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau_withInfo.pth'
      
-    svds_path = Path.cwd()/'../data/svds'
+    svds_path = Path.cwd()/'../../data/svds_vit'
     
-    cvs_path = Path.cwd()/'../data/corevectors'
+    cvs_path = Path.cwd()/'../../data/corevectors_vit'
     cvs_name = 'corevectors'
 
-    drill_path = Path.cwd()/'../data/drillers'
+    drill_path = Path.cwd()/'../../data/drillers_vit'
     drill_name = 'classifier'
 
-    phs_path = Path.cwd()/'../data/peepholes'
+    phs_path = Path.cwd()/'../../data/peepholes_vit'
     phs_name = 'peepholes'
-    
+
     verbose = True 
     
     # Peepholelib
     target_layers = [
-            'features.26',
-            'features.28',
-            'classifier.0',
+            'encoder.layers.encoder_layer_0.mlp.0',
+            'encoder.layers.encoder_layer_0.mlp.3',
+            'heads.head'
             ]
-    
-    cv_dims = {
-            'features.26': 30,
-            'features.28': 2,
-            'classifier.0': 30,
-            }
 
     svd_rank = 30
-    n_cluster = 50 
+    n_cluster = 50
+    cv_dim = 10
     
     loaders = [
             'CIFAR100-train',
             'CIFAR100-val',
-            'CIFAR100-test',  
-            'CIFAR100-C-val-c0',
-            'CIFAR100-C-test-c0' 
+            'CIFAR100-test' 
             ]
 
     #--------------------------------
     # Model 
     #--------------------------------
     
-    nn = vgg16()
+    nn = vit_b_16()
     n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
 
     model = ModelWrap(
@@ -99,7 +91,7 @@ if __name__ == "__main__":
             )
                                             
     model.update_output(
-            output_layer = 'classifier.6', 
+            output_layer = 'heads.head', 
             to_n_classes = n_classes,
             overwrite = True 
             )
@@ -123,37 +115,29 @@ if __name__ == "__main__":
     # SVDs 
     #--------------------------------
     t0 = time()
-    with datasets as ds:
-        ds.load_only(
-                loaders = ['CIFAR100-train'],
+    svds = {
+            'encoder.layers.encoder_layer_0.mlp.0': ViTLinearSVD(
+                path = svds_path,
+                layer = 'encoder.layers.encoder_layer_0.mlp.0',
+                model = model,
+                rank = svd_rank,
+                verbose = verbose
+                ),
+            'encoder.layers.encoder_layer_0.mlp.3': ViTLinearSVD(
+                path = svds_path,
+                layer = 'encoder.layers.encoder_layer_0.mlp.3',
+                model = model,
+                rank = svd_rank,
+                verbose = verbose
+                ),
+            'heads.head': LinearSVD(
+                path = svds_path,
+                layer = 'heads.head',
+                model = model,
+                rank = svd_rank,
                 verbose = verbose
                 )
-        sample_in = ds._dss['CIFAR100-train']['image'][0]
-
-        svds = {
-                'features.26': Conv2dToeplitzSVD(
-                    path = svds_path,
-                    layer = 'features.26',
-                    model = model,
-                    rank = svd_rank,
-                    sample_in = sample_in,
-                    device = device,
-                    ),
-                'features.28': Conv2dKernelSVD(
-                    path = svds_path,
-                    layer = 'features.28',
-                    model = model,
-                    rank = svd_rank,
-                    device = device,
-                    ),
-                'classifier.0': LinearSVD(
-                    path = svds_path,
-                    layer = 'classifier.0',
-                    model = model,
-                    rank = svd_rank,
-                    verbose = verbose
-                    ),
-                }
+        }
     print('time: ', time()-t0)
 
     #--------------------------------
@@ -197,28 +181,20 @@ if __name__ == "__main__":
     #--------------------------------
     # Peepholes
     #--------------------------------
-    feature_sizes = {
-            'features.26': cv_dims['features.26'],
-            # for channel_wise corevectors, the size is out_size * cv_dim
-            # TODO: get 196 from somewhere
-            'features.28': cv_dims['features.28']*196,
-            'classifier.0': cv_dims['classifier.0'],
-            }
-
     drillers = {}
     for peep_layer in target_layers:
         cv_parser = partial(
                     svds[peep_layer].parser,
-                    cv_dim = cv_dims[peep_layer]
+                    cv_dim = cv_dim
                     )
 
         drillers[peep_layer] = tGMM(
                 path = drill_path,
-                name = f'{drill_name}.GMM.{peep_layer}.{n_classes}.{feature_sizes[peep_layer]}.{n_cluster}',
+                name = f'{drill_name}.GMM.{peep_layer}.{n_classes}.{cv_dim}.{n_cluster}',
                 target_module = peep_layer,
                 nl_classifier = n_cluster,
                 nl_model = n_classes,
-                n_features = feature_sizes[peep_layer],
+                n_features = cv_dim,
                 parser = cv_parser,
                 device = device
                 )

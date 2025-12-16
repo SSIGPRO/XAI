@@ -58,16 +58,6 @@ if __name__ == "__main__":
      
     verbose = True 
     
-    # Peepholelib
-    target_layers = [
-            'features.24',
-            'features.26',
-            'features.28',
-            'classifier.0',
-            'classifier.3',
-            'classifier.6',
-            ]
-    
     #--------------------------------
     # Model 
     #--------------------------------
@@ -91,11 +81,6 @@ if __name__ == "__main__":
             verbose = verbose
             )
                                             
-    model.set_target_modules(
-            target_modules = target_layers,
-            verbose = verbose
-            )
-
     #--------------------------------
     # Datasets 
     #--------------------------------
@@ -120,7 +105,7 @@ if __name__ == "__main__":
     _dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 0.025
+                perc = 0.1
                 ) for k in _dss.keys()
             }
 
@@ -139,7 +124,7 @@ if __name__ == "__main__":
             n_threads = n_threads,
             verbose = verbose
             )
-    
+    quit()
     #######################
     # creating attk dataset 
     #######################
@@ -188,6 +173,7 @@ if __name__ == "__main__":
     #######################
     # lazy stacking 
     #######################
+    Path('./temp_plots').mkdir(parents=True, exist_ok=True)
     with ds, atk_ds:
         ds.load_only(
                 loaders = ['CIFAR100-test', 'CIFAR100-C-test-c0'],

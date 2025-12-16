@@ -15,7 +15,7 @@ from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.coreVectors.coreVectors import CoreVectors
 
 # corevecs
-from peepholelib.coreVectors.dimReduction.avgPooling import AvgPooling 
+from peepholelib.coreVectors.dimReduction.vit_cls_token import ViTCLSToken 
 from peepholelib.coreVectors.get_coreVectors import get_out_activations
 
 # peepholes
@@ -24,7 +24,7 @@ from peepholelib.peepholes.peepholes import Peepholes
 
 # torch stuff
 import torch
-from torchvision.models import vgg16
+from torchvision.models import vit_b_16 
 from cuda_selector import auto_cuda
 
 if __name__ == "__main__":
@@ -36,46 +36,43 @@ if __name__ == "__main__":
     # Directories definitions
     #--------------------------------
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
-    ds_path = Path.cwd()/'../data/datasets'
+    ds_path = Path.cwd()/'../../data/datasets'
 
     # model parameters
     bs = 64 
     n_threads = 1 
 
     model_dir = '/srv/newpenny/XAI/models'
-    model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
+    model_name = 'SV_model=vit_b_16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau_withInfo.pth'
     
-    cvs_path = Path.cwd()/'../data/corevectors'
+    cvs_path = Path.cwd()/'../../data/corevectors_vit'
     cvs_name = 'corevectors_avg'
 
-    drill_path = Path.cwd()/'../data/drillers'
+    drill_path = Path.cwd()/'../../data/drillers_vit'
     drill_name = 'DMD'
 
-    phs_path = Path.cwd()/'../data/peepholes'
+    phs_path = Path.cwd()/'../../data/peepholes_vit'
     phs_name = 'peepholes_avg'
 
     verbose = True 
 
     # Peepholelib
     target_layers = [
-            'features.7',
-            'features.14',
-            'features.28',
+            'encoder.layers.encoder_layer_0.mlp.0',
+            'encoder.layers.encoder_layer_0.mlp.3',
             ]
 
     loaders = [
             'CIFAR100-train',
             'CIFAR100-val',
-            'CIFAR100-test',
-            'CIFAR100-C-val-c0',
-            'CIFAR100-C-test-c0' 
+            'CIFAR100-test' 
             ]
 
     #--------------------------------
     # Model 
     #--------------------------------
 
-    nn = vgg16()
+    nn = vit_b_16()
     n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
     model = ModelWrap(
             model=nn,
@@ -84,7 +81,7 @@ if __name__ == "__main__":
             )
 
     model.update_output(
-            output_layer = 'classifier.6', 
+            output_layer = 'heads.head', 
             to_n_classes = n_classes,
             overwrite = True 
             )
@@ -115,18 +112,14 @@ if __name__ == "__main__":
     
     # for each layer we define the function used to perform dimensionality reduction
     reducers = {
-            'features.7': AvgPooling(
+            'encoder.layers.encoder_layer_0.mlp.0': ViTCLSToken(
                 model = model,
-                layer = 'features.7'
+                layer = 'encoder.layers.encoder_layer_0.mlp.0'
                 ),
-            'features.14': AvgPooling(
+            'encoder.layers.encoder_layer_0.mlp.3': ViTCLSToken(
                 model = model,
-                layer = 'features.14'
+                layer = 'encoder.layers.encoder_layer_0.mlp.0'
                 ),
-            'features.28': AvgPooling(
-                model = model,
-                layer = 'features.28'
-                )
             }
     
     with datasets as ds, corevecs as cv: 
@@ -152,9 +145,8 @@ if __name__ == "__main__":
 
     # number of channels in a conv layer. Get numbers from `nn`
     feature_sizes = {
-            'features.7': 128,
-            'features.14': 256,
-            'features.28': 512,
+            'encoder.layers.encoder_layer_0.mlp.0': 3072, 
+            'encoder.layers.encoder_layer_0.mlp.3': 768
             }
     
     drillers = {}

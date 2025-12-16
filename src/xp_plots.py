@@ -15,7 +15,6 @@ from cuda_selector import auto_cuda
 
 # Model
 from peepholelib.models.model_wrap import ModelWrap 
-from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd, conv2d_kernel_svd
 
 # datasets
 from peepholelib.datasets.cifar100 import Cifar100
@@ -33,7 +32,6 @@ from peepholelib.plots.confidence import plot_confidence
 from peepholelib.plots.calibration import plot_calibration
 from peepholelib.plots.ood import plot_ood
 from peepholelib.plots.conceptograms import plot_conceptogram
-
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -55,12 +53,9 @@ if __name__ == "__main__":
     
     # Peepholelib
     target_layers = [
-            'features.24',
             'features.26',
             'features.28',
             'classifier.0',
-            'classifier.3',
-            'classifier.6',
             ]
     
     n_conceptograms = 2 
@@ -163,9 +158,9 @@ if __name__ == "__main__":
                 path = plots_path,
                 verbose = verbose
                 )
-        
+
         # plot conceptograms
-        idx = [2, 20, 100, 150]
+        idx = [2, 5]
         plot_conceptogram(
                 path = plots_path,
                 name = 'conceptogram',
@@ -178,3 +173,4 @@ if __name__ == "__main__":
                 protoclasses = protoclasses,
                 scores = scores,
                 verbose = verbose,
+                )
