@@ -16,7 +16,7 @@ from peepholelib.coreVectors.coreVectors import CoreVectors
 
 # corevecs
 from peepholelib.coreVectors.dimReduction.vit_cls_token import ViTCLSToken 
-from peepholelib.coreVectors.get_coreVectors import get_out_activations
+from peepholelib.models.model_wrap import get_out_activations
 
 # peepholes
 from peepholelib.peepholes.DeepMahalanobisDistance.DMD import DeepMahalanobisDistance as DMD

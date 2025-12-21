@@ -25,6 +25,7 @@ from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
 from peepholelib.coreVectors.dimReduction.svds.conv2d_kernel_svd import Conv2dKernelSVD
+from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
 
 # peepholes
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
@@ -63,26 +64,26 @@ if __name__ == "__main__":
     
     # Peepholelib
     target_layers = [
-            'features.26',
+            #'features.26',
             'features.28',
-            'classifier.0',
+            #'classifier.0',
             ]
     
     cv_dims = {
-            'features.26': 30,
-            'features.28': 2,
-            'classifier.0': 30,
+            #'features.26': 30,
+            'features.28': 50,
+            #'classifier.0': 30,
             }
 
-    svd_rank = 30
+    svd_rank = 300
     n_cluster = 50 
     
     loaders = [
             'CIFAR100-train',
             'CIFAR100-val',
             'CIFAR100-test',  
-            'CIFAR100-C-val-c0',
-            'CIFAR100-C-test-c0' 
+            #'CIFAR100-C-val-c0',
+            #'CIFAR100-C-test-c0' 
             ]
 
     #--------------------------------
@@ -131,28 +132,28 @@ if __name__ == "__main__":
         sample_in = ds._dss['CIFAR100-train']['image'][0]
 
         svds = {
-                'features.26': Conv2dToeplitzSVD(
-                    path = svds_path,
-                    layer = 'features.26',
-                    model = model,
-                    rank = svd_rank,
-                    sample_in = sample_in,
-                    device = device,
-                    ),
-                'features.28': Conv2dKernelSVD(
+                #'features.26': Conv2dToeplitzSVD(
+                #    path = svds_path,
+                #    layer = 'features.26',
+                #    model = model,
+                #    rank = svd_rank,
+                #    sample_in = sample_in,
+                #    device = device,
+                #    ),
+                'features.28': Conv2dAvgKernelSVD(
                     path = svds_path,
                     layer = 'features.28',
                     model = model,
                     rank = svd_rank,
                     device = device,
                     ),
-                'classifier.0': LinearSVD(
-                    path = svds_path,
-                    layer = 'classifier.0',
-                    model = model,
-                    rank = svd_rank,
-                    verbose = verbose
-                    ),
+                #'classifier.0': LinearSVD(
+                #    path = svds_path,
+                #    layer = 'classifier.0',
+                #    model = model,
+                #    rank = svd_rank,
+                #    verbose = verbose
+                #    ),
                 }
     print('time: ', time()-t0)
 
@@ -198,11 +199,11 @@ if __name__ == "__main__":
     # Peepholes
     #--------------------------------
     feature_sizes = {
-            'features.26': cv_dims['features.26'],
+            #'features.26': cv_dims['features.26'],
             # for channel_wise corevectors, the size is out_size * cv_dim
             # TODO: get 196 from somewhere
-            'features.28': cv_dims['features.28']*196,
-            'classifier.0': cv_dims['classifier.0'],
+            'features.28': cv_dims['features.28'],
+            #'classifier.0': cv_dims['classifier.0'],
             }
 
     drillers = {}

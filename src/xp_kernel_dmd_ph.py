@@ -4,6 +4,7 @@ sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
 # python stuff
 from time import time
+from functools import partial
 
 # Our stuff
 # model
@@ -15,8 +16,8 @@ from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.coreVectors.coreVectors import CoreVectors
 
 # corevecs
-from peepholelib.coreVectors.dimReduction.avgPooling import AvgPooling 
-from peepholelib.models.model_wrap import get_out_activations
+from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD 
+from peepholelib.models.model_wrap import get_in_activations
 
 # peepholes
 from peepholelib.peepholes.DeepMahalanobisDistance.DMD import DeepMahalanobisDistance as DMD
@@ -44,17 +45,21 @@ if __name__ == "__main__":
 
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
+
+    svds_path = Path.cwd()/'../data/svds'
     
     cvs_path = Path.cwd()/'../data/corevectors'
-    cvs_name = 'corevectors_avg'
+    cvs_name = 'dmd_avg_k'
 
     drill_path = Path.cwd()/'../data/drillers'
-    drill_name = 'DMD'
+    drill_name = 'dmd_avg_k'
 
     phs_path = Path.cwd()/'../data/peepholes'
-    phs_name = 'peepholes_avg'
+    phs_name = 'dmd_avg_k'
 
     verbose = True 
+
+    cv_dim = 50
 
     # Peepholelib
     target_layers = [
@@ -62,6 +67,8 @@ if __name__ == "__main__":
             'features.14',
             'features.28',
             ]
+
+    svd_rank = 300
 
     loaders = [
             'CIFAR100-train',
@@ -105,6 +112,21 @@ if __name__ == "__main__":
             )
 
     #--------------------------------
+    # SVDs 
+    #--------------------------------
+    t0 = time()
+    svds = dict()
+    for _layer in target_layers:
+        svds[_layer] = Conv2dAvgKernelSVD(
+                    path = svds_path,
+                    layer = _layer,
+                    model = model,
+                    rank = svd_rank,
+                    device = device,
+                    )
+    print('time: ', time()-t0)
+
+    #--------------------------------
     # CoreVectors 
     #--------------------------------
     corevecs = CoreVectors(
@@ -112,22 +134,6 @@ if __name__ == "__main__":
             name = cvs_name,
             model = model,
             )
-    
-    # for each layer we define the function used to perform dimensionality reduction
-    reducers = {
-            'features.7': AvgPooling(
-                model = model,
-                layer = 'features.7'
-                ),
-            'features.14': AvgPooling(
-                model = model,
-                layer = 'features.14'
-                ),
-            'features.28': AvgPooling(
-                model = model,
-                layer = 'features.28'
-                )
-            }
     
     with datasets as ds, corevecs as cv: 
         ds.load_only(
@@ -137,10 +143,10 @@ if __name__ == "__main__":
 
         cv.get_coreVectors(
                 datasets = ds,
-                reducers = reducers,
-                activations_parser = get_out_activations,
-                save_input = False,
-                save_output = True,
+                reducers = svds,
+                activations_parser = get_in_activations,
+                save_input = True,
+                save_output = False,
                 batch_size = bs,
                 n_threads = n_threads,
                 verbose = verbose
@@ -150,25 +156,27 @@ if __name__ == "__main__":
     # Peepholes
     #--------------------------------
 
-    # number of channels in a conv layer. Get numbers from `nn`
-    feature_sizes = {
-            'features.7': 128,
-            'features.14': 256,
-            'features.28': 512,
-            }
-    
     drillers = {}
     for peep_layer in target_layers:
+        cv_parser = partial(
+                    svds[peep_layer].parser,
+                    cv_dim = cv_dim
+                    )
+
         drillers[peep_layer] = DMD(
                 path = drill_path,
                 name = f'{drill_name}.{peep_layer}',
                 target_module = peep_layer,
                 nl_model = n_classes,
-                n_features = feature_sizes[peep_layer],
+                n_features = cv_dim,
                 model = model,
                 magnitude = 0.004,
-                reducer = reducers[peep_layer],
+                reducer = svds[peep_layer],
+                act_parser = get_in_activations,
+                cv_parser = cv_parser,
                 std_transform = [0.229, 0.224, 0.225],
+                save_input = True,
+                save_output = False,
                 device = device,
                 )
         
