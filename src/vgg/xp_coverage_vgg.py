@@ -65,6 +65,8 @@ def load_all_drillers(**kwargs):
             if driller._empp_file.exists():
                 print(f'Loading Classifier for {drill_key}')
                 driller.load()
+            else:
+                print(f'No Classifier found for {drill_key} at {driller._empp_file}')
 
         all_drillers[n_cluster] = drillers
 
@@ -91,22 +93,22 @@ if __name__ == "__main__":
         bs = 512
         n_threads = 1
 
-        model_dir = '/srv/newpenny/XAI/models'
+        model_dir = Path('/srv/newpenny/XAI/models')
         model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
         
-        svds_path = Path.cwd()/'../data'
-        svds_name = 'svds' 
+        proj_path = Path('/srv/newpenny/XAI/CN/vgg_data_rand_proj2')
+        proj_name = 'rand_projections' 
         
-        cvs_path = Path.cwd()/'../data/corevectors'
+        cvs_path = Path('/srv/newpenny/XAI/CN/vgg_data_rand_proj2/corevectors')
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'../data/drillers_all'
+        drill_path = Path('/srv/newpenny/XAI/CN/vgg_data_rand_proj2/drillers_all')
         drill_name = 'classifier'
 
-        phs_path = Path.cwd()/'../data/peepholes'
+        phs_path =  Path('/srv/newpenny/XAI/CN/vgg_data_rand_proj2/peepholes')
         phs_name = 'peepholes'
 
-        plots_path = Path.cwd()/'temp_plots'
+        plots_path = Path.cwd()/'temp_plots/coverage/'
         
         verbose = True 
 
@@ -239,7 +241,7 @@ if __name__ == "__main__":
                 }
 
         drillers_dict = load_all_drillers(
-            n_cluster_list = [10, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550],  
+            n_cluster_list = [50,100, 200],  
             target_layers = target_layers,
             drill_path = drill_path,
             device = device,
@@ -247,13 +249,14 @@ if __name__ == "__main__":
             cv_parsers = cv_parsers
             )
 
-        peepholes = Peepholes(
-                path = phs_path,
-                name = phs_name,
-                device = device
-                )
 
-        with datasets as ds, corevecs as cv, peepholes as ph:
+        # peepholes = Peepholes(
+        #         path = phs_path,
+        #         name = phs_name,
+        #         device = device
+        #         )
+
+        with datasets as ds, corevecs as cv:
                 ds.load_only(
                         loaders = loaders,
                         verbose = verbose
@@ -263,6 +266,8 @@ if __name__ == "__main__":
                         loaders = loaders,
                         verbose = verbose 
                         ) 
+                
+
 
                 # ph.get_peepholes(
                 #         datasets = ds,
@@ -277,6 +282,6 @@ if __name__ == "__main__":
                 #coverage = empp_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_550clusters.png')
                 #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
                 compare_relative_coverage_all_clusters( all_drillers = drillers_dict,
-                        threshold=0.8, plot= True, save_path=plots_path, file_name='relative_cluster_coverage_all_clusters_vgg.png')
+                        threshold=0.8, plot= True, save_path=plots_path, filename='relative_cluster_coverage_vgg_rand_proj2.png')
 
 

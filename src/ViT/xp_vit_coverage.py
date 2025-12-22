@@ -104,18 +104,20 @@ if __name__ == "__main__":
         seed = 29
         bs = 512
         n_threads = 1
-
-        model_dir = '/srv/newpenny/XAI/models'
+        model_dir = Path('/srv/newpenny/XAI/models')
         model_name = 'SV_model=vit_b_16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau_withInfo.pth'        
         
-        svds_path = '/srv/newpenny/XAI/CN/vit_data'
-        svds_name = 'svds' 
+        proj_path = Path('/srv/newpenny/XAI/CN/vit_data_rand_proj')
+        proj_name = 'rand_projections' 
         
-        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/corevectors'
+        cvs_path = Path('/srv/newpenny/XAI/CN/vit_data_rand_proj/corevectors')
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/drillers_all'
+        drill_path = Path('/srv/newpenny/XAI/CN/vit_data_rand_proj/drillers_all')
         drill_name = 'classifier'
+
+        phs_path =  Path('/srv/newpenny/XAI/CN/vit_data_rand_proj/peepholes')
+        phs_name = 'peepholes'
 
         plots_path = Path.cwd()/'temp_plots/coverage/'
         
@@ -185,18 +187,47 @@ if __name__ == "__main__":
                         verbose = verbose
                         )
 
-                model.get_svds(
-                        path = svds_path,
-                        name = svds_name,
-                        target_modules = target_layers,
-                        sample_in = ds._dss['CIFAR100-train']['image'][0],
-                        svd_fns = svd_fns,
-                        verbose = verbose
-                        )
-                viz_singular_values_2(model, svds_path)
+                # model.get_svds(
+                #         path = svds_path,
+                #         name = svds_name,
+                #         target_modules = target_layers,
+                #         sample_in = ds._dss['CIFAR100-train']['image'][0],
+                #         svd_fns = svd_fns,
+                #         verbose = verbose
+                #         )
+
+
     #--------------------------------
     # CoreVectors 
     #--------------------------------
+
+        cv_parsers = {}
+        feature_sizes = {}
+        for layer in target_layers:
+
+                if layer == "heads.head":
+                        features_cv_dim = 100
+                else:
+                        features_cv_dim = 200
+                cv_parsers[layer] = partial(trim_corevectors,
+                        module = layer,
+                        cv_dim = features_cv_dim)
+                feature_sizes[layer] = features_cv_dim
+
+
+        drillers_dict = load_all_drillers(
+            n_cluster_list = [50,100,200],  
+            target_layers = target_layers,
+            drill_path = drill_path,
+            device = device,
+            feature_sizes = feature_sizes,
+            cv_parsers = cv_parsers
+            )
+
+        compare_relative_coverage_all_clusters(all_drillers = drillers_dict, threshold=0.8, plot= True, 
+        save_path=plots_path, filename='relative_coverage_rand_proj_vit.png')
+        quit()
+
         corevecs = CoreVectors(
                 path = cvs_path,
                 name = cvs_name,
@@ -234,41 +265,10 @@ if __name__ == "__main__":
                         verbose = verbose
                         )
 
-                if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
-                        cv.normalize_corevectors(
-                                wrt = 'CIFAR100-train',
-                                to_file = cvs_path/(cvs_name+'.normalization.pt'),
-                                batch_size = bs,
-                                n_threads = n_threads,
-                                verbose=verbose
-                                )
-
     #--------------------------------
     # Peepholes
     #--------------------------------
 
-        cv_parsers = {}
-        feature_sizes = {}
-        for layer in target_layers:
-
-                if layer == "heads.head":
-                        features_cv_dim = 100
-                else:
-                        features_cv_dim = 200
-                cv_parsers[layer] = partial(trim_corevectors,
-                        module = layer,
-                        cv_dim = features_cv_dim)
-                feature_sizes[layer] = features_cv_dim
-
-
-        drillers_dict = load_all_drillers(
-            n_cluster_list = [10, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550],  
-            target_layers = target_layers,
-            drill_path = drill_path,
-            device = device,
-            feature_sizes = feature_sizes,
-            cv_parsers = cv_parsers
-            )
 
         # peepholes = Peepholes(
         #         path = phs_path,
@@ -282,19 +282,18 @@ if __name__ == "__main__":
                         loaders = loaders,
                         verbose = verbose 
                         ) 
-                # layer = "features.13.conv.1.0"
-                # X = cv._corevds['train'][layer]
-                # X_reduced = X[:, :10]
+                layer = "features.6.conv.1.0"
+                X = cv._corevds['train'][layer]
                         
-                # X_np = X_reduced.cpu().numpy()
+                X_np = X_reduced.cpu().numpy()
 
                 # plot_tsne(X_np = X_np, 
                 #         save_path = plots_path,
-                #         file_name = "features13conv10_mobilenet_tsne")
+                #         file_name = "features6conv10_mobilenet_tsne_3d",
+                #         )
                 # quit()
                 #coverage = empp_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_550clusters.png')
-                #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
-                compare_relative_coverage_all_clusters(all_drillers = drillers_dict,
-                        threshold=0.8, plot= True, save_path=plots_path, file_name='relative_coverage_all_clusters_vit.png')
+                empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
+        
 
 

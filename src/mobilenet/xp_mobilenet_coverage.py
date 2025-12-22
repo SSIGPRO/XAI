@@ -2,6 +2,9 @@ import sys
 from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
+import cuml
+cuml.accel.install()
+
 # python stuff
 from time import time
 from functools import partial
@@ -34,7 +37,7 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
-from peepholelib.utils.viz_tsne import plot_tsne
+from peepholelib.utils.viz_corevecs import plot_tsne, plot_tsne_CUDA
 
 def load_all_drillers(**kwargs):
     n_cluster_list = kwargs.get('n_cluster_list', None)
@@ -55,6 +58,7 @@ def load_all_drillers(**kwargs):
             drillers[peep_layer] = tGMM(
                 path=drill_path,
                 name=f"classifier.{peep_layer}",  
+                label_key = 'label',
                 nl_classifier=n_cluster,
                 nl_model=n_classes,
                 n_features=feature_sizes[peep_layer],
@@ -84,7 +88,7 @@ if __name__ == "__main__":
         # Directories definitions
         #--------------------------------
         cifar_path = '/srv/newpenny/dataset/CIFAR100'
-        ds_path = Path.cwd()/'../data/datasets'
+        ds_path = '/srv/newpenny/XAI/CN/data/corevectors'
 
         # model parameters
         seed = 29
@@ -106,7 +110,7 @@ if __name__ == "__main__":
         phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/data/peepholes'
         phs_name = 'peepholes'
 
-        plots_path = Path.cwd()/'temp_plots'
+        plots_path = Path.cwd()/'temp_plots/coverage/'
         
         verbose = True 
         
@@ -162,9 +166,9 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
 
-        # datasets = ParsedDataset(
-        #         path = ds_path,
-        #         )
+        datasets = ParsedDataset(
+                path = ds_path,
+                )
 
     #--------------------------------
     # CoreVectors 
@@ -362,7 +366,7 @@ if __name__ == "__main__":
                 }
 
         drillers_dict = load_all_drillers(
-            n_cluster_list = [100, 150, 200, 250, 300, 400, 600],  
+            n_cluster_list = [10, 50, 100, 150, 200, 250, 300, 400, 600],  
             target_layers = target_layers,
             drill_path = drill_path,
             device = device,
@@ -376,29 +380,31 @@ if __name__ == "__main__":
                 device = device
                 )
        
-        with corevecs as cv, peepholes as ph:
-                # ds.load_only(
-                #         loaders = loaders,
-                #         verbose = verbose
-                #         )
+        with datasets as ds, corevecs as cv:
+                ds.load_only(
+                        loaders = loaders,
+                        verbose = verbose
+                        )
 
                 cv.load_only(
                         loaders = loaders,
                         verbose = verbose 
-                        ) 
-                layer = "features.13.conv.1.0"
+                        )
+                layer = 'features.15.conv.0.0'
                 X = cv._corevds['train'][layer]
                 X_reduced = X[:, :10]
                         
                 X_np = X_reduced.cpu().numpy()
 
-                plot_tsne(X_np = X_np, 
-                        save_path = plots_path,
-                        file_name = "features13conv10_mobilenet_tsne")
+                plot_tsne_CUDA(corevector = cv,
+                        ds = ds,
+                        save_path = Path('/home/claranunesbarrancos/repos/XAI/src/temp_plots/corevectors'),
+                        layer = layer,
+                        file_name = "features15conv00_mobilenet_tsne",
+                        )
                 quit()
                 #coverage = empp_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_550clusters.png')
                 #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
                 compare_relative_coverage_all_clusters( all_drillers = drillers_dict,
-                        threshold=0.8, plot= True, save_path=plots_path, file_name='relative_coverage_all_clusters_mobilenet.png')
-
+                        threshold=0.8, plot= True, save_path=plots_path, filename='relative_coverage_all_clusters_mobilenet.png')
 

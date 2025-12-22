@@ -64,7 +64,7 @@ if __name__ == "__main__":
         # Directories definitions
         #--------------------------------
         cifar_path = '/srv/newpenny/dataset/CIFAR100'
-        ds_path = Path.cwd()/'../data/datasets'
+        ds_path = Path('/srv/newpenny/XAI/CN/vit_data/cifar100')
 
         # model parameters
         seed = 29
@@ -74,13 +74,13 @@ if __name__ == "__main__":
         model_dir = '/srv/newpenny/XAI/models'
         model_name = 'SV_model=vit_b_16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau_withInfo.pth'        
         
-        svds_path = '/srv/newpenny/XAI/CN/vit_data'
+        svds_path = Path('/srv/newpenny/XAI/CN/vit_data')
         svds_name = 'svds' 
         
-        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/corevectors'
+        cvs_path = Path('/srv/newpenny/XAI/CN/vit_data/corevectors')
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/drillers_all/drillers_50'
+        drill_path = Path('/srv/newpenny/XAI/CN/vit_data/drillers_all/drillers_100')
         drill_name = 'classifier'
 
         plots_path = Path.cwd()/'temp_plots'
@@ -91,11 +91,33 @@ if __name__ == "__main__":
         # Peepholelib
         
 
-        n_cluster = 50
+        n_cluster = 100
 
         n_conceptograms = 2 
         
-        loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test']
+        loaders = [
+        'CIFAR100-train',
+        'CIFAR100-val',
+        'CIFAR100-test',
+        'CIFAR100-C-val-c0',
+        'CIFAR100-C-test-c0',
+        'CIFAR100-C-val-c1',
+        'CIFAR100-C-test-c1',
+        'CIFAR100-C-val-c2',
+        'CIFAR100-C-test-c2',
+        'CIFAR100-C-val-c3',
+        'CIFAR100-C-test-c3',
+        'CIFAR100-C-val-c4',
+        'CIFAR100-C-test-c4',
+        'CW-CIFAR100-val',
+        'CW-CIFAR100-test',
+        'BIM-CIFAR100-val',
+        'BIM-CIFAR100-test',
+        'DF-CIFAR100-val',
+        'DF-CIFAR100-test',
+        'PGD-CIFAR100-val',
+        'PGD-CIFAR100-test',
+        ]
 
     #--------------------------------
     # Model 
@@ -104,6 +126,11 @@ if __name__ == "__main__":
         nn = torchvision.models.vit_b_16()
         n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
         target_layers = get_st_list(nn.state_dict().keys())
+
+        # target_layers = ['encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
+        # 'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
+        # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
+
         print(f'Target layers: {target_layers}')
 
         model = ModelWrap(
@@ -218,7 +245,7 @@ if __name__ == "__main__":
         feature_sizes = {}
         for layer in target_layers:
 
-                if layer == "classifier.1":
+                if layer == "heads.head":
                         features_cv_dim = 100
                 else:
                         features_cv_dim = 200
@@ -232,6 +259,7 @@ if __name__ == "__main__":
         for peep_layer in target_layers:
                 drillers[peep_layer] = tGMM(
                         path = drill_path,
+                        label_key = 'label',
                         name = drill_name+'.'+peep_layer,
                         nl_classifier = n_cluster,
                         nl_model = n_classes,

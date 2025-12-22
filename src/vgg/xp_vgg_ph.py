@@ -49,7 +49,7 @@ if __name__ == "__main__":
         # Directories definitions
         #--------------------------------
         cifar_path = '/srv/newpenny/dataset/CIFAR100'
-        ds_path = Path.cwd()/'../data/datasets'
+        ds_path = Path('/srv/newpenny/XAI/CN/vgg_data/cifar100')
 
         # model parameters
         seed = 29
@@ -59,16 +59,16 @@ if __name__ == "__main__":
         model_dir = '/srv/newpenny/XAI/models'
         model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
         
-        svds_path = Path.cwd()/'../data'
+        svds_path = Path.cwd()/'../vgg_data'
         svds_name = 'svds' 
         
-        cvs_path = Path.cwd()/'../data/corevectors'
+        cvs_path = Path.cwd()/'../vgg_data/corevectors'
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'../data/drillers_all/drillers_550'
+        drill_path = Path.cwd()/'../vgg_data/drillers_all/drillers_100'
         drill_name = 'classifier'
 
-        phs_path = Path.cwd()/'../data/peepholes'
+        phs_path = Path.cwd()/'../vgg_data/peepholes'
         phs_name = 'peepholes'
 
         plots_path = Path.cwd()/'temp_plots/coverage/'
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         verbose = True 
         
         # Peepholelib
-        target_layers = [ 'features.7', 'features.10', 'features.12', 'features.14', 'features.17', 'features.19', 'features.21',
+        target_layers = [ 'features.0', 'features.2', 'features.5','features.7', 'features.10', 'features.12', 'features.14', 'features.17', 'features.19', 'features.21',
                                 'features.24','features.26','features.28','classifier.0','classifier.3', 
                                 'classifier.6',
                         ]
@@ -84,18 +84,41 @@ if __name__ == "__main__":
         features26_svd_rank = 100 
         features28_svd_rank = 100
         classifier_svd_rank = 100 
-        n_cluster = 550
+        n_cluster = 100
         features_cv_dim = 100
 
         n_conceptograms = 2 
         
-        loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test']
+        loaders = [
+        'CIFAR100-train',
+        'CIFAR100-val',
+        'CIFAR100-test',
+        'CIFAR100-C-val-c0',
+        'CIFAR100-C-test-c0',
+        'CIFAR100-C-val-c1',
+        'CIFAR100-C-test-c1',
+        'CIFAR100-C-val-c2',
+        'CIFAR100-C-test-c2',
+        'CIFAR100-C-val-c3',
+        'CIFAR100-C-test-c3',
+        'CIFAR100-C-val-c4',
+        'CIFAR100-C-test-c4',
+        'CW-CIFAR100-val',
+        'CW-CIFAR100-test',
+        'BIM-CIFAR100-val',
+        'BIM-CIFAR100-test',
+        'DF-CIFAR100-val',
+        'DF-CIFAR100-test',
+        'PGD-CIFAR100-val',
+        'PGD-CIFAR100-test',
+        ]
 
     #--------------------------------
     # Model 
     #--------------------------------
     
         nn = vgg16()
+        print(target_layers)
         n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
 
         model = ModelWrap(
@@ -199,6 +222,8 @@ if __name__ == "__main__":
                         svd_fns = svd_fns,
                         verbose = verbose
                         )
+                viz_singular_values_2(model, svds_path)
+                quit()
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -207,52 +232,186 @@ if __name__ == "__main__":
                 name = cvs_name,
                 model = model,
                 )
+        
         # define a dimensionality reduction function for each layer
-        reduction_fns = {}
-        for layer in target_layers:
-
-                reduction_fns[layer] = partial(fn,
-                        svd=model._svds[layer],
-                        use_s=True,
+        reduction_fns = {
+                'features.7': partial(conv2d_toeplitz_svd_projection, 
+                        svd = model._svds['features.7'], 
+                        layer = model._target_modules['features.7'], 
+                        use_s = True,
                         device=device
-                )
+                        ),
+                'features.10': partial(conv2d_toeplitz_svd_projection, 
+                        svd = model._svds['features.10'], 
+                        layer = model._target_modules['features.10'], 
+                        use_s = True,
+                        device=device
+                        ),
+                'features.12': partial(conv2d_toeplitz_svd_projection, 
+                        svd = model._svds['features.12'], 
+                        layer = model._target_modules['features.12'], 
+                        use_s = True,
+                        device=device
+                        ),
+                'features.14': partial(conv2d_toeplitz_svd_projection,
+                        svd = model._svds['features.14'], 
+                        layer = model._target_modules['features.14'], 
+                        use_s = True,
+                        device=device
+                        ),
+                'features.17': partial(conv2d_toeplitz_svd_projection,
+                        svd = model._svds['features.17'], 
+                        layer = model._target_modules['features.17'], 
+                        use_s = True,
+                        device=device
+                        ),
+                'features.19': partial(conv2d_toeplitz_svd_projection,
+                        svd = model._svds['features.19'], 
+                        layer = model._target_modules['features.19'], 
+                        use_s = True,
+                        device=device
+                        ),
+                'features.21': partial(conv2d_toeplitz_svd_projection,
+                        svd = model._svds['features.21'], 
+                        layer = model._target_modules['features.21'], 
+                        use_s = True,
+                        device=device
+                        ),
+                'features.24': partial(conv2d_toeplitz_svd_projection,   
+                        svd = model._svds['features.24'], 
+                        layer = model._target_modules['features.24'], 
+                        use_s = True,
+                        device = device
+                ),
+                'features.26': partial(conv2d_toeplitz_svd_projection, 
+                        svd = model._svds['features.26'], 
+                        layer = model._target_modules['features.26'], 
+                        use_s = True,
+                        device = device
+                        ),
+                'features.28': partial(conv2d_toeplitz_svd_projection, 
+                svd = model._svds['features.28'], 
+                layer = model._target_modules['features.28'], 
+                use_s = True,
+                device = device
+                ),
+                'classifier.0': partial(linear_svd_projection,
+                svd = model._svds['classifier.0'], 
+                use_s = True,
+                device=device
+                ),
+                'classifier.3': partial(linear_svd_projection,
+                svd = model._svds['classifier.3'], 
+                use_s = True,
+                device=device
+                ),
+                'classifier.6': partial(linear_svd_projection,
+                svd = model._svds['classifier.6'], 
+                use_s = True,
+                device=device
+                ),
+                }
 
-        with datasets as ds, corevecs as cv: 
-                ds.load_only(
-                        loaders = loaders,
-                        verbose = verbose
-                        )
+        # with datasets as ds, corevecs as cv: 
+        #         ds.load_only(
+        #                 loaders = loaders,
+        #                 verbose = verbose
+        #                 )
 
-                # computing the corevectors
-                cv.get_coreVectors(
-                        datasets = ds,
-                        reduction_fns = reduction_fns,
-                        save_input = True,
-                        save_output = False,
-                        batch_size = bs,
-                        n_threads = n_threads,
-                        verbose = verbose
-                        )
+        #         # computing the corevectors
+        #         cv.get_coreVectors(
+        #                 datasets = ds,
+        #                 reduction_fns = reduction_fns,
+        #                 save_input = True,
+        #                 save_output = False,
+        #                 batch_size = bs,
+        #                 n_threads = n_threads,
+        #                 verbose = verbose
+        #                 )
 
-                if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
-                        cv.normalize_corevectors(
-                                wrt = 'CIFAR100-train',
-                                to_file = cvs_path/(cvs_name+'.normalization.pt'),
-                                batch_size = bs,
-                                n_threads = n_threads,
-                                verbose=verbose
-                                )
+        #         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
+        #                 cv.normalize_corevectors(
+        #                         wrt = 'CIFAR100-train',
+        #                         to_file = cvs_path/(cvs_name+'.normalization.pt'),
+        #                         batch_size = bs,
+        #                         n_threads = n_threads,
+        #                         verbose=verbose
+        #                         )
 
     #--------------------------------
     # Peepholes
     #--------------------------------
-        cv_parsers = {}
-        feature_sizes = {}
-        for layer in target_layers:
-                cv_parsers[layer] = partial(trim_corevectors,
-                        module = layer,
-                        cv_dim = 100)
-                feature_sizes[layer] = 100
+
+        cv_parsers = {
+                'features.7': partial(trim_corevectors,
+                        module = 'features.7',
+                        cv_dim = features_cv_dim
+                        ),
+                'features.10': partial(trim_corevectors,
+                        module = 'features.10',
+                        cv_dim = features_cv_dim
+                        ),
+                'features.12': partial(trim_corevectors,
+                        module = 'features.12',
+                        cv_dim = features_cv_dim
+                        ),
+                'features.14': partial(trim_corevectors,
+                        module = 'features.14',
+                        cv_dim = features_cv_dim
+                        ),
+                'features.17': partial(trim_corevectors,
+                        module = 'features.17',
+                        cv_dim = features_cv_dim
+                        ),
+                'features.19': partial(trim_corevectors,
+                        module = 'features.19',
+                        cv_dim = features_cv_dim
+                        ),
+                'features.21': partial(trim_corevectors,
+                        module = 'features.21',
+                        cv_dim = features_cv_dim
+                        ),
+                'features.24': partial(trim_corevectors,
+                        module = 'features.24',
+                        cv_dim = features_cv_dim
+                        ),
+                'features.26': partial(trim_corevectors,
+                        module = 'features.26',
+                        cv_dim = features_cv_dim
+                        ),
+                'features.28': partial(trim_corevectors,
+                        module = 'features.28',
+                        cv_dim = features_cv_dim
+                        ),
+                'classifier.0': partial(trim_corevectors,
+                        module = 'classifier.0',
+                        cv_dim = features_cv_dim
+                        ),
+                'classifier.3': partial(trim_corevectors,
+                        module = 'classifier.3',
+                        cv_dim = features_cv_dim
+                        ),
+                'classifier.6': partial(trim_corevectors,
+                        module = 'classifier.6',
+                        cv_dim = features_cv_dim
+                        ),
+                }
+
+        feature_sizes = {
+                'features.7': features_cv_dim,
+                'features.10': features_cv_dim,
+                'features.12': features_cv_dim,
+                'features.14': features_cv_dim,
+                'features.17': features_cv_dim,
+                'features.19': features_cv_dim,
+                'features.21': features_cv_dim,   
+                'features.24': features_cv_dim,
+                'features.26': features_cv_dim,
+                'features.28': features_cv_dim,
+                'classifier.0': features_cv_dim,
+                'classifier.3': features_cv_dim,
+                'classifier.6': features_cv_dim,
+                }
 
         drillers = {}
         for peep_layer in target_layers:

@@ -3,372 +3,340 @@ from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
 # python stuff
-from pathlib import Path as Path
 from time import time
 from functools import partial
 
-
-# Our stuff
-from peepholelib.datasets.cifar import Cifar
-from peepholelib.models.model_wrap import ModelWrap 
-
-from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds import svd_Linear, svd_Conv2D
-
-from peepholelib.peepholes.parsers import trim_corevectors
-from peepholelib.peepholes.classifiers.tkmeans import KMeans as tKMeans 
-from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
-from peepholelib.peepholes.peepholes import Peepholes
-
-from peepholelib.utils.samplers import random_subsampling 
-
-
 # torch stuff
 import torch
-from cuda_selector import auto_cuda
 import torchvision
-import torch.nn as nn
+from cuda_selector import auto_cuda
+
+###### Our stuff
+
+# Model
+from peepholelib.models.model_wrap import ModelWrap 
+from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
+
+# datasets
+from peepholelib.datasets.cifar100 import Cifar100
+from peepholelib.datasets.parsedDataset import ParsedDataset 
+from peepholelib.datasets.functional.parsers import from_dataset
+from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
+from peepholelib.datasets.functional.samplers import random_subsampling 
+
+# corevecs
+from peepholelib.coreVectors.coreVectors import CoreVectors
+from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
+
+# peepholes
+from peepholelib.peepholes.parsers import trim_corevectors
+from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
+from peepholelib.peepholes.peepholes import Peepholes
+from peepholelib.models.viz import viz_singular_values_2
+from peepholelib.utils.viz_empp import *
 
 if __name__ == "__main__":
-    torch.cuda.empty_cache()
-    use_cuda = torch.cuda.is_available()
-    cuda_index = torch.cuda.device_count() - 1
-    device = torch.device(f"cuda:{cuda_index}" if use_cuda else "cpu")
-    print(f"Using {device} device")
+        use_cuda = torch.cuda.is_available()
+        #device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+        device = torch.device('cuda:1') 
+        torch.cuda.empty_cache()
 
-    #--------------------------------
-    # Directories definitions
-    #--------------------------------
+        #device = torch.device("cpu")
+        print(f"Using {device} device")
 
-    ds_path = '/srv/newpenny/dataset/CIFAR100'
+        #--------------------------------
+        # Directories definitions
+        #--------------------------------
+        cifar_path = '/srv/newpenny/dataset/CIFAR100'
+        ds_path = Path('/srv/newpenny/XAI/CN/mobilenet_data')
 
-    # model parameters
-    pretrained = True
-    dataset = 'CIFAR100' 
-    seed = 29
-    bs = 512
-    
-    model_dir = '/srv/newpenny/XAI/models'
-    model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
+        # model parameters
+        seed = 29
+        bs = 512
+        n_threads = 1
 
-    svds_path = Path.cwd()/'../data'
-    svds_name = 'svds' 
-    
-    cvs_path = Path.cwd()/'../data/corevectors'
-    cvs_name = 'corevectors'
+        model_dir = '/srv/newpenny/XAI/models'
+        model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
+        
+        svds_path = '/srv/newpenny/XAI/CN/mobilenet_data'
+        svds_name = 'svds' 
+        
+        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/corevectors'
+        cvs_name = 'corevectors'
 
-    act_path = Path.cwd()/'../data/corevectors'
-    act_name = 'activations'
-    
-    drill_path = Path.cwd()/'../data/drillers'
-    drill_name = 'classifier'
+        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/drillers_all/drillers_100'
+        drill_name = 'classifier'
 
-    phs_path = Path.cwd()/'../data/peepholes'
-    phs_name = 'peepholes'
+        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/peepholes_all/peepholes_100'
+        phs_name = 'peepholes'
 
-    cls_path = Path.cwd()/'../data/classifier'
-    cls_name = 'clustering'
+        plots_path = Path.cwd()/'temp_plots'
+        
+        verbose = True 
+        
+        # target_layers = [ 'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2',
+        # 'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2',
+        # 'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
+        # 'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
+        # 'features.6.conv.0.0','features.6.conv.1.0', 'features.6.conv.2',
+        # 'features.7.conv.0.0', 'features.7.conv.1.0','features.7.conv.2',
+        # 'features.8.conv.0.0', 'features.8.conv.1.0', 'features.8.conv.2',
+        # 'features.9.conv.0.0', 'features.9.conv.1.0', 'features.9.conv.2',  
+        # 'features.10.conv.0.0', 'features.10.conv.1.0', 'features.10.conv.2',
+        # 'features.11.conv.0.0', 'features.11.conv.1.0', 'features.11.conv.2',
+        # 'features.12.conv.0.0', 'features.12.conv.1.0',  'features.12.conv.2',
+        # 'features.13.conv.0.0', 'features.13.conv.1.0', 'features.13.conv.2',
+        # 'features.14.conv.0.0', 'features.14.conv.1.0', 'features.14.conv.2',
+        # 'features.15.conv.0.0', 'features.15.conv.1.0', 'features.15.conv.2',
+        # 'features.16.conv.0.0', 'features.16.conv.1.0', 'features.16.conv.2', 
+        # 'features.17.conv.0.0', 'features.17.conv.1.0', 'features.17.conv.2',
+        # 'features.18.0', 'classifier.1',
+        #        ]
 
-    verbose = False
+        target_layers = ['features.2.conv.0.0','features.3.conv.2', 'features.5.conv.1.0','features.6.conv.1.0',
+        'features.9.conv.1.0','features.11.conv.2','features.17.conv.1.0', 'features.17.conv.2',
+        'features.18.0', 'classifier.1']
 
-    #--------------------------------
-    # Dataset 
-    #--------------------------------
+        
+        loaders = [
+        'CIFAR100-train',
+        'CIFAR100-val',
+        'CIFAR100-test',
+        'CIFAR100-C-val-c0',
+        'CIFAR100-C-test-c0',
+        'CIFAR100-C-val-c1',
+        'CIFAR100-C-test-c1',
+        'CIFAR100-C-val-c2',
+        'CIFAR100-C-test-c2',
+        'CIFAR100-C-val-c3',
+        'CIFAR100-C-test-c3',
+        'CIFAR100-C-val-c4',
+        'CIFAR100-C-test-c4',
+        'CW-CIFAR100-val',
+        'CW-CIFAR100-test',
+        'BIM-CIFAR100-val',
+        'BIM-CIFAR100-test',
+        'DF-CIFAR100-val',
+        'DF-CIFAR100-test',
+        'PGD-CIFAR100-val',
+        'PGD-CIFAR100-test',
+        ]
 
-    ds = Cifar(
-        data_path = ds_path,
-        dataset=dataset
-        )
-    ds.load_data(
-            batch_size = bs,
-            data_kwargs = {'num_workers': 4, 'pin_memory': True},
-            seed = seed,
-            )
-    
+        n_cluster = 100
+
     #--------------------------------
     # Model 
     #--------------------------------
-
-    nn = torchvision.models.mobilenet_v2(pretrained=True)
-    print(nn.state_dict().keys())
-
-    in_features = nn.classifier[-1].in_features
-    print("in features", in_features)
-    nn.classifier[-1] = torch.nn.Linear(in_features, len(ds.get_classes()))
-    model = ModelWrap(
-        model=nn,
-        path=model_dir,
-        name=model_name,
-        device=device
-        )
     
-    model.load_checkpoint(verbose=verbose)
-    
-    target_layers = [ #'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0', 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
-               #'features.11.conv.1.0', 'features.12.conv.1.0',
-               'features.13.conv.1.0', 'features.14.conv.1.0', 
-               'features.15.conv.1.0', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0'
-               ]
-    
-    model.set_target_modules(target_modules=target_layers, verbose=verbose)
+        nn = torchvision.models.mobilenet_v2(pretrained=True)
 
+        n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
 
-    direction = {'save_input':True, 'save_output':True}
-    model.add_hooks(**direction, verbose=False) 
-        
-    dry_img, _ = ds._dss['train'][0]
-    dry_img = dry_img.reshape((1,)+dry_img.shape)
-    model.dry_run(x=dry_img)
+        model = ModelWrap(
+                model = nn,
+                device = device
+                )
+                                                
+        model.update_output(
+                output_layer = 'classifier.1', 
+                to_n_classes = n_classes,
+                overwrite = True 
+                )
+                                                
+        model.load_checkpoint(
+                name = model_name,
+                path = model_dir,
+                verbose = verbose
+                )
+                                                
+        model.set_target_modules(
+                target_modules = target_layers,
+                verbose = verbose
+                )
+
+        datasets = ParsedDataset(
+                path = ds_path,
+                )
+
 
     #--------------------------------
     # SVDs 
     #--------------------------------
+        svd_fns = {}
 
-    model.get_svds(
-            target_modules = target_layers,
-            path=svds_path,
-            name=svds_name,
-            verbose=verbose
-            )
-    
-    for k in model._svds.keys():
-        for kk in model._svds[k].keys():
-            print('svd shapes: ', k, kk, model._svds[k][kk].shape)
+        for layer in target_layers:
+            if 'classifier' in layer:
+                svd_type = linear_svd
+            else:
+                svd_type = conv2d_toeplitz_svd
+
+            svd_fns[layer] = partial(svd_type,
+                        layer = layer,
+                        rank = 200,
+                        device=device
+                )
+
+
+        with datasets as ds:
+                ds.load_only(
+                        loaders = loaders,
+                        verbose = verbose
+                )
+
+                model.get_svds(
+                        path = svds_path,
+                        name = svds_name,
+                        target_modules = target_layers,
+                        sample_in = ds._dss[f'CIFAR100-train']['image'][0],
+                        svd_fns = svd_fns,
+                        verbose = verbose
+                )
 
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-    dss = ds._dss
-    #dss = random_subsampling(ds._dss, 0.05)
-
-    corevecs = CoreVectors(
-        path = cvs_path,
-        name = cvs_name,
-        model = model,
-    )
-
-    reduction_fns = {
-            # 'features.4.conv.1.0': partial(svd_Conv2D,
-            #                         reduct_m=model._svds['features.4.conv.1.0']['Vh'], 
-            #                         layer =  model._target_modules['features.4.conv.1.0'],
-            #                         device=device),
-            # 'features.5.conv.1.0': partial(svd_Conv2D,
-            #                         reduct_m=model._svds['features.5.conv.1.0']['Vh'], 
-            #                         layer = model._target_modules['features.5.conv.1.0'],
-            #                         device=device),
-            # 'features.6.conv.1.0': partial(svd_Conv2D,        
-            #                        reduct_m=model._svds['features.6.conv.1.0']['Vh'], 
-            #                        layer = model._target_modules['features.6.conv.1.0'],
-            #                        device=device),
-            # 'features.7.conv.1.0': partial(svd_Conv2D,        
-            #                        reduct_m=model._svds['features.7.conv.1.0']['Vh'], 
-            #                        layer = model._target_modules['features.7.conv.1.0'],
-            #                        device=device),
-            # 'features.8.conv.1.0': partial(svd_Conv2D,
-            #                        reduct_m=model._svds['features.8.conv.1.0']['Vh'], 
-            #                        layer = model._target_modules['features.8.conv.1.0'],
-            #                        device=device), 
-            # 'features.9.conv.1.0': partial(svd_Conv2D,
-            #                        reduct_m=model._svds['features.9.conv.1.0']['Vh'], 
-            #                        layer = model._target_modules['features.9.conv.1.0'],
-            #                        device=device),
-            # 'features.10.conv.1.0': partial(svd_Conv2D,
-            #                        reduct_m=model._svds['features.10.conv.1.0']['Vh'], 
-            #                        layer = model._target_modules['features.10.conv.1.0'],
-            #                        device=device),
-            # 'features.11.conv.1.0': partial(svd_Conv2D,
-            #                        reduct_m=model._svds['features.11.conv.1.0']['Vh'], 
-            #                        layer = model._target_modules['features.11.conv.1.0'],
-            #                        device=device),
-            # 'features.12.conv.1.0': partial(svd_Conv2D,
-            #                        reduct_m=model._svds['features.12.conv.1.0']['Vh'], 
-            #                        layer = model._target_modules['features.12.conv.1.0'],
-            #                        device=device),
-            'features.13.conv.1.0': partial(svd_Conv2D,
-                                   reduct_m=model._svds['features.13.conv.1.0']['Vh'], 
-                                   layer = model._target_modules['features.13.conv.1.0'],
-                                   device=device),
-            'features.14.conv.1.0': partial(svd_Conv2D,
-                                   reduct_m=model._svds['features.14.conv.1.0']['Vh'], 
-                                   layer = model._target_modules['features.14.conv.1.0'],
-                                   device=device),
-            'features.15.conv.1.0': partial(svd_Conv2D,
-                                   reduct_m=model._svds['features.15.conv.1.0']['Vh'], 
-                                   layer = model._target_modules['features.15.conv.1.0'],
-                                   device=device),
-            'features.16.conv.1.0': partial(svd_Conv2D,       
-                                   reduct_m=model._svds['features.16.conv.1.0']['Vh'], 
-                                   layer = model._target_modules['features.16.conv.1.0'],
-                                   device=device), 
-            'features.16.conv.2': partial(svd_Conv2D,
-                                   reduct_m=model._svds['features.16.conv.2']['Vh'], 
-                                   layer = model._target_modules['features.16.conv.2'],
-                                   device=device),
-            'features.17.conv.0.0': partial(svd_Conv2D,
-                                   reduct_m=model._svds['features.17.conv.0.0']['Vh'], 
-                                   layer = model._target_modules['features.17.conv.0.0'],
-                                   device=device),
-    }
-
-    shapes = {
-            # 'features.4.conv.1.0': 300, 
-            # 'features.5.conv.1.0':300,
-            #'features.6.conv.1.0':300,
-            #'features.7.conv.1.0':300,
-            #'features.8.conv.1.0':300,
-            #'features.9.conv.1.0':300,
-            #'features.10.conv.1.0':300,
-            #'features.11.conv.1.0':300,
-            #'features.12.conv.1.0':300,
-            'features.13.conv.1.0':300,
-            'features.14.conv.1.0':300,
-            'features.15.conv.1.0':300,
-            'features.16.conv.1.0':300,
-            'features.16.conv.2':300,
-            'features.17.conv.0.0':300,
-            }
-
-    with corevecs as cv: 
-        # copy dataset to coreVect dataset
-
-        cv.get_activations(
-            batch_size = bs,
-            datasets = dss,
-            verbose = verbose
-        )
-        
-        cv.get_coreVectors(
-                batch_size = bs,
-                reduction_fns = reduction_fns,
-                shapes = shapes,
-                verbose = verbose
-        )
-
-        cv_dl = cv.get_dataloaders(verbose=verbose)
-
-        i = 0
-        print('\nPrinting some corevecs')
-        for data in cv_dl['test']:
-            print('\nfeatures.16.conv.1.0')
-            print(data['features.16.conv.1.0'][34:56,:])
-            i += 1
-            if i == 1: break
-        
-        cv.normalize_corevectors(
-                wrt='train',
-                #from_file=cvs_path/(cvs_name+'.normalization.pt'),
-                to_file=cvs_path/(cvs_name+'.normalization.pt'),
-                verbose=verbose
+        corevecs = CoreVectors(
+                path = cvs_path,
+                name = cvs_name,
+                model = model,
                 )
-        
-        i = 0
-        print('after norm')
-        for data in cv_dl['test']:
-            print(data['features.16.conv.1.0'][34:56,:])
-            i += 1
-            if i == 1: break
-    #quit()
+
+    # define a dimensionality reduction function for each layer
+        reduction_fns = {}
+        for layer in target_layers:
+                if layer == "classifier.1":
+                        reduction_fns[layer] = partial(linear_svd_projection,
+                        svd=model._svds[layer],
+                        use_s=True,
+                        device=device
+                )
+                else:
+                        reduction_fns[layer] = partial(conv2d_toeplitz_svd_projection,
+                                layer = model._target_modules[layer], 
+                                svd = model._svds[layer],
+                                use_s=True,
+                                device=device
+                )
+
+        with datasets as ds, corevecs as cv: 
+                ds.load_only(
+                        loaders = loaders,
+                        verbose = verbose
+                        )
+                print(ds._dss)
+
+                # computing the corevectors
+                cv.get_coreVectors(
+                        datasets = ds,
+                        reduction_fns = reduction_fns,
+                        save_input = True,
+                        save_output = False,
+                        batch_size = bs,
+                        n_threads = n_threads,
+                        verbose = verbose
+                        )
+
+                if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
+                        cv.normalize_corevectors(
+                                wrt = 'CIFAR100-train',
+                                to_file = cvs_path/(cvs_name+'.normalization.pt'),
+                                batch_size = bs,
+                                n_threads = n_threads,
+                                verbose=verbose
+                                )
+
 
     #--------------------------------
     # Peepholes
     #--------------------------------
+        cv_parsers = {}
+        feature_sizes = {}
+        for layer in target_layers:
 
-    n_classes = 100
-    n_cluster = 100
-    cv_dim = 10
-    parser_cv = trim_corevectors
-    peep_layers =[ #'features.4.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0', 'features.7.conv.1.0', 'features.8.conv.1.0', 'features.9.conv.1.0', 'features.10.conv.1.0', 
-               #'features.11.conv.1.0', 'features.12.conv.1.0', 
-               'features.13.conv.1.0', 'features.14.conv.1.0', 
-               'features.15.conv.1.0', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0'
-               ]
-    
+                if layer == "classifier.1":
+                        features_cv_dim = 100
+                else:
+                        features_cv_dim = 300
+                cv_parsers[layer] = partial(trim_corevectors,
+                        module = layer,
+                        cv_dim = features_cv_dim)
+                feature_sizes[layer] = features_cv_dim
 
-    cls_kwargs = {}#{'batch_size':256} 
+        drillers = {}
+        for peep_layer in target_layers:
+                drillers[peep_layer] = tGMM(
+                        path = drill_path,
+                        name = drill_name+'.'+peep_layer,
+                        label_key = 'label',
+                        nl_classifier = n_cluster,
+                        nl_model = n_classes,
+                        n_features = feature_sizes[peep_layer],
+                        parser = cv_parsers[peep_layer],
+                        device = device
+                        )
 
-    corevecs = CoreVectors(
-        path = cvs_path,
-        name = cvs_name,
-        )
-    
-    drillers = {}
-    for peep_layer in peep_layers:
-        parser_kwargs = {'module': peep_layer, 'cv_dim':cv_dim}
 
-        drillers[peep_layer] = tGMM(
-                path = drill_path,
-                name = drill_name+'.'+peep_layer,
-                nl_classifier = n_cluster,
-                nl_model = n_classes,
-                n_features = cv_dim,
-                parser = parser_cv,
-                parser_kwargs = parser_kwargs,
+        peepholes = Peepholes(
+                path = phs_path,
+                name = phs_name,
                 device = device
                 )
 
-    peepholes = Peepholes(
-            path = phs_path,
-            name = phs_name,
-            driller = drillers,
-            target_modules = peep_layers,
-            device = device
-            )
-    
-    # fitting classifiers
-    with corevecs as cv:
-        cv.load_only(
-                loaders = ['train', 'test', 'val'],
-                verbose = True
-                ) 
-
-        for drill_key, driller in drillers.items():
-            if (drill_path/(driller._suffix+'.empp.pt')).exists():
-                print(f'Loading Classifier for {drill_key}') 
-                driller.load()
-            else:
-                t0 = time()
-                print(f'Fitting classifier for {drill_key} time = ', time()-t0)
-                driller.fit(corevectors = cv._corevds['train'], verbose=verbose)
-                driller.compute_empirical_posteriors(
-                        actds=cv._actds['train'],
-                        corevds=cv._corevds['train'],
-                        batch_size = bs,
-                        verbose=verbose
+        # fitting classifiers
+        with datasets as ds, corevecs as cv:
+                ds.load_only(
+                        loaders = loaders,
+                        verbose = verbose
                         )
+
+                cv.load_only(
+                        loaders = loaders,
+                        verbose = verbose 
+                        ) 
+
+                for drill_key, driller in drillers.items():
+                        if (driller._empp_file).exists():
+                                print(f'Loading Classifier for {drill_key}') 
+                                driller.load()
+                        else:
+                                t0 = time()
+                                print(f'Fitting classifier for {drill_key}')
+                                driller.fit(
+                                        corevectors = cv,
+                                        loader = 'CIFAR100-train',
+                                        verbose=verbose
+                                        )
+                                print(f'Fitting time for {drill_key}  = ', time()-t0)
+
+                                driller.compute_empirical_posteriors(
+                                        datasets = ds,
+                                        corevectors = cv,
+                                        loader = 'CIFAR100-train',
+                                        batch_size = bs,
+                                        verbose=verbose
+                                        )
                         
-                # save classifiers
-                print(f'Saving classifier for {drill_key}')
-                driller.save()
+                                # save classifiers
+                                print(f'Saving classifier for {drill_key}')
+                                driller.save()
 
-    with corevecs as cv, peepholes as ph:
-        cv.load_only(
-                loaders = ['train', 'test', 'val'],
-                verbose = True
-                ) 
+        with datasets as ds, corevecs as cv, peepholes as ph:
+                ds.load_only(
+                        loaders = loaders,
+                        verbose = verbose
+                        )
 
-        ph.get_peepholes(
-                corevectors = cv,
-                batch_size = bs,
-                verbose = verbose
-                )
+                cv.load_only(
+                        loaders = loaders,
+                        verbose = verbose 
+                        ) 
 
-        ph.get_scores(
-            batch_size = bs,
-            verbose=verbose
-            )
-
-        i = 0
-        print('\nPrinting some peeps')
-        ph_dl = ph.get_dataloaders(verbose=verbose)
-        for data in ph_dl['test']:
-            print('phs\n', data[peep_layer]['peepholes'])
-            print('max\n', data[peep_layer]['score_max'])
-            print('ent\n', data[peep_layer]['score_entropy'])
-            i += 1
-            if i == 3: break
-
-        ph.evaluate_dists(
-                score_type = 'max',
-                activations = cv._actds,
-                bins = 20
-                )
+                ph.get_peepholes(
+                        datasets = ds,
+                        corevectors = cv,
+                        target_modules = target_layers,
+                        batch_size = bs,
+                        drillers = drillers,
+                        n_threads = n_threads,
+                        verbose = verbose
+                        )
