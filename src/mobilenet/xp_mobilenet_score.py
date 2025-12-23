@@ -89,6 +89,7 @@ if __name__ == "__main__":
 
         use_cuda = torch.cuda.is_available()
         device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+       # device  = torch.device('cuda:2')
         print(f"Using {device} device")
 
         #--------------------------------
@@ -117,10 +118,10 @@ if __name__ == "__main__":
         phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/peepholes_all/peepholes_100'
         phs_name = 'peepholes'
 
-        plots_path = Path.cwd()/'temp_plots/conf/last'
+        plots_path = Path.cwd()/'temp_plots/conf/random'
 
 
-        scores_file = Path('/home/claranunesbarrancos/repos/XAI/src/mobilenet/scores/temp_score_cifar100_last')
+        scores_file = Path('/home/claranunesbarrancos/repos/XAI/src/mobilenet/scores/temp_score_cifar100_rand_avg')
         scores_file.parent.mkdir(parents=True, exist_ok=True)
         if scores_file.exists():
                 scores = torch.load(scores_file)
@@ -129,21 +130,21 @@ if __name__ == "__main__":
 
         verbose = True 
     
-        target_layers = [ #'features.1.conv.0.0', 'features.1.conv.1',
-        # 'features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2',
-        # 'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2', 
-        # 'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
-        # 'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
-        # 'features.6.conv.0.0','features.6.conv.1.0', 'features.6.conv.2',
-        # 'features.7.conv.0.0', 'features.7.conv.1.0','features.7.conv.2',
-        # 'features.8.conv.0.0', 'features.8.conv.1.0', 'features.8.conv.2',
-        # 'features.9.conv.0.0', 'features.9.conv.1.0', 'features.9.conv.2',  
-        # 'features.10.conv.0.0', 'features.10.conv.1.0', 'features.10.conv.2',
-        # 'features.11.conv.0.0', 'features.11.conv.1.0', 'features.11.conv.2',
-        # 'features.12.conv.0.0', 'features.12.conv.1.0',  'features.12.conv.2',
-        # 'features.13.conv.0.0', 'features.13.conv.1.0', 'features.13.conv.2',
-        # 'features.14.conv.0.0', 'features.14.conv.1.0', 'features.14.conv.2',
-        # 'features.15.conv.0.0', 
+        target_layers = [ 'features.1.conv.0.0', 'features.1.conv.1',
+        'features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2',
+        'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2', 
+        'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
+        'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
+        'features.6.conv.0.0','features.6.conv.1.0', 'features.6.conv.2',
+        'features.7.conv.0.0', 'features.7.conv.1.0','features.7.conv.2',
+        'features.8.conv.0.0', 'features.8.conv.1.0', 'features.8.conv.2',
+        'features.9.conv.0.0', 'features.9.conv.1.0', 'features.9.conv.2',  
+        'features.10.conv.0.0', 'features.10.conv.1.0', 'features.10.conv.2',
+        'features.11.conv.0.0', 'features.11.conv.1.0', 'features.11.conv.2',
+        'features.12.conv.0.0', 'features.12.conv.1.0',  'features.12.conv.2',
+        'features.13.conv.0.0', 'features.13.conv.1.0', 'features.13.conv.2',
+        'features.14.conv.0.0', 'features.14.conv.1.0', 'features.14.conv.2',
+        'features.15.conv.0.0', 
         'features.15.conv.1.0', 'features.15.conv.2',
         'features.16.conv.0.0', 'features.16.conv.1.0', 'features.16.conv.2', 
         'features.17.conv.0.0', 'features.17.conv.1.0', 'features.17.conv.2',

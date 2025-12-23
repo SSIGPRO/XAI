@@ -10,6 +10,7 @@ from functools import partial
 import torch
 import torchvision
 from cuda_selector import auto_cuda
+from torchvision.models import vgg16
 
 
 ###### Our stuff
@@ -22,7 +23,6 @@ from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.parsers import from_dataset
-from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 from peepholelib.featureSqueezing.FeatureSqueezingDetector import FeatureSqueezingDetector as FSD
 from peepholelib.featureSqueezing.preprocessing import NLM_filtering_torch, NLM_filtering_cv, bit_depth_torch, MedianPool2d
@@ -46,21 +46,6 @@ from peepholelib.plots.atks import auc_atks
 
 import random
 
-def get_st_list(state_dict):
-    '''
-    Return a clean list of the layers of the model
-
-    Args:
-    - state_dict: state dict of the model
-    '''
-    state_dict_list = list(state_dict)
-
-    # remove .weight and .bias from the strings in the state_dict list
-    st_clean = [s.replace(".bias", "").replace(".weight", "") for s in state_dict]
-    filtered_layers = [layer for layer in st_clean if 'mlp.0' in layer or 
-                                                'mlp.3' in layer or 
-                                                'heads' in layer]
-    return filtered_layers
 
 def average_random_layer_scores(*,ds, ph, target_layers_pool, scores_file, target_k=10,           
     n_runs=1000, proto_key="CIFAR100-train", score_name="LACS", batch_size=128,verbose=False):
@@ -111,7 +96,7 @@ if __name__ == "__main__":
         # Directories definitions
         #--------------------------------
         cifar_path = '/srv/newpenny/dataset/CIFAR100'
-        ds_path = Path('/srv/newpenny/XAI/CN/mobilenet_data')
+        ds_path = Path('/srv/newpenny/XAI/CN/vgg_data/cifar100')
 
         # model parameters
         seed = 29
@@ -119,24 +104,24 @@ if __name__ == "__main__":
         n_threads = 1
 
         model_dir = '/srv/newpenny/XAI/models'
-        model_name = 'SV_model=vit_b_16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau_withInfo.pth'        
+        model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
         
-        svds_path = '/srv/newpenny/XAI/CN/vit_data'
+        svds_path = '/srv/newpenny/XAI/CN/vgg_data'
         svds_name = 'svds' 
         
-        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/corevectors'
+        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vgg_data/corevectors'
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/drillers_all/drillers_100'
+        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/vgg_data/drillers_all/drillers_100'
         drill_name = 'classifier'
 
-        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/peepholes_all/peepholes_100'
+        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vgg_data/peepholes_all/peepholes_100'
         phs_name = 'peepholes'
 
-        plots_path = Path.cwd()/'temp_plots/conf/vit/all'
+        plots_path = Path.cwd()/'temp_plots/conf/vgg/all'
 
 
-        scores_file = Path('/home/claranunesbarrancos/repos/XAI/src/ViT/scores/temp_score_cifar100_all')
+        scores_file = Path('/home/claranunesbarrancos/repos/XAI/src/vgg/scores/temp_score_cifar100_all')
         scores_file.parent.mkdir(parents=True, exist_ok=True)
         if scores_file.exists():
                 scores = torch.load(scores_file)
@@ -149,38 +134,34 @@ if __name__ == "__main__":
         'CIFAR100-train',
         'CIFAR100-val',
         'CIFAR100-test',
-        'CIFAR100-C-val-c0',
-        'CIFAR100-C-test-c0',
-        'CIFAR100-C-val-c1',
-        'CIFAR100-C-test-c1',
-        'CIFAR100-C-val-c2',
-        'CIFAR100-C-test-c2',
-        'CIFAR100-C-val-c3',
-        'CIFAR100-C-test-c3',
-        'CIFAR100-C-val-c4',
-        'CIFAR100-C-test-c4',
-        'CW-CIFAR100-val',
-        'CW-CIFAR100-test',
-        'BIM-CIFAR100-val',
-        'BIM-CIFAR100-test',
-        'DF-CIFAR100-val',
-        'DF-CIFAR100-test',
-        'PGD-CIFAR100-val',
-        'PGD-CIFAR100-test',
+        # 'CIFAR100-C-val-c0',
+        # 'CIFAR100-C-test-c0',
+        # 'CIFAR100-C-val-c1',
+        # 'CIFAR100-C-test-c1',
+        # 'CIFAR100-C-val-c2',
+        # 'CIFAR100-C-test-c2',
+        # 'CIFAR100-C-val-c3',
+        # 'CIFAR100-C-test-c3',
+        # 'CIFAR100-C-val-c4',
+        # 'CIFAR100-C-test-c4',
+        # 'CW-CIFAR100-val',
+        # 'CW-CIFAR100-test',
+        # 'BIM-CIFAR100-val',
+        # 'BIM-CIFAR100-test',
+        # 'DF-CIFAR100-val',
+        # 'DF-CIFAR100-test',
+        # 'PGD-CIFAR100-val',
+        # 'PGD-CIFAR100-test',
         ]
 
         #--------------------------------
         # Model 
         #--------------------------------
-        nn = torchvision.models.vit_b_16()
-        target_layers = get_st_list(nn.state_dict().keys())
-        # target_layers = ['encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
-        # 'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
-        # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
-
-        # target_layers = ['encoder.layers.encoder_layer_7.mlp.3', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
-        # 'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
-        # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
+        nn = vgg16()
+        target_layers = [ 'features.0', 'features.2', 'features.5','features.7', 'features.10', 'features.12', 'features.14', 'features.17', 'features.19', 'features.21',
+                            'features.24','features.26','features.28','classifier.0','classifier.3', 
+                            'classifier.6',
+                ]
 
         n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
 
@@ -190,7 +171,7 @@ if __name__ == "__main__":
                 )
                                                 
         model.update_output(
-                output_layer = 'heads.head', 
+                output_layer = 'classifier.6', 
                 to_n_classes = n_classes,
                 overwrite = True 
                 )
@@ -253,31 +234,31 @@ if __name__ == "__main__":
                         )
 
                 if (not 'CIFAR100-test' in scores) or (('CIFAR100-test' in scores) and (not 'LACS' in scores['CIFAR100-test'])): 
-                # get scores
-                        # scores, protoclasses = proto_score(
-                        #         datasets = ds,
-                        #         peepholes = ph,
-                        #         proto_key = 'CIFAR100-train',
-                        #         score_name = 'LACS',
-                        #         batch_size = bs, 
-                        #         target_modules = target_layers,
-                        #         append_scores = scores,
-                        #         verbose = verbose,
-                        #         )
+                #get scores
+                        scores, protoclasses = proto_score(
+                                datasets = ds,
+                                peepholes = ph,
+                                proto_key = 'CIFAR100-train',
+                                score_name = 'LACS',
+                                batch_size = bs, 
+                                target_modules = target_layers,
+                                append_scores = scores,
+                                verbose = verbose,
+                                )
                                 
-                        # torch.save(scores, scores_file)
-                        scores_avg = average_random_layer_scores(
-                                ds=ds,
-                                ph=ph,
-                                target_layers_pool=target_layers,
-                                target_k=10,
-                                n_runs=1000,
-                                batch_size=bs,
-                                verbose=verbose,
-                                scores_file=scores_file,
-                        )
-                        scores = scores_avg
-                        print(scores_avg)
+                        torch.save(scores, scores_file)
+                        # scores_avg = average_random_layer_scores(
+                        #         ds=ds,
+                        #         ph=ph,
+                        #         target_layers_pool=target_layers,
+                        #         target_k=10,
+                        #         n_runs=1000,
+                        #         batch_size=bs,
+                        #         verbose=verbose,
+                        #         scores_file=scores_file,
+                        # )
+                        # scores = scores_avg
+                        # print(scores_avg)
 
                 else: 
                         print('proto scores found')
@@ -320,30 +301,30 @@ if __name__ == "__main__":
                         verbose = verbose
                         )
 
-                print('\n----------------------\n  OOD Near \n----------------------\n')
-                plot_ood(
-                        scores = scores,
-                        path = plots_path,
-                        id_loaders = {
-                        'LACS': 'CIFAR100-test',
-                       # 'MSP': 'CIFAR100-test',
-                        },
-                        ood_loaders = [f'CIFAR100-C-test-c{i}' for i in range(5)],
-                        suffix = 'Corruption',
-                        loaders_renames = [f'c{i}' for i in range(5)],
-                        verbose = verbose
-                        ) 
+                # print('\n----------------------\n  OOD Near \n----------------------\n')
+                # plot_ood(
+                #         scores = scores,
+                #         path = plots_path,
+                #         id_loaders = {
+                #         'LACS': 'CIFAR100-test',
+                #        # 'MSP': 'CIFAR100-test',
+                #         },
+                #         ood_loaders = [f'CIFAR100-C-test-c{i}' for i in range(5)],
+                #         suffix = 'Corruption',
+                #         loaders_renames = [f'c{i}' for i in range(5)],
+                #         verbose = verbose
+                #         ) 
 
-                auc_atks(
-                        datasets = ds,
-                        scores = scores,
-                        ori_loaders = {
-                        'LACS': 'CIFAR100-test',
-                       # 'MSP': 'CIFAR100-test',
-                        },
-                        atk_loaders = ['BIM-CIFAR100-test', 'CW-CIFAR100-test', 'DF-CIFAR100-test', 'PGD-CIFAR100-test'],
-                        verbose = verbose
-                        )
+                # auc_atks(
+                #         datasets = ds,
+                #         scores = scores,
+                #         ori_loaders = {
+                #         'LACS': 'CIFAR100-test',
+                #        # 'MSP': 'CIFAR100-test',
+                #         },
+                #         atk_loaders = ['BIM-CIFAR100-test', 'CW-CIFAR100-test', 'DF-CIFAR100-test', 'PGD-CIFAR100-test'],
+                #         verbose = verbose
+                #         )
 
 
 

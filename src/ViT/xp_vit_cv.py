@@ -22,7 +22,6 @@ from peepholelib.models.svd_fns import linear_svd
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.parsers import from_dataset
-from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # corevecs
@@ -56,7 +55,7 @@ if __name__ == "__main__":
         use_cuda = torch.cuda.is_available()
         device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
         torch.cuda.empty_cache()
-
+        device  = torch.device('cuda:3')
         #device = torch.device("cpu")
         print(f"Using {device} device")
 
@@ -82,6 +81,9 @@ if __name__ == "__main__":
 
         drill_path = Path('/srv/newpenny/XAI/CN/vit_data/drillers_all/drillers_100')
         drill_name = 'classifier'
+
+        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/peepholes_all/peepholes_100'
+        phs_name = 'peepholes'
 
         plots_path = Path.cwd()/'temp_plots'
         plots_path = Path.cwd()/'temp_plots/coverage/'
@@ -127,9 +129,7 @@ if __name__ == "__main__":
         n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
         target_layers = get_st_list(nn.state_dict().keys())
 
-        # target_layers = ['encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
-        # 'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
-        # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
+       
 
         print(f'Target layers: {target_layers}')
 
@@ -268,6 +268,12 @@ if __name__ == "__main__":
                         device = device
                         )
 
+        peepholes = Peepholes(
+            path = phs_path,
+            name = phs_name,
+            device = device
+            )
+
         # fitting classifiers
         with datasets as ds, corevecs as cv:
                 ds.load_only(
@@ -307,3 +313,23 @@ if __name__ == "__main__":
                                 driller.save()
 
 
+        with datasets as ds, corevecs as cv, peepholes as ph:
+                ds.load_only(
+                        loaders = loaders,
+                        verbose = verbose
+                        )
+
+                cv.load_only(
+                        loaders = loaders,
+                        verbose = verbose 
+                        ) 
+
+                ph.get_peepholes(
+                        datasets = ds,
+                        corevectors = cv,
+                        target_modules = target_layers,
+                        batch_size = bs,
+                        drillers = drillers,
+                        n_threads = n_threads,
+                        verbose = verbose
+                        )

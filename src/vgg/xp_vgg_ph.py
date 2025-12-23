@@ -21,7 +21,6 @@ from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.parsers import from_dataset
-from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # corevecs
@@ -38,10 +37,9 @@ from peepholelib.utils.viz_empp import *
 
 if __name__ == "__main__":
         use_cuda = torch.cuda.is_available()
-        device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
-        #device = torch.device('cuda:1') 
-        torch.cuda.empty_cache()
-
+        # device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+        # torch.cuda.empty_cache()
+        device  = torch.device('cuda:2')
         #device = torch.device("cpu")
         print(f"Using {device} device")
 
@@ -53,22 +51,22 @@ if __name__ == "__main__":
 
         # model parameters
         seed = 29
-        bs = 512
+        bs = 128
         n_threads = 1
 
         model_dir = '/srv/newpenny/XAI/models'
         model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
         
-        svds_path = Path.cwd()/'../vgg_data'
+        svds_path = Path('/srv/newpenny/XAI/CN/vgg_data')
         svds_name = 'svds' 
         
-        cvs_path = Path.cwd()/'../vgg_data/corevectors'
+        cvs_path = Path('/srv/newpenny/XAI/CN/vgg_data/corevectors')
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'../vgg_data/drillers_all/drillers_100'
+        drill_path = Path('/srv/newpenny/XAI/CN/vgg_data/drillers_all/drillers_100')
         drill_name = 'classifier'
 
-        phs_path = Path.cwd()/'../vgg_data/peepholes'
+        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vgg_data/peepholes_all/peepholes_100'
         phs_name = 'peepholes'
 
         plots_path = Path.cwd()/'temp_plots/coverage/'
@@ -77,8 +75,8 @@ if __name__ == "__main__":
         
         # Peepholelib
         target_layers = [ 'features.0', 'features.2', 'features.5','features.7', 'features.10', 'features.12', 'features.14', 'features.17', 'features.19', 'features.21',
-                                'features.24','features.26','features.28','classifier.0','classifier.3', 
-                                'classifier.6',
+                                 'features.24','features.26','features.28','classifier.0','classifier.3', 
+                                 'classifier.6',
                         ]
         features24_svd_rank = 100 
         features26_svd_rank = 100 
@@ -93,24 +91,24 @@ if __name__ == "__main__":
         'CIFAR100-train',
         'CIFAR100-val',
         'CIFAR100-test',
-        'CIFAR100-C-val-c0',
-        'CIFAR100-C-test-c0',
-        'CIFAR100-C-val-c1',
-        'CIFAR100-C-test-c1',
-        'CIFAR100-C-val-c2',
-        'CIFAR100-C-test-c2',
-        'CIFAR100-C-val-c3',
-        'CIFAR100-C-test-c3',
-        'CIFAR100-C-val-c4',
-        'CIFAR100-C-test-c4',
-        'CW-CIFAR100-val',
-        'CW-CIFAR100-test',
-        'BIM-CIFAR100-val',
-        'BIM-CIFAR100-test',
-        'DF-CIFAR100-val',
-        'DF-CIFAR100-test',
-        'PGD-CIFAR100-val',
-        'PGD-CIFAR100-test',
+        # 'CIFAR100-C-val-c0',
+        # 'CIFAR100-C-test-c0',
+        # 'CIFAR100-C-val-c1',
+        # 'CIFAR100-C-test-c1',
+        # 'CIFAR100-C-val-c2',
+        # 'CIFAR100-C-test-c2',
+        # 'CIFAR100-C-val-c3',
+        # 'CIFAR100-C-test-c3',
+        # 'CIFAR100-C-val-c4',
+        # 'CIFAR100-C-test-c4',
+        # 'CW-CIFAR100-val',
+        # 'CW-CIFAR100-test',
+        # 'BIM-CIFAR100-val',
+        # 'BIM-CIFAR100-test',
+        # 'DF-CIFAR100-val',
+        # 'DF-CIFAR100-test',
+        # 'PGD-CIFAR100-val',
+        # 'PGD-CIFAR100-test',
         ]
 
     #--------------------------------
@@ -150,64 +148,25 @@ if __name__ == "__main__":
     #--------------------------------
     # SVDs 
     #--------------------------------
-        svd_fns = {
-                'features.7': partial(conv2d_toeplitz_svd, 
-                        rank = features24_svd_rank,
-                        device = device,
-                ),
-                'features.10': partial(conv2d_toeplitz_svd, 
-                        rank = features24_svd_rank,
-                        device = device,
-                ),
-                'features.12': partial(conv2d_toeplitz_svd, 
-                        rank = features24_svd_rank,
-                        device = device,
-                ),
-                'features.14': partial(conv2d_toeplitz_svd, 
-                        rank = features24_svd_rank,
-                        device = device,
-                ),
-                'features.17': partial(conv2d_toeplitz_svd, 
-                        rank = features24_svd_rank,
-                        device = device,
-                ),
-                'features.19': partial(conv2d_toeplitz_svd, 
-                        rank = features24_svd_rank,
-                        device = device,
-                ),
-                'features.21': partial(conv2d_toeplitz_svd, 
-                        rank = features24_svd_rank,
-                        device = device,
-                ),
-                'features.24': partial(conv2d_toeplitz_svd,   
-                        rank = features24_svd_rank,
-                        channel_wise = False,
-                        device = device,
-                ),
-                'features.26': partial(conv2d_toeplitz_svd, 
-                        rank = features26_svd_rank,
-                        channel_wise = False,
-                        device = device,
-                ),
-                'features.28': partial(conv2d_toeplitz_svd, 
-                        rank = features26_svd_rank,
-                        channel_wise = False,
-                        device = device,
-                ),
-                'classifier.0': partial(linear_svd,
-                        rank = classifier_svd_rank,
-                        device = device,
-                ),
-                'classifier.3': partial(linear_svd,
-                        rank = classifier_svd_rank,
-                        device = device,
-                ),
-                'classifier.6': partial(linear_svd,
-                        rank = classifier_svd_rank,
-                        device = device,
-                ),
-                }
+        svd_fns = {}
 
+        low_rank_convs = {'features.0', 'features.2'}
+
+        for layer in target_layers:
+                # choose SVD type
+                if 'classifier' in layer:
+                        svd_type = linear_svd
+                        rank = 100
+                else:
+                        svd_type = conv2d_toeplitz_svd
+                        rank = 64 if layer in low_rank_convs else 100
+
+                svd_fns[layer] = partial(
+                        svd_type,
+                        layer=layer,
+                        rank=rank,
+                        device=device
+                )
         with datasets as ds:
                 ds.load_only(
                         loaders = loaders,
@@ -222,8 +181,6 @@ if __name__ == "__main__":
                         svd_fns = svd_fns,
                         verbose = verbose
                         )
-                viz_singular_values_2(model, svds_path)
-                quit()
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -235,6 +192,24 @@ if __name__ == "__main__":
         
         # define a dimensionality reduction function for each layer
         reduction_fns = {
+                'features.0': partial(conv2d_toeplitz_svd_projection, 
+                        svd = model._svds['features.0'], 
+                        layer = model._target_modules['features.0'], 
+                        use_s = True,
+                        device=device
+                        ),
+                'features.2': partial(conv2d_toeplitz_svd_projection, 
+                        svd = model._svds['features.2'], 
+                        layer = model._target_modules['features.2'], 
+                        use_s = True,
+                        device=device
+                        ),
+                'features.5': partial(conv2d_toeplitz_svd_projection, 
+                        svd = model._svds['features.5'], 
+                        layer = model._target_modules['features.5'], 
+                        use_s = True,
+                        device=device
+                        ),
                 'features.7': partial(conv2d_toeplitz_svd_projection, 
                         svd = model._svds['features.7'], 
                         layer = model._target_modules['features.7'], 
@@ -312,37 +287,49 @@ if __name__ == "__main__":
                 ),
                 }
 
-        # with datasets as ds, corevecs as cv: 
-        #         ds.load_only(
-        #                 loaders = loaders,
-        #                 verbose = verbose
-        #                 )
+        with datasets as ds, corevecs as cv: 
+                ds.load_only(
+                        loaders = loaders,
+                        verbose = verbose
+                        )
 
-        #         # computing the corevectors
-        #         cv.get_coreVectors(
-        #                 datasets = ds,
-        #                 reduction_fns = reduction_fns,
-        #                 save_input = True,
-        #                 save_output = False,
-        #                 batch_size = bs,
-        #                 n_threads = n_threads,
-        #                 verbose = verbose
-        #                 )
+                # computing the corevectors
+                cv.get_coreVectors(
+                        datasets = ds,
+                        reduction_fns = reduction_fns,
+                        save_input = True,
+                        save_output = False,
+                        batch_size = bs,
+                        n_threads = n_threads,
+                        verbose = verbose
+                        )
 
-        #         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
-        #                 cv.normalize_corevectors(
-        #                         wrt = 'CIFAR100-train',
-        #                         to_file = cvs_path/(cvs_name+'.normalization.pt'),
-        #                         batch_size = bs,
-        #                         n_threads = n_threads,
-        #                         verbose=verbose
-        #                         )
+                if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
+                        cv.normalize_corevectors(
+                                wrt = 'CIFAR100-train',
+                                to_file = cvs_path/(cvs_name+'.normalization.pt'),
+                                batch_size = bs,
+                                n_threads = n_threads,
+                                verbose=verbose
+                                )
 
     #--------------------------------
     # Peepholes
     #--------------------------------
 
         cv_parsers = {
+                'features.0': partial(trim_corevectors,
+                        module = 'features.0',
+                        cv_dim = 64
+                        ),
+                'features.2': partial(trim_corevectors,
+                        module = 'features.2',
+                        cv_dim = 64
+                        ),
+                'features.5': partial(trim_corevectors,
+                        module = 'features.5',
+                        cv_dim = features_cv_dim
+                        ),
                 'features.7': partial(trim_corevectors,
                         module = 'features.7',
                         cv_dim = features_cv_dim
@@ -398,6 +385,9 @@ if __name__ == "__main__":
                 }
 
         feature_sizes = {
+                'features.0': 64,
+                'features.2': 64,
+                'features.5': features_cv_dim,
                 'features.7': features_cv_dim,
                 'features.10': features_cv_dim,
                 'features.12': features_cv_dim,
@@ -419,6 +409,7 @@ if __name__ == "__main__":
                         path = drill_path,
                         name = drill_name+'.'+peep_layer,
                         nl_classifier = n_cluster,
+                        label_key = 'label',
                         nl_model = n_classes,
                         n_features = feature_sizes[peep_layer],
                         parser = cv_parsers[peep_layer],
