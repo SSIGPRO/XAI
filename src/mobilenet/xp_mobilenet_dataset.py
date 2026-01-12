@@ -4,12 +4,14 @@ sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
 # our stuff
 from peepholelib.models.model_wrap import ModelWrap 
-
-from peepholelib.datasets.imagenet import ImageNet
 from peepholelib.datasets.functional.parsers import from_dataset
 from peepholelib.datasets.parsedDataset import ParsedDataset 
-from peepholelib.datasets.functional.transforms import mobilenet_imagenet as ds_transform 
+from peepholelib.datasets.functional.transforms import mobilenet_v2 as ds_transform 
 
+from peepholelib.datasets.cifar100 import Cifar100
+from peepholelib.datasets.cifarC import CifarC
+from peepholelib.datasets.SVHN import SVHN 
+from peepholelib.datasets.Places import Places
 
 # ATK dataset
 from peepholelib.adv_atk.BIM import myBIM
@@ -26,107 +28,127 @@ import torch
 
     
 if __name__ == "__main__":
-    imagenet_path = '/srv/newpenny/dataset/ImageNet_torchvision'
-    ds_path = Path('/srv/newpenny/XAI/CN/mobilenet_data/imagenet')
+        cifar_path = '/srv/newpenny/dataset/CIFAR100'
+        cifarc_path = '/srv/newpenny/dataset/CIFAR-100-C'
+        svhn_path = '/srv/newpenny/dataset/SVHN' 
+        places_path = '/srv/newpenny/dataset/Places365'
+        ds_path = Path('/srv/newpenny/XAI/CN/mobilenet_data/cifar100')
 
-    model_dir = '/srv/newpenny/XAI/models'
-    model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
+        model_dir = '/srv/newpenny/XAI/models'
+        model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
 
-    use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
-    print(f"Using {device} device")
+        use_cuda = torch.cuda.is_available()
+        #device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+        device = torch.device('cuda:1') 
+        print(f"Using {device} device")
 
-    verbose = True 
-    seed = 29
-    bs = 256+128
-    n_threads = 1
+        verbose = True 
+        seed = 29
+        bs = 256+128
+        n_threads = 1
 
-    #--------------------------------
-    # Model 
-    #--------------------------------
-    
-    nn = torchvision.models.mobilenet_v2(pretrained=True)
-    n_classes = 1000
-    model = ModelWrap(
-            model = nn,
-            device = device
-            )
-                                            
-                                
-    #--------------------------------
-    # Datasets 
-    #--------------------------------
-    # original datasets
-    dss = {
-            'ImageNet': ImageNet(
-                path = imagenet_path,
-                transform = ds_transform,
-                seed = seed
-                ),
+        #--------------------------------
+        # Model 
+        #--------------------------------
+        
+        nn = torchvision.models.mobilenet_v2(pretrained=True)
+        n_classes = 100
+        model = ModelWrap(
+                model = nn,
+                device = device
+                )                       
+                                        
+        #--------------------------------
+        # Datasets 
+        #--------------------------------
+        # original datasets
+        dss = {
+                # 'CIFAR100': Cifar100(
+                #         path = cifar_path,
+                #         transform = ds_transform,
+                #         seed = seed
+                #         ),
+                'CIFARC': CifarC(
+                        path = cifarc_path,
+                        transform = ds_transform,
+                        seed = seed
+                        ),
+                # 'SVHN': SVHN(
+                #         path = svhn_path,
+                #         transform = ds_transform,
+                #         seed = seed
+                #         ),
+                # 'Places': Places(
+                #         path = places_path,
+                #         transform = ds_transform,
+                #         seed = seed
+                #         )
+                }
 
-            }
+        dss_parsers = {
+                #'CIFAR100': from_dataset,
+                'CIFARC': from_dataset,
+                #'SVHN': from_dataset,
+                #'Places': from_dataset,
+        }
 
-    dss_parsers = {
-            'ImageNet': from_dataset,
-            }
-
-    #######################
-    # parsing datasets
-    #######################
-    
-    # parse the original datasets into ds_path
-    ParsedDataset.parse_ds(
-            save_path = ds_path,
-            model = model,
-            datasets = dss,
-            ds_parsers = dss_parsers, 
-            batch_size = bs,
-            n_threads = n_threads,
-            verbose = verbose,
-            )
-    
-    #######################
-    # creating attk dataset 
-    #######################
-
-    # create a DatasetBase object for the parsed dataset
-    ds = ParsedDataset(
-            path = ds_path,
-            )
-
-    # atks will be saved in atk_path
-    atk_ds = AttacksDS(
-            path = ds_path,
-            )
-
-    atks = {
-            'CW': myCW(
+        #######################
+        # parsing datasets
+        #######################
+        
+        # parse the original datasets into ds_path
+        ParsedDataset.parse_ds(
+                save_path = ds_path,
                 model = model,
-                max_steps = 10,
-                ),
-            'BIM': myBIM(
-                model = model,
-                ),
-            'DF': myDeepFool(
-                model = model,
-                ),
-            'PGD': myPGD(
-                model = model,
-                ),
-            }
-    
-    # Apply attks to ds
-    with ds, atk_ds:
-        ds.load_only(
-                loaders = ['ImageNet-val'],
-                verbose = verbose 
-                )
-
-        atk_ds.apply_attacks(
-                dataset = ds,
-                loaders = ['ImageNet-val'],
-                attacks = atks,
+                datasets = dss,
+                ds_parsers = dss_parsers, 
                 batch_size = bs,
-                verbose = verbose 
+                n_threads = n_threads,
+                verbose = verbose,
                 )
+        
+        #######################
+        # creating attk dataset 
+        #######################
+
+        # # create a DatasetBase object for the parsed dataset
+        # ds = ParsedDataset(
+        #         path = ds_path,
+        #         )
+
+        # # atks will be saved in atk_path
+        # atk_ds = AttacksDS(
+        #         path = ds_path,
+        #         )
+
+        # atks = {
+        #         'CW': myCW(
+        #                 model = model,
+        #                 max_steps = 10,
+        #                 ),
+        #         'BIM': myBIM(
+        #                 model = model,
+        #                 ),
+        #         'DF': myDeepFool(
+        #                 model = model,
+        #                 ),
+        #         'PGD': myPGD(
+        #                 model = model,
+        #                 ),
+        #         }
+        
+        # # Apply attks to ds
+        # with ds, atk_ds:
+        #         ds.load_only(
+        #                 loaders = ['ImageNet-val'],
+        #                 verbose = verbose 
+        #                 )
+
+        #         atk_ds.apply_attacks(
+        #                 dataset = ds,
+        #                 loaders = ['ImageNet-val'],
+        #                 attacks = atks,
+        #                 batch_size = bs,
+        #                 verbose = verbose 
+        #                 )
 

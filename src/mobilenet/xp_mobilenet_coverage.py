@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import cuml
 cuml.accel.install()
@@ -8,6 +9,8 @@ cuml.accel.install()
 # python stuff
 from time import time
 from functools import partial
+import random
+
 
 # torch stuff
 import torch
@@ -24,7 +27,6 @@ from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.parsers import from_dataset
-from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # corevecs
@@ -38,6 +40,11 @@ from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
 from peepholelib.utils.viz_corevecs import plot_tsne, plot_tsne_CUDA
+from peepholelib.utils.localization import *
+from peepholelib.utils.get_samples import *
+from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
+from peepholelib.plots.conceptograms import plot_conceptogram 
+
 
 def load_all_drillers(**kwargs):
     n_cluster_list = kwargs.get('n_cluster_list', None)
@@ -88,7 +95,7 @@ if __name__ == "__main__":
         # Directories definitions
         #--------------------------------
         cifar_path = '/srv/newpenny/dataset/CIFAR100'
-        ds_path = '/srv/newpenny/XAI/CN/data/corevectors'
+        ds_path = Path('/srv/newpenny/XAI/CN/mobilenet_data')
 
         # model parameters
         seed = 29
@@ -98,43 +105,125 @@ if __name__ == "__main__":
         model_dir = '/srv/newpenny/XAI/models'
         model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
         
-        svds_path = '/srv/newpenny/XAI/CN/data'
+        svds_path = '/srv/newpenny/XAI/CN/mobilenet_data'
         svds_name = 'svds' 
         
-        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/data/corevectors'
+        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/corevectors'
         cvs_name = 'corevectors'
 
-        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/data/drillers_all'
+        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/drillers_all/drillers_100'
         drill_name = 'classifier'
 
-        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/data/peepholes'
+        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/peepholes_all/peepholes_100'
         phs_name = 'peepholes'
 
         plots_path = Path.cwd()/'temp_plots/coverage/'
         
         verbose = True 
         
-        target_layers = [ 'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2',
-        'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2',
-        'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
-        'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
-        'features.6.conv.0.0','features.6.conv.1.0', 'features.6.conv.2',
-        'features.7.conv.0.0', 'features.7.conv.1.0','features.7.conv.2',
-        'features.8.conv.0.0', 'features.8.conv.1.0', 'features.8.conv.2',
-        'features.9.conv.0.0', 'features.9.conv.1.0', 'features.9.conv.2',  
-        'features.10.conv.0.0', 'features.10.conv.1.0', 'features.10.conv.2',
-        'features.11.conv.0.0', 'features.11.conv.1.0', 'features.11.conv.2',
-        'features.12.conv.0.0', 'features.12.conv.1.0',  'features.12.conv.2',
-        'features.13.conv.0.0', 'features.13.conv.1.0', 'features.13.conv.2',
-        'features.14.conv.0.0', 'features.14.conv.1.0', 'features.14.conv.2',
-        'features.15.conv.0.0', 'features.15.conv.1.0', 'features.15.conv.2',
-        'features.16.conv.0.0', 'features.16.conv.1.0', 'features.16.conv.2', 
-        'features.17.conv.0.0', 'features.17.conv.1.0', 'features.17.conv.2',
-        'features.18.0', 'classifier.1',
-               ]
+        # target_layers = [ 'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2',
+        # 'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2',
+        # 'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
+        # 'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
+        # 'features.6.conv.0.0','features.6.conv.1.0', 'features.6.conv.2',
+        # 'features.7.conv.0.0', 'features.7.conv.1.0','features.7.conv.2',
+        # 'features.8.conv.0.0', 'features.8.conv.1.0', 'features.8.conv.2',
+        # 'features.9.conv.0.0', 'features.9.conv.1.0', 'features.9.conv.2',  
+        # 'features.10.conv.0.0', 'features.10.conv.1.0', 'features.10.conv.2',
+        # 'features.11.conv.0.0', 'features.11.conv.1.0', 'features.11.conv.2',
+        # 'features.12.conv.0.0', 'features.12.conv.1.0',  'features.12.conv.2',
+        # 'features.13.conv.0.0', 'features.13.conv.1.0', 'features.13.conv.2',
+        # 'features.14.conv.0.0', 'features.14.conv.1.0', 'features.14.conv.2',
+        # 'features.15.conv.0.0', 'features.15.conv.1.0', 'features.15.conv.2',
+        # 'features.16.conv.0.0', 'features.16.conv.1.0', 'features.16.conv.2', 
+        # 'features.17.conv.0.0', 'features.17.conv.1.0', 'features.17.conv.2',
+        # 'features.18.0', 'classifier.1',
+        #        ]
 
-        
-        loaders = ['train', 'val', 'test']
+        # # #worst ones
+        # target_layers = ['features.1.conv.0.0','features.4.conv.1.0','features.4.conv.2', 'features.7.conv.2','features.8.conv.0.0',
+        #         'features.8.conv.2','features.9.conv.0.0', 'features.11.conv.1.0',
+        #         'features.12.conv.1.0','features.13.conv.2' ]
+
+        # # # best auc
+        # target_layers = ['features.1.conv.1','features.2.conv.0.0','features.4.conv.1.0','features.9.conv.1.0','features.5.conv.1.0' ,'features.15.conv.0.0', 
+        # 'features.17.conv.1.0','features.17.conv.2', 'features.18.0', 'classifier.1']
+
+        # #best fr95
+        # target_layers=[
+        #         'features.14.conv.2', 'features.17.conv.0.0', 'features.17.conv.2', 'features.15.conv.2', 'features.11.conv.2','features.17.conv.1.0', 
+        #         'features.14.conv.1.0','features.15.conv.0.0','features.18.0', 'classifier.1'
+        # ]
+
+        # best coverage (threshold =0.1)
+        # target_layers = ['classifier.1','features.18.0', 'features.17.conv.2', 'features.17.conv.1.0',
+        # 'features.14.conv.2', 'features.14.conv.1.0', 'features.17.conv.0.0', 'features.15.conv.0.0',
+        # 'features.16.conv.1.0', 'features.15.conv.2' ]
+
+        # best coverage (threshold =0.2)
+        # target_layers = ['features.3.conv.2','features.6.conv.1.0','features.14.conv.1.0','features.14.conv.2','features.15.conv.0.0',
+        # 'features.17.conv.0.0','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
+
+
+        # best coverage (threshold =0.3)
+        # target_layers = ['features.2.conv.0.0','features.3.conv.2','features.6.conv.1.0','features.14.conv.1.0','features.14.conv.2',
+        # 'features.15.conv.2','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
+
+        # best coverage (threshold =0.4/0.5)
+        # target_layers = ['features.2.conv.0.0','features.3.conv.2','features.5.conv.1.0','features.6.conv.1.0','features.9.conv.1.0',
+        # 'features.14.conv.2','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
+
+        # best coverage (threshold =0.6)
+        # target_layers = ['features.2.conv.0.0','features.3.conv.2','features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0',
+        # 'features.14.conv.2','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
+
+        # best coverage (threshold =0.7-0.89)
+        # target_layers = ['features.2.conv.0.0','features.3.conv.2','features.5.conv.1.0','features.6.conv.1.0','features.8.conv.1.0',
+        # 'features.9.conv.1.0','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
+
+        # best coverage (threshold =0.9/0.91)
+        # target_layers = ['features.2.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0','features.6.conv.1.0',
+        # 'features.8.conv.1.0','features.9.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
+
+
+        # best coverage (threshold =0.92/0.94)
+        # target_layers = ['features.1.conv.1','features.2.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
+        # 'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.17.conv.2','classifier.1']
+
+        # best coverage (threshold =0.93)
+        # target_layers = ['features.2.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0','features.6.conv.1.0',
+        # 'features.8.conv.1.0','features.9.conv.1.0','features.17.conv.1.0','features.17.conv.2','classifier.1']
+
+        #best coverage (threshold =0.95)
+        target_layers = ['features.2.conv.0.0','features.3.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
+        'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.17.conv.2','classifier.1']
+
+        # best coverage (threshold =0.96/0.99)
+        # target_layers = ['features.1.conv.1','features.2.conv.0.0','features.3.conv.0.0','features.3.conv.1.0','features.3.conv.2',
+        # 'features.5.conv.1.0','features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','classifier.1']
+
+        # best coverage (threshold =0.97)
+        # target_layers = ['features.2.conv.0.0','features.2.conv.2','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
+        # 'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.14.conv.2','classifier.1']
+
+        # best coverage (threshold =0.98)
+        # target_layers = ['features.1.conv.1','features.2.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
+        # 'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.10.conv.1.0','classifier.1']
+
+
+        # best coverage (threshold =1)
+        # target_layers = ['features.1.conv.1','features.2.conv.0.0','features.3.conv.0.0','features.3.conv.1.0','features.3.conv.2',
+        # 'features.5.conv.1.0','features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.10.conv.1.0']
+
+
+
+
+
+        loaders = [
+        'CIFAR100-train',
+        'CIFAR100-val',
+        'CIFAR100-test',
+         ]
 
     #--------------------------------
     # Model 
@@ -169,6 +258,7 @@ if __name__ == "__main__":
         datasets = ParsedDataset(
                 path = ds_path,
                 )
+                
 
     #--------------------------------
     # CoreVectors 
@@ -183,204 +273,37 @@ if __name__ == "__main__":
     #--------------------------------
     # Peepholes
     #--------------------------------
-        features_cv_dim = 300
 
-        cv_parsers = {
-                'features.1.conv.0.0': partial(trim_corevectors,
-                        module = 'features.1.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.1.conv.1': partial(trim_corevectors,
-                        module = 'features.1.conv.1',
-                        cv_dim = features_cv_dim),
-                'features.2.conv.0.0': partial(trim_corevectors,
-                        module = 'features.2.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.2.conv.1.0': partial(trim_corevectors,
-                        module = 'features.2.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.2.conv.2': partial(trim_corevectors,
-                        module = 'features.2.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.3.conv.0.0': partial(trim_corevectors,
-                        module = 'features.3.conv.0.0', 
-                        cv_dim = features_cv_dim ),
-                'features.3.conv.1.0': partial(trim_corevectors,
-                        module = 'features.3.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.3.conv.2': partial(trim_corevectors,
-                        module = 'features.3.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.4.conv.0.0': partial(trim_corevectors,
-                        module = 'features.4.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.4.conv.1.0': partial(trim_corevectors,
-                        module = 'features.4.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.4.conv.2': partial(trim_corevectors,
-                        module = 'features.4.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.5.conv.0.0': partial(trim_corevectors,
-                        module = 'features.5.conv.0.0', 
-                        cv_dim = features_cv_dim),
-                'features.5.conv.1.0': partial(trim_corevectors,
-                        module = 'features.5.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.5.conv.2': partial(trim_corevectors,
-                        module = 'features.5.conv.2',
-                        cv_dim = features_cv_dim),      
-                'features.6.conv.0.0': partial(trim_corevectors,
-                        module = 'features.6.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.6.conv.1.0': partial(trim_corevectors,
-                        module = 'features.6.conv.1.0',     
-                        cv_dim = features_cv_dim),
-                'features.6.conv.2': partial(trim_corevectors,
-                        module = 'features.6.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.7.conv.0.0': partial(trim_corevectors,
-                        module = 'features.7.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.7.conv.1.0': partial(trim_corevectors,
-                        module = 'features.7.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.7.conv.2': partial(trim_corevectors,
-                        module = 'features.7.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.8.conv.0.0': partial(trim_corevectors,
-                        module = 'features.8.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.8.conv.1.0': partial(trim_corevectors,
-                        module = 'features.8.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.8.conv.2': partial(trim_corevectors,
-                        module = 'features.8.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.9.conv.0.0': partial(trim_corevectors,
-                        module = 'features.9.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.9.conv.1.0': partial(trim_corevectors,
-                        module = 'features.9.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.9.conv.2': partial(trim_corevectors,
-                        module = 'features.9.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.10.conv.0.0': partial(trim_corevectors,
-                        module = 'features.10.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.10.conv.1.0': partial(trim_corevectors,
-                        module = 'features.10.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.10.conv.2': partial(trim_corevectors,
-                        module = 'features.10.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.11.conv.0.0': partial(trim_corevectors,
-                        module = 'features.11.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.11.conv.1.0': partial(trim_corevectors,
-                        module = 'features.11.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.11.conv.2': partial(trim_corevectors,
-                        module = 'features.11.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.12.conv.0.0': partial(trim_corevectors,
-                        module = 'features.12.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.12.conv.1.0': partial(trim_corevectors,
-                        module = 'features.12.conv.1.0',            
-                        cv_dim = features_cv_dim),
-                'features.12.conv.2': partial(trim_corevectors,
-                        module = 'features.12.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.13.conv.0.0': partial(trim_corevectors,
-                        module = 'features.13.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.13.conv.1.0': partial(trim_corevectors,
-                        module = 'features.13.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.13.conv.2': partial(trim_corevectors,
-                        module = 'features.13.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.14.conv.0.0': partial(trim_corevectors,
-                        module = 'features.14.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.14.conv.1.0': partial(trim_corevectors,
-                        module = 'features.14.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.14.conv.2': partial(trim_corevectors,
-                        module = 'features.14.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.15.conv.0.0': partial(trim_corevectors,
-                        module = 'features.15.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.15.conv.1.0': partial(trim_corevectors,
-                        module = 'features.15.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.15.conv.2': partial(trim_corevectors,
-                        module = 'features.15.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.16.conv.0.0': partial(trim_corevectors,
-                        module = 'features.16.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.16.conv.1.0': partial(trim_corevectors,
-                        module = 'features.16.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.16.conv.2': partial(trim_corevectors,
-                        module = 'features.16.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.17.conv.0.0': partial(trim_corevectors,
-                        module = 'features.17.conv.0.0',
-                        cv_dim = features_cv_dim),
-                'features.17.conv.1.0': partial(trim_corevectors,
-                        module = 'features.17.conv.1.0',
-                        cv_dim = features_cv_dim),
-                'features.17.conv.2': partial(trim_corevectors,
-                        module = 'features.17.conv.2',
-                        cv_dim = features_cv_dim),
-                'features.18.0': partial(trim_corevectors,
-                        module = 'features.18.0',
-                        cv_dim = features_cv_dim),
-                'classifier.1': partial(trim_corevectors,
-                        module = 'classifier.1',
-                        cv_dim = features_cv_dim),
-                }
+        cv_parsers = {}
+        feature_sizes = {}
+        for layer in target_layers:
 
-        feature_sizes = {
-                'features.1.conv.0.0': features_cv_dim, 'features.1.conv.1': features_cv_dim,
-                'features.2.conv.0.0': features_cv_dim, 'features.2.conv.1.0': features_cv_dim, 'features.2.conv.2': features_cv_dim,
-                'features.3.conv.0.0': features_cv_dim, 'features.3.conv.1.0': features_cv_dim, 'features.3.conv.2': features_cv_dim,
-                'features.4.conv.0.0': features_cv_dim, 'features.4.conv.1.0': features_cv_dim, 'features.4.conv.2': features_cv_dim,
-                'features.5.conv.0.0': features_cv_dim, 'features.5.conv.1.0': features_cv_dim, 'features.5.conv.2': features_cv_dim,      
-                'features.6.conv.0.0': features_cv_dim, 'features.6.conv.1.0': features_cv_dim, 'features.6.conv.2': features_cv_dim,
-                'features.7.conv.0.0': features_cv_dim, 'features.7.conv.1.0': features_cv_dim, 'features.7.conv.2': features_cv_dim,
-                'features.8.conv.0.0': features_cv_dim, 'features.8.conv.1.0': features_cv_dim, 'features.8.conv.2': features_cv_dim,
-                'features.9.conv.0.0': features_cv_dim, 'features.9.conv.1.0': features_cv_dim, 'features.9.conv.2': features_cv_dim,
-                'features.10.conv.0.0': features_cv_dim, 'features.10.conv.1.0': features_cv_dim, 'features.10.conv.2': features_cv_dim,
-                'features.11.conv.0.0': features_cv_dim, 'features.11.conv.1.0': features_cv_dim, 'features.11.conv.2': features_cv_dim,
-                'features.12.conv.0.0': features_cv_dim, 'features.12.conv.1.0': features_cv_dim, 'features.12.conv.2': features_cv_dim,
-                'features.13.conv.0.0': features_cv_dim, 'features.13.conv.1.0': features_cv_dim, 'features.13.conv.2': features_cv_dim,
-                'features.14.conv.0.0': features_cv_dim, 'features.14.conv.1.0': features_cv_dim, 'features.14.conv.2': features_cv_dim,
-                'features.15.conv.0.0': features_cv_dim, 'features.15.conv.1.0': features_cv_dim, 'features.15.conv.2': features_cv_dim,
-                'features.16.conv.0.0': features_cv_dim, 'features.16.conv.1.0': features_cv_dim, 'features.16.conv.2': features_cv_dim,
-                'features.17.conv.0.0': features_cv_dim, 'features.17.conv.1.0': features_cv_dim, 'features.17.conv.2': features_cv_dim,
-                'features.18.0': features_cv_dim, 'classifier.1': 100,                
-                }
+                if layer == "classifier.1":
+                        features_cv_dim = 100
+                else:
+                        features_cv_dim = 300
+                cv_parsers[layer] = partial(trim_corevectors,
+                        module = layer,
+                        cv_dim = features_cv_dim)
+                feature_sizes[layer] = features_cv_dim
 
-        drillers_dict = load_all_drillers(
-            n_cluster_list = [10, 50, 100, 150, 200, 250, 300, 400, 600],  
-            target_layers = target_layers,
-            drill_path = drill_path,
-            device = device,
-            feature_sizes = feature_sizes,
-            cv_parsers = cv_parsers
-            )
+        # drillers_dict = load_all_drillers(
+        #     n_cluster_list = [10, 50, 100, 150, 200, 250, 300, 400, 600],  
+        #     target_layers = target_layers,
+        #     drill_path = drill_path,
+        #     device = device,
+        #     feature_sizes = feature_sizes,
+        #     cv_parsers = cv_parsers
+        #     )
 
         peepholes = Peepholes(
                 path = phs_path,
                 name = phs_name,
                 device = device
                 )
-       
-        with datasets as ds, corevecs as cv:
+
+        with datasets as ds, corevecs as cv, peepholes as ph:
+
                 ds.load_only(
                         loaders = loaders,
                         verbose = verbose
@@ -390,21 +313,175 @@ if __name__ == "__main__":
                         loaders = loaders,
                         verbose = verbose 
                         )
-                layer = 'features.15.conv.0.0'
-                X = cv._corevds['train'][layer]
-                X_reduced = X[:, :10]
+                # layer = 'features.9.conv.1.0'
+                # X = cv._corevds['CIFAR100-train'][layer]
+                # X_reduced = X[:, :10]
                         
-                X_np = X_reduced.cpu().numpy()
+                # X_np = X_reduced.cpu().numpy()
 
-                plot_tsne_CUDA(corevector = cv,
-                        ds = ds,
-                        save_path = Path('/home/claranunesbarrancos/repos/XAI/src/temp_plots/corevectors'),
-                        layer = layer,
-                        file_name = "features15conv00_mobilenet_tsne",
+                # plot_tsne_CUDA(corevector = cv,
+                #         ds = ds,
+                #         save_path = Path('/home/claranunesbarrancos/repos/XAI/src/temp_plots/corevectors'),
+                #         layer = layer,
+                #         file_name = "features6conv10_mobilenet_supersuperclass_tsne",
+                #         n_classes = 10,
+                #         )
+
+                #quit()
+                        
+                ph.load_only(
+                        loaders = loaders,
+                        verbose = verbose 
                         )
-                quit()
-                #coverage = empp_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_550clusters.png')
-                #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
-                compare_relative_coverage_all_clusters( all_drillers = drillers_dict,
-                        threshold=0.8, plot= True, save_path=plots_path, filename='relative_coverage_all_clusters_mobilenet.png')
 
+                # corrs = localization_pmax_correlations(
+                #         phs=ph,
+                #         ds=ds,
+                #         ds_key="CIFAR100-test",
+                #         target_modules=target_layers,
+                #         save_dir="/home/claranunesbarrancos/repos/XAI/src/temp_plots/localization" ,  
+                #         file_name="conf_vs_localization_mobilenet.png"
+                #         )
+
+                # print(corrs)
+                # quit()
+
+                # correct = get_filtered_samples(ds=ds,
+                # split='CIFAR100-test',
+                # correct=True,
+                # conf_range=[100,100]
+                # )
+                # quit()
+                plot_conceptogram(path = Path.cwd()/'temp_plots/conceptos/',
+                name='mobilenet_correct', 
+                ds=ds,
+                )
+                
+                drillers = {}
+                for peep_layer in target_layers:
+                        drillers[peep_layer] = tGMM(
+                                path=drill_path,
+                                name=f"classifier.{peep_layer}",  
+                                label_key = 'label',
+                                nl_classifier=100,
+                                nl_model=n_classes,
+                                n_features=feature_sizes[peep_layer],
+                                parser=cv_parsers[peep_layer],
+
+                                device=device
+                        )
+
+                for drill_key, driller in drillers.items():
+                        if driller._empp_file.exists():
+                                print(f'Loading Classifier for {drill_key}')
+                                driller.load()
+                        else:
+                                print(f'No Classifier found for {drill_key} at {driller._empp_file}')
+
+                correct = get_filtered_samples(ds=ds,
+                split='CIFAR100-test',
+                correct=True,
+                )
+
+
+                scores, protoclasses = proto_score(
+                                datasets = ds,
+                                peepholes = ph,
+                                proto_key = 'CIFAR100-test',
+                                score_name = 'LACS',
+                                target_modules = target_layers,
+                                verbose = verbose,
+                                )
+
+                avg_scores = {}
+
+                for ds_key in scores:
+                        avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
+                print(avg_scores)
+
+                # quit()
+                out =localization_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", target_modules=target_layers, plot = True,
+                save_dir = plots_path)
+                results = ds._dss["CIFAR100-test"]["result"]
+
+                means = localization_means(Ls=out["Ls"], results=results)
+                print(means)
+                #plot_empp_posteriors(drillers=drillers, save_dir=drill_path)
+                #coverage = empp_coverage_scores(drillers=drillers, threshold=0.9, plot=False, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_mobilenet_06.png')
+                #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
+                # compare_relative_coverage_all_clusters( all_drillers = drillers_dict,
+                #         threshold=0.8, plot= True, save_path=plots_path, filename='relative_coverage_all_clusters_mobilenet.png')
+
+                # proto_scores_runs = []
+                # localization_runs = []
+                # localization_metric_runs = []
+
+                # for i in range(20):
+                #         random_layers = random.sample(target_layers, 10)
+
+                #         scores, protoclasses = proto_score(
+                #                 datasets=ds,
+                #                 peepholes=ph,
+                #                 proto_key='CIFAR100-test',
+                #                 score_name='LACS',
+                #                 target_modules=random_layers,
+                #                 verbose=verbose,
+                #         )
+
+                #         avg_scores = {}
+                #         for ds_key in scores:
+                #                 avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
+                #         proto_scores_runs.append(avg_scores)
+
+                #         out = localization_from_peepholes(
+                #                 phs=ph,
+                #                 ds=ds,
+                #                 ds_key="CIFAR100-test",
+                #                 target_modules=random_layers,
+                #                 plot=False,
+                #                 verbose=False,
+                #         )
+
+                #         results = ds._dss["CIFAR100-test"]["result"]
+                #         means = localization_means(Ls=out["Ls"], results=results)
+                #         localization_runs.append(means)
+
+                #         localization_metric_runs.append({
+                #                 "auc": out["auc"],
+                #                 "fpr95": out["fpr95"],
+                #                 "threshold_tpr95": out["threshold_tpr95"],
+                #                 "L_avg": out["L_avg"],
+                #         })
+
+                # # --- aggregate protoscore ---
+                # avg_proto_scores = {}
+                # for key in proto_scores_runs[0]:
+                #         xs = torch.stack([torch.as_tensor(run[key]).float() for run in proto_scores_runs])
+                #         avg_proto_scores[key] = xs.mean()
+
+                # # --- aggregate localization means (exclude counts from averaging) ---
+                # avg_localization = {}
+                # for key in localization_runs[0]:
+                #         if key.startswith("n_"):
+                #                 continue
+                #         xs = torch.stack([torch.as_tensor(run[key]).float() for run in localization_runs])
+                #         avg_localization[key] = torch.nanmean(xs)
+
+                # # keep counts from first run (they should be identical across runs)
+                # for k in ["n_all", "n_correct", "n_incorrect"]:
+                #         avg_localization[k] = localization_runs[0][k]
+
+                # # --- aggregate auc/fpr95 metrics ---
+                # avg_loc_metrics = {}
+                # for key in localization_metric_runs[0]:
+                #         xs = torch.stack([torch.as_tensor(run[key]).float() for run in localization_metric_runs])
+                #         avg_loc_metrics[key] = torch.nanmean(xs)
+
+                # print("Average ProtoScores over random layers:")
+                # print(avg_proto_scores)
+
+                # print("\nAverage localization means over random layers:")
+                # print(avg_localization)
+
+                # print("\nAverage localization AUC/FPR95 over random layers:")
+                # print(avg_loc_metrics)

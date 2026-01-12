@@ -25,6 +25,7 @@ from peepholelib.datasets.functional.parsers import from_dataset
 from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 from peepholelib.featureSqueezing.FeatureSqueezingDetector import FeatureSqueezingDetector as FSD
+from peepholelib.peepholes.DeepMahalanobisDistance.DMD import DeepMahalanobisDistance as DMD 
 from peepholelib.featureSqueezing.preprocessing import NLM_filtering_torch, NLM_filtering_cv, bit_depth_torch, MedianPool2d
 
 # peepholes
@@ -36,7 +37,7 @@ from peepholelib.scores.model_confidence import model_confidence_score as mconf_
 from peepholelib.scores.doctor import DOCTOR_score as doctor_score 
 from peepholelib.scores.relu import RelU_score as relu_score 
 from peepholelib.scores.feature_squeezing import feature_squeezing_score as fs_score 
-
+from peepholelib.scores.dmd import DMD_score as dmd_score 
 
 
 from peepholelib.plots.confidence import plot_confidence
@@ -111,7 +112,7 @@ if __name__ == "__main__":
         # Directories definitions
         #--------------------------------
         cifar_path = '/srv/newpenny/dataset/CIFAR100'
-        ds_path = Path('/srv/newpenny/XAI/CN/mobilenet_data')
+        ds_path = '/srv/newpenny/XAI/generated_data/TPAMI/parsed_datasets/CIFAR100_ViT'
 
         # model parameters
         seed = 29
@@ -120,23 +121,15 @@ if __name__ == "__main__":
 
         model_dir = '/srv/newpenny/XAI/models'
         model_name = 'SV_model=vit_b_16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau_withInfo.pth'        
-        
-        svds_path = '/srv/newpenny/XAI/CN/vit_data'
-        svds_name = 'svds' 
-        
-        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/corevectors'
-        cvs_name = 'corevectors'
-
-        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/drillers_all/drillers_100'
-        drill_name = 'classifier'
 
         phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vit_data/peepholes_all/peepholes_100'
         phs_name = 'peepholes'
+        dmd_phs_name = 'peepavg'
 
-        plots_path = Path.cwd()/'temp_plots/conf/vit/all'
+        plots_path = Path.cwd()/'temp_plots/conf_dmd/vit/all'
 
 
-        scores_file = Path('/home/claranunesbarrancos/repos/XAI/src/ViT/scores/temp_score_cifar100_all')
+        scores_file = Path('/home/claranunesbarrancos/repos/XAI/src/ViT/scores/temp_score_cifar100_dmd_all')
         scores_file.parent.mkdir(parents=True, exist_ok=True)
         if scores_file.exists():
                 scores = torch.load(scores_file)
@@ -149,37 +142,64 @@ if __name__ == "__main__":
         'CIFAR100-train',
         'CIFAR100-val',
         'CIFAR100-test',
-        'CIFAR100-C-val-c0',
-        'CIFAR100-C-test-c0',
-        'CIFAR100-C-val-c1',
-        'CIFAR100-C-test-c1',
-        'CIFAR100-C-val-c2',
-        'CIFAR100-C-test-c2',
-        'CIFAR100-C-val-c3',
-        'CIFAR100-C-test-c3',
-        'CIFAR100-C-val-c4',
-        'CIFAR100-C-test-c4',
-        'CW-CIFAR100-val',
-        'CW-CIFAR100-test',
-        'BIM-CIFAR100-val',
-        'BIM-CIFAR100-test',
-        'DF-CIFAR100-val',
-        'DF-CIFAR100-test',
-        'PGD-CIFAR100-val',
-        'PGD-CIFAR100-test',
+        # 'CIFAR100-C-val-c0',
+        # 'CIFAR100-C-test-c0',
+        # 'CIFAR100-C-val-c1',
+        # 'CIFAR100-C-test-c1',
+        # 'CIFAR100-C-val-c2',
+        # 'CIFAR100-C-test-c2',
+        # 'CIFAR100-C-val-c3',
+        # 'CIFAR100-C-test-c3',
+        # 'CIFAR100-C-val-c4',
+        # 'CIFAR100-C-test-c4',
+        # 'SVHN-val',
+        # 'SVHN-test',
+        # 'Places365-val',
+        # 'Places365-test',
         ]
 
         #--------------------------------
         # Model 
         #--------------------------------
         nn = torchvision.models.vit_b_16()
-        target_layers = get_st_list(nn.state_dict().keys())
+        target_layers = list(dict.fromkeys(get_st_list(nn.state_dict().keys())))
+        print("Available layers for peepholes:", target_layers)
         # target_layers = ['encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
         # 'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
         # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
 
-        # target_layers = ['encoder.layers.encoder_layer_7.mlp.3', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
-        # 'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
+        #target_layers = [
+        #'encoder.layers.encoder_layer_7.mlp.3', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
+        #'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
+        # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 
+        #'heads.head']
+        # target_layers = ['heads.head',
+        # 'encoder.layers.encoder_layer_11.mlp.0',
+        # 'encoder.layers.encoder_layer_11.mlp.3',
+        # 'encoder.layers.encoder_layer_10.mlp.3',
+        # 'encoder.layers.encoder_layer_10.mlp.0',
+        # 'encoder.layers.encoder_layer_9.mlp.0',
+        # 'encoder.layers.encoder_layer_9.mlp.3',
+        # 'encoder.layers.encoder_layer_8.mlp.3',
+        # 'encoder.layers.encoder_layer_8.mlp.0',
+        # 'encoder.layers.encoder_layer_7.mlp.0'
+        # ]
+
+        # #worst
+        target_layers = ['encoder.layers.encoder_layer_0.mlp.3','encoder.layers.encoder_layer_1.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3','encoder.layers.encoder_layer_2.mlp.0',
+        'encoder.layers.encoder_layer_2.mlp.3','encoder.layers.encoder_layer_3.mlp.0','encoder.layers.encoder_layer_3.mlp.3', 
+        'encoder.layers.encoder_layer_4.mlp.0','encoder.layers.encoder_layer_4.mlp.3','encoder.layers.encoder_layer_6.mlp.3']
+
+        
+        # # 10 best auc
+        # target_layers = ['encoder.layers.encoder_layer_3.mlp.3', 'encoder.layers.encoder_layer_2.mlp.3', 'encoder.layers.encoder_layer_1.mlp.3',
+        # 'encoder.layers.encoder_layer_0.mlp.0', 'encoder.layers.encoder_layer_0.mlp.3',
+        # 'encoder.layers.encoder_layer_10.mlp.0',
+        # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
+
+        # #best frp95
+        # target_layers = ['encoder.layers.encoder_layer_2.mlp.3', 'encoder.layers.encoder_layer_5.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3',
+        # 'encoder.layers.encoder_layer_8.mlp.3', 'encoder.layers.encoder_layer_9.mlp.3','encoder.layers.encoder_layer_10.mlp.0',
         # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
 
         n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
@@ -240,6 +260,10 @@ if __name__ == "__main__":
                 path = phs_path,
                 name = phs_name,
                 )
+        # dmd_peepholes = Peepholes(
+        #     path = phs_path,
+        #     name = dmd_phs_name,
+        #     )
 
         with datasets as ds, peepholes as ph: 
                 ds.load_only(
@@ -252,35 +276,35 @@ if __name__ == "__main__":
                         verbose = verbose 
                         )
 
-                if (not 'CIFAR100-test' in scores) or (('CIFAR100-test' in scores) and (not 'LACS' in scores['CIFAR100-test'])): 
-                # get scores
-                        # scores, protoclasses = proto_score(
-                        #         datasets = ds,
-                        #         peepholes = ph,
-                        #         proto_key = 'CIFAR100-train',
-                        #         score_name = 'LACS',
-                        #         batch_size = bs, 
-                        #         target_modules = target_layers,
-                        #         append_scores = scores,
-                        #         verbose = verbose,
-                        #         )
-                                
-                        # torch.save(scores, scores_file)
-                        scores_avg = average_random_layer_scores(
-                                ds=ds,
-                                ph=ph,
-                                target_layers_pool=target_layers,
-                                target_k=10,
-                                n_runs=1000,
-                                batch_size=bs,
-                                verbose=verbose,
-                                scores_file=scores_file,
+                # if (not 'CIFAR100-test' in scores) or (('CIFAR100-test' in scores) and (not 'LACS' in scores['CIFAR100-test'])): 
+                # # get scores
+                scores, protoclasses = proto_score(
+                        datasets = ds,
+                        peepholes = ph,
+                        proto_key = 'CIFAR100-train',
+                        score_name = 'LACS',
+                        batch_size = bs, 
+                        target_modules = target_layers,
+                        append_scores = scores,
+                        verbose = verbose,
                         )
-                        scores = scores_avg
-                        print(scores_avg)
+                                
+                #         torch.save(scores, scores_file)
+                # scores_avg = average_random_layer_scores(
+                #         ds=ds,
+                #         ph=ph,
+                #         target_layers_pool=target_layers,
+                #         target_k=10,
+                #         n_runs=20,
+                #         batch_size=bs,
+                #         verbose=verbose,
+                #         scores_file=scores_file,
+                # )
+                # scores = scores_avg
+                # print(scores_avg)
 
-                else: 
-                        print('proto scores found')
+                # else: 
+                #         print('proto scores found')
         
                 # if (not 'CIFAR100-test' in scores) or (('CIFAR100-test' in scores) and (not 'MSP' in scores['CIFAR100-test'])): 
                 #         scores = mconf_score(
@@ -293,14 +317,53 @@ if __name__ == "__main__":
                 # else:
                 #         print('mconf scores found')
 
-
-                print('\n----------------------\n  Conf \n----------------------\n')
-                # make plots
-        
                 ds.load_only(
                         loaders = loaders,
                         verbose = verbose 
                         ) 
+                # DMD Aware
+                # if (not 'CIFAR100-C-test-c0' in scores) or (('CIFAR100-C-test-c0' in scores) and (not 'DMD-A' in scores['CIFAR100-C-test-c0'])): 
+                #         scores = dmd_score(
+                #                 peepholes = dmd_ph,
+                #                 pos_loader_train = 'CIFAR100-val',
+                #                 pos_loader_test = 'CIFAR100-test',
+                #                 neg_loaders = {
+                #                         'CIFAR100-C-test-c0': ['CIFAR100-C-val-c0'],
+                #                         'CIFAR100-C-test-c1': ['CIFAR100-C-val-c1'],
+                #                         'CIFAR100-C-test-c2': ['CIFAR100-C-val-c2'],
+                #                         'CIFAR100-C-test-c3': ['CIFAR100-C-val-c3'],
+                #                         'CIFAR100-C-test-c4': ['CIFAR100-C-val-c4'],
+                #                         'Places365-test': ['Places365-val'],
+                #                         'SVHN-test': ['SVHN-val']
+                #                         },
+                #                 append_scores = scores,
+                #                 score_name = 'DMD-A'
+                #         )
+                #         torch.save(scores, scores_file)
+                # else:
+                #         print('dmd-a scores found')
+
+                # # DMD Unaware
+                # if (not 'Places365-test' in scores) or (('Places365-test' in scores) and (not 'DMD-U' in scores['Places365-test'])): 
+                #         scores = dmd_score(
+                #                 peepholes = dmd_ph,
+                #                 pos_loader_train = 'CIFAR100-val',
+                #                 pos_loader_test = 'CIFAR100-test',
+                #                 neg_loaders = {
+                #                         'Places365-test': ['SVHN-val'],
+                #                         'SVHN-test': ['Places365-val']
+                #                         },
+                #                 append_scores = scores,
+                #                 score_name = 'DMD-U'
+                #                 )
+                #         torch.save(scores, scores_file)
+                # else:
+                #         print('dmd-u scores found')
+
+
+                print('\n----------------------\n  Conf \n----------------------\n')
+                # make plots
+        
                 plot_confidence(
                         datasets = ds,
                         scores = scores,
@@ -320,30 +383,47 @@ if __name__ == "__main__":
                         verbose = verbose
                         )
 
-                print('\n----------------------\n  OOD Near \n----------------------\n')
-                plot_ood(
-                        scores = scores,
-                        path = plots_path,
-                        id_loaders = {
-                        'LACS': 'CIFAR100-test',
-                       # 'MSP': 'CIFAR100-test',
-                        },
-                        ood_loaders = [f'CIFAR100-C-test-c{i}' for i in range(5)],
-                        suffix = 'Corruption',
-                        loaders_renames = [f'c{i}' for i in range(5)],
-                        verbose = verbose
-                        ) 
+                # print('\n----------------------\n  OOD Near \n----------------------\n')
+                # plot_ood(
+                #         scores = scores,
+                #         path = plots_path,
+                #         id_loaders = {
+                #         #'LACS': 'CIFAR100-test',
+                #         #'MSP': 'CIFAR100-test',
+                #         'DMD-A': ['SVHN-val', 'Places365-val'],
+                #         },
+                #         ood_loaders = [f'CIFAR100-C-test-c{i}' for i in range(5)],
+                #         suffix = 'Corruption',
+                #         loaders_renames = [f'c{i}' for i in range(5)],
+                #         verbose = verbose
+                #         ) 
+                # print('\n----------------------\n  OOD Far \n----------------------\n')
+                # plot_ood(
+                #         scores = scores,
+                #         path = plots_path,
+                #         id_loaders = {
+                #         # 'LACS': 'CIFAR100-test',
+                #         # 'MSP': 'CIFAR100-test',
+                #         'DMD-A': ['SVHN-val', 'Places365-val'],
+                #         'DMD-U': ['Places365-val', 'SVHN-val'],
+                #         },
+                #         ood_loaders = ['SVHN-test', 'Places365-test'],
+                #         suffix = 'Far',
+                #         verbose = verbose
+                #         ) 
 
-                auc_atks(
-                        datasets = ds,
-                        scores = scores,
-                        ori_loaders = {
-                        'LACS': 'CIFAR100-test',
-                       # 'MSP': 'CIFAR100-test',
-                        },
-                        atk_loaders = ['BIM-CIFAR100-test', 'CW-CIFAR100-test', 'DF-CIFAR100-test', 'PGD-CIFAR100-test'],
-                        verbose = verbose
-                        )
+                # auc_atks(
+                #         datasets = ds,
+                #         scores = scores,
+                #         ori_loaders = {
+                #         #'LACS': 'CIFAR100-test',
+                #         #'MSP': 'CIFAR100-test',
+                #         'DMD-A': ['SVHN-val', 'Places365-val'],
+                #         'DMD-U': ['Places365-val', 'SVHN-val'],
+                #         },
+                #         atk_loaders = ['BIM-CIFAR100-test', 'CW-CIFAR100-test', 'DF-CIFAR100-test', 'PGD-CIFAR100-test'],
+                #         verbose = verbose
+                #         )
 
 
 

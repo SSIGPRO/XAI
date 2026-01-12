@@ -33,6 +33,8 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
+from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
+
 
 
 if __name__ == "__main__":
@@ -480,12 +482,29 @@ if __name__ == "__main__":
                         n_threads = n_threads,
                         verbose = verbose
                         )
-        
-                #coverage = empp_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_550clusters.png')
-                #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
-                compare_relative_coverage_all_clusters(
-                        root_dir = '/home/claranunesbarrancos/repos/XAI/data/drillers_all',
-                        threshold=0.8,
+                ph.load_only(
+                        loaders = loaders,
+                        verbose = verbose 
                         )
 
+                scores, protoclasses = proto_score(
+                datasets = ds,
+                peepholes = ph,
+                proto_key = 'CIFAR100-test',
+                score_name = 'LACS',
+                target_modules = target_layers,
+                verbose = verbose,
+                )
 
+                avg_scores = {}
+
+                for ds_key in scores:
+                        avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
+                print(avg_scores)
+        
+                #coverage = empp_coverage_scores(drillers=drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/temp_plots/coverage', file_name='coverage_vgg_100clusters.png')
+                #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
+                # compare_relative_coverage_all_clusters(
+                #         root_dir = '/home/claranunesbarrancos/repos/XAI/data/drillers_all',
+                #         threshold=0.8,
+                #         )     

@@ -21,7 +21,6 @@ from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.parsers import from_dataset
-from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # corevecs
