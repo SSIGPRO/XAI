@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # python stuff
 from time import time
@@ -44,6 +45,8 @@ from peepholelib.plots.confidence import plot_confidence
 from peepholelib.plots.ood import plot_ood
 from peepholelib.plots.calibration import plot_calibration
 from peepholelib.plots.atks import auc_atks 
+
+from calculate_layer_importance import localization_delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
 
 import random
 
@@ -186,9 +189,9 @@ if __name__ == "__main__":
         # ]
 
         # #worst
-        target_layers = ['encoder.layers.encoder_layer_0.mlp.3','encoder.layers.encoder_layer_1.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3','encoder.layers.encoder_layer_2.mlp.0',
-        'encoder.layers.encoder_layer_2.mlp.3','encoder.layers.encoder_layer_3.mlp.0','encoder.layers.encoder_layer_3.mlp.3', 
-        'encoder.layers.encoder_layer_4.mlp.0','encoder.layers.encoder_layer_4.mlp.3','encoder.layers.encoder_layer_6.mlp.3']
+        # target_layers = ['encoder.layers.encoder_layer_0.mlp.3','encoder.layers.encoder_layer_1.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3','encoder.layers.encoder_layer_2.mlp.0',
+        # 'encoder.layers.encoder_layer_2.mlp.3','encoder.layers.encoder_layer_3.mlp.0','encoder.layers.encoder_layer_3.mlp.3', 
+        # 'encoder.layers.encoder_layer_4.mlp.0','encoder.layers.encoder_layer_4.mlp.3','encoder.layers.encoder_layer_6.mlp.3']
 
         
         # # 10 best auc
@@ -275,6 +278,14 @@ if __name__ == "__main__":
                         loaders = loaders,
                         verbose = verbose 
                         )
+                deltas = layer_importance(ds=ds, phs=peepholes,
+                        loader = "CIFAR100-test",
+                        target_modules=target_layers, 
+                        )
+                topk = topk_layers(deltas, k=20,
+                        negatives = True
+                        )
+                quit()
 
                 # if (not 'CIFAR100-test' in scores) or (('CIFAR100-test' in scores) and (not 'LACS' in scores['CIFAR100-test'])): 
                 # # get scores

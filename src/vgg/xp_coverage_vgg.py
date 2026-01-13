@@ -36,8 +36,9 @@ from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.models.viz import viz_singular_values
 from peepholelib.utils.viz_empp import *
 from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
-from calculate_layer_importance import layer_importance_lolo_deltas_per_loader_okko as layer_importance, topk_layers_per_loader 
 from peepholelib.utils.localization import *
+from peepholelib.plots.conceptograms import plot_conceptogram 
+from peepholelib.utils.get_samples import *
 
 
 def load_all_drillers(**kwargs):
@@ -124,25 +125,25 @@ if __name__ == "__main__":
                                 'features.24','features.26','features.28','classifier.0','classifier.3', 
                                 'classifier.6',
                         ]
-        # best (0.95)
-        target_layers = ['features.21','features.24','classifier.0','classifier.3', 'classifier.6']
 
-        # best (0.9)
-        #target_layers = ['features.24','features.28','classifier.0','classifier.3', 'classifier.6']
-
-        # best (0.85)
-        #target_layers = ['features.26','features.28','classifier.0','classifier.3', 'classifier.6']
+        # best (0.8)
+        target_layers = ['features.26','features.28','classifier.0','classifier.3', 'classifier.6']
 
         # worst
-        #target_layers = ['features.0', 'features.2', 'features.5', 'features.7', 'features.10']
+        # target_layers = ['features.0', 'features.2', 'features.5', 'features.7', 'features.10']
 
         # best auc
         #target_layers = ['features.0', 'features.10', 'features.17','classifier.3', 'classifier.6']
+        # target_layers = ['features.0', 'features.7' ,'classifier.0','classifier.3', 'classifier.6']
+
+        #worst auc
+        #target_layers= ['features.19', 'features.21', 'features.24', 'features.26', 'features.28']
 
         #best fr95
-        #target_layers = ['features.2', 'features.19', 'features.24', 'classifier.3', 'classifier.6']
+        # target_layers = ['features.2', 'features.19', 'features.24', 'classifier.3', 'classifier.6']
 
-
+        # best (0.95)
+        #target_layers = ['features.21','features.24','classifier.0','classifier.3', 'classifier.6']
         
         loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test']
 
@@ -309,17 +310,17 @@ if __name__ == "__main__":
                         verbose = verbose 
                         )
                 
-                corrs = localization_pmax_correlations(
-                        phs=ph,
-                        ds=ds,
-                        ds_key="CIFAR100-test",
-                        target_modules=target_layers,
-                        save_dir="/home/claranunesbarrancos/repos/XAI/src/temp_plots/localization" ,  
-                        file_name="conf_vs_localization_vgg.png"
-                        )
+                # corrs = localization_pmax_correlations(
+                #         phs=ph,
+                #         ds=ds,
+                #         ds_key="CIFAR100-test",
+                #         target_modules=target_layers,
+                #         save_dir="/home/claranunesbarrancos/repos/XAI/src/temp_plots/localization" ,  
+                #         file_name="conf_vs_localization_vgg.png"
+                #         )
 
-                print(corrs)
-                quit()
+                # print(corrs)
+                # quit()
                 # deltas = layer_importance(score_fn=proto_score,
                 #         datasets=ds, peepholes=peepholes,
                 #         target_modules=target_layers, loaders=loaders,
@@ -331,34 +332,55 @@ if __name__ == "__main__":
                 #         )
                 # quit()
                 
-                drillers = {}
-                for peep_layer in target_layers:
-                        drillers[peep_layer] = tGMM(
-                                path=drill_path,
-                                name=f"classifier.{peep_layer}",  
-                                label_key = 'label',
-                                nl_classifier=100,
-                                nl_model=n_classes,
-                                n_features=feature_sizes[peep_layer],
-                                parser=cv_parsers[peep_layer],
-                                device=device
-                        )
+                # drillers = {}
+                # for peep_layer in target_layers:
+                #         drillers[peep_layer] = tGMM(
+                #                 path=drill_path,
+                #                 name=f"classifier.{peep_layer}",  
+                #                 label_key = 'label',
+                #                 nl_classifier=100,
+                #                 nl_model=n_classes,
+                #                 n_features=feature_sizes[peep_layer],
+                #                 parser=cv_parsers[peep_layer],
+                #                 device=device
+                #         )
 
-                for drill_key, driller in drillers.items():
-                        if driller._empp_file.exists():
-                                print(f'Loading Classifier for {drill_key}')
-                                driller.load()
-                        else:
-                                print(f'No Classifier found for {drill_key} at {driller._empp_file}')
+                # for drill_key, driller in drillers.items():
+                #         if driller._empp_file.exists():
+                #                 print(f'Loading Classifier for {drill_key}')
+                #                 driller.load()
+                #         else:
+                #                 print(f'No Classifier found for {drill_key} at {driller._empp_file}')
 
-                # scores, protoclasses = proto_score(
-                # datasets = ds,
-                # peepholes = ph,
-                # proto_key = 'CIFAR100-test',
-                # score_name = 'LACS',
-                # target_modules = target_layers,
-                # verbose = verbose,
+                # correct = get_filtered_samples(ds=ds,
+                # split='CIFAR100-test',
+                # #correct=False,
+                # conf_range=[0,40],
+                # localization_range = [0.075, 0.2],
+                # phs = ph,
+                # target_modules = target_layers # best config
                 # )
+                # quit()
+                scores, protoclasses = proto_score(
+                datasets = ds,
+                peepholes = ph,
+                proto_key = 'CIFAR100-test',
+                score_name = 'LACS',
+                target_modules = target_layers,
+                verbose = verbose,
+                )
+
+                plot_conceptogram(path = Path.cwd()/'temp_plots/conceptos/vgg',
+                name='mid_local_not_conf', 
+                datasets=ds,
+                peepholes=ph,
+                loaders=['CIFAR100-test'],
+                target_modules=target_layers,
+                samples=[7405],
+                classes =Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
+                scores=scores,
+                )
+                quit()
 
                 # avg_scores = {}
 
@@ -366,12 +388,12 @@ if __name__ == "__main__":
                 #         avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
                 # print(avg_scores)
 
-                out = localization_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", target_modules=target_layers, plot = True,
-                save_dir = plots_path)
-                results = ds._dss["CIFAR100-test"]["result"]
+                # out = localization_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", target_modules=target_layers, plot = True,
+                # save_dir = plots_path)
+                # results = ds._dss["CIFAR100-test"]["result"]
 
-                means = localization_means(Ls=out["Ls"], results=results)
-                print(means)
+                # means = localization_means(Ls=out["Ls"], results=results)
+                # print(means)
         
                 #coverage = empp_coverage_scores(drillers=drillers, threshold=0.8, plot=False, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_01.png')
                 #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
@@ -380,76 +402,52 @@ if __name__ == "__main__":
 
 
                
-                # proto_scores_runs = []
-                # localization_runs = []
-                # localization_metric_runs = []
+                localization_runs = []
+                localization_metric_runs = []
 
-                # for i in range(20):
-                #         random_layers = random.sample(target_layers, 10)
+                for i in range(20):
+                        random_layers = random.sample(target_layers, 5)
 
-                #         scores, protoclasses = proto_score(
-                #                 datasets=ds,
-                #                 peepholes=ph,
-                #                 proto_key='CIFAR100-test',
-                #                 score_name='LACS',
-                #                 target_modules=random_layers,
-                #                 verbose=verbose,
-                #         )
+                        out = localization_from_peepholes(
+                                phs=ph,
+                                ds=ds,
+                                ds_key="CIFAR100-test",
+                                target_modules=random_layers,
+                                plot=False,
+                                verbose=False,
+                        )
 
-                #         avg_scores = {}
-                #         for ds_key in scores:
-                #                 avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
-                #         proto_scores_runs.append(avg_scores)
+                        results = ds._dss["CIFAR100-test"]["result"]
+                        means = localization_means(Ls=out["Ls"], results=results)
+                        localization_runs.append(means)
 
-                #         out = localization_from_peepholes(
-                #                 phs=ph,
-                #                 ds=ds,
-                #                 ds_key="CIFAR100-test",
-                #                 target_modules=random_layers,
-                #                 plot=False,
-                #                 verbose=False,
-                #         )
+                        localization_metric_runs.append({
+                                "auc": out["auc"],
+                                "fpr95": out["fpr95"],
+                                "threshold_tpr95": out["threshold_tpr95"],
+                                "L_avg": out["L_avg"],
+                        })
 
-                #         results = ds._dss["CIFAR100-test"]["result"]
-                #         means = localization_means(Ls=out["Ls"], results=results)
-                #         localization_runs.append(means)
+                # --- aggregate localization means (exclude counts from averaging) ---
+                avg_localization = {}
+                for key in localization_runs[0]:
+                        if key.startswith("n_"):
+                                continue
+                        xs = torch.stack([torch.as_tensor(run[key]).float() for run in localization_runs])
+                        avg_localization[key] = torch.nanmean(xs)
 
-                #         localization_metric_runs.append({
-                #                 "auc": out["auc"],
-                #                 "fpr95": out["fpr95"],
-                #                 "threshold_tpr95": out["threshold_tpr95"],
-                #                 "L_avg": out["L_avg"],
-                #         })
+                # keep counts from first run (they should be identical across runs)
+                for k in ["n_all", "n_correct", "n_incorrect"]:
+                        avg_localization[k] = localization_runs[0][k]
 
-                # # --- aggregate protoscore ---
-                # avg_proto_scores = {}
-                # for key in proto_scores_runs[0]:
-                #         xs = torch.stack([torch.as_tensor(run[key]).float() for run in proto_scores_runs])
-                #         avg_proto_scores[key] = xs.mean()
+                # --- aggregate auc/fpr95 metrics ---
+                avg_loc_metrics = {}
+                for key in localization_metric_runs[0]:
+                        xs = torch.stack([torch.as_tensor(run[key]).float() for run in localization_metric_runs])
+                        avg_loc_metrics[key] = torch.nanmean(xs)
 
-                # # --- aggregate localization means (exclude counts from averaging) ---
-                # avg_localization = {}
-                # for key in localization_runs[0]:
-                #         if key.startswith("n_"):
-                #                 continue
-                #         xs = torch.stack([torch.as_tensor(run[key]).float() for run in localization_runs])
-                #         avg_localization[key] = torch.nanmean(xs)
+                print("\nAverage localization means over random layers:")
+                print(avg_localization)
 
-                # # keep counts from first run (they should be identical across runs)
-                # for k in ["n_all", "n_correct", "n_incorrect"]:
-                #         avg_localization[k] = localization_runs[0][k]
-
-                # # --- aggregate auc/fpr95 metrics ---
-                # avg_loc_metrics = {}
-                # for key in localization_metric_runs[0]:
-                #         xs = torch.stack([torch.as_tensor(run[key]).float() for run in localization_metric_runs])
-                #         avg_loc_metrics[key] = torch.nanmean(xs)
-
-                # print("Average ProtoScores over random layers:")
-                # print(avg_proto_scores)
-
-                # print("\nAverage localization means over random layers:")
-                # print(avg_localization)
-
-                # print("\nAverage localization AUC/FPR95 over random layers:")
-                # print(avg_loc_metrics)
+                print("\nAverage localization AUC/FPR95 over random layers:")
+                print(avg_loc_metrics)

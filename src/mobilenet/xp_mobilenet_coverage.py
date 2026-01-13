@@ -121,103 +121,50 @@ if __name__ == "__main__":
         
         verbose = True 
         
-        # target_layers = [ 'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2',
-        # 'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2',
-        # 'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
-        # 'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
-        # 'features.6.conv.0.0','features.6.conv.1.0', 'features.6.conv.2',
-        # 'features.7.conv.0.0', 'features.7.conv.1.0','features.7.conv.2',
-        # 'features.8.conv.0.0', 'features.8.conv.1.0', 'features.8.conv.2',
-        # 'features.9.conv.0.0', 'features.9.conv.1.0', 'features.9.conv.2',  
-        # 'features.10.conv.0.0', 'features.10.conv.1.0', 'features.10.conv.2',
-        # 'features.11.conv.0.0', 'features.11.conv.1.0', 'features.11.conv.2',
-        # 'features.12.conv.0.0', 'features.12.conv.1.0',  'features.12.conv.2',
-        # 'features.13.conv.0.0', 'features.13.conv.1.0', 'features.13.conv.2',
-        # 'features.14.conv.0.0', 'features.14.conv.1.0', 'features.14.conv.2',
-        # 'features.15.conv.0.0', 'features.15.conv.1.0', 'features.15.conv.2',
-        # 'features.16.conv.0.0', 'features.16.conv.1.0', 'features.16.conv.2', 
-        # 'features.17.conv.0.0', 'features.17.conv.1.0', 'features.17.conv.2',
-        # 'features.18.0', 'classifier.1',
-        #        ]
+        target_layers = [ 'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2',
+        'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2',
+        'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
+        'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
+        'features.6.conv.0.0','features.6.conv.1.0', 'features.6.conv.2',
+        'features.7.conv.0.0', 'features.7.conv.1.0','features.7.conv.2',
+        'features.8.conv.0.0', 'features.8.conv.1.0', 'features.8.conv.2',
+        'features.9.conv.0.0', 'features.9.conv.1.0', 'features.9.conv.2',  
+        'features.10.conv.0.0', 'features.10.conv.1.0', 'features.10.conv.2',
+        'features.11.conv.0.0', 'features.11.conv.1.0', 'features.11.conv.2',
+        'features.12.conv.0.0', 'features.12.conv.1.0',  'features.12.conv.2',
+        'features.13.conv.0.0', 'features.13.conv.1.0', 'features.13.conv.2',
+        'features.14.conv.0.0', 'features.14.conv.1.0', 'features.14.conv.2',
+        'features.15.conv.0.0', 'features.15.conv.1.0', 'features.15.conv.2',
+        'features.16.conv.0.0', 'features.16.conv.1.0', 'features.16.conv.2', 
+        'features.17.conv.0.0', 'features.17.conv.1.0', 'features.17.conv.2',
+        'features.18.0', 'classifier.1',
+               ]
 
-        # # #worst ones
+        #worst ones
         # target_layers = ['features.1.conv.0.0','features.4.conv.1.0','features.4.conv.2', 'features.7.conv.2','features.8.conv.0.0',
         #         'features.8.conv.2','features.9.conv.0.0', 'features.11.conv.1.0',
         #         'features.12.conv.1.0','features.13.conv.2' ]
 
-        # # # best auc
-        # target_layers = ['features.1.conv.1','features.2.conv.0.0','features.4.conv.1.0','features.9.conv.1.0','features.5.conv.1.0' ,'features.15.conv.0.0', 
-        # 'features.17.conv.1.0','features.17.conv.2', 'features.18.0', 'classifier.1']
+        # best auc
+        # target_layers = ['features.1.conv.1','features.2.conv.0.0', 'features.3.conv.1.0', 'features.5.conv.1.0', 'features.6.conv.1.0','features.8.conv.1.0',
+        # 'features.17.conv.1.0', 'features.17.conv.2', 'features.18.0', 'classifier.1']
+
+        # worst auc
+        # target_layers = ['features.11.conv.1.0', 'features.11.conv.2', 'features.14.conv.1.0', 'features.14.conv.2', 'features.15.conv.0.0',  'features.15.conv.1.0',
+        # 'features.15.conv.2', 'features.16.conv.0.0', 'features.16.conv.1.0', 'features.16.conv.2']
 
         # #best fr95
         # target_layers=[
         #         'features.14.conv.2', 'features.17.conv.0.0', 'features.17.conv.2', 'features.15.conv.2', 'features.11.conv.2','features.17.conv.1.0', 
         #         'features.14.conv.1.0','features.15.conv.0.0','features.18.0', 'classifier.1'
         # ]
-
-        # best coverage (threshold =0.1)
-        # target_layers = ['classifier.1','features.18.0', 'features.17.conv.2', 'features.17.conv.1.0',
-        # 'features.14.conv.2', 'features.14.conv.1.0', 'features.17.conv.0.0', 'features.15.conv.0.0',
-        # 'features.16.conv.1.0', 'features.15.conv.2' ]
-
-        # best coverage (threshold =0.2)
-        # target_layers = ['features.3.conv.2','features.6.conv.1.0','features.14.conv.1.0','features.14.conv.2','features.15.conv.0.0',
-        # 'features.17.conv.0.0','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
-
-
-        # best coverage (threshold =0.3)
-        # target_layers = ['features.2.conv.0.0','features.3.conv.2','features.6.conv.1.0','features.14.conv.1.0','features.14.conv.2',
-        # 'features.15.conv.2','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
-
-        # best coverage (threshold =0.4/0.5)
-        # target_layers = ['features.2.conv.0.0','features.3.conv.2','features.5.conv.1.0','features.6.conv.1.0','features.9.conv.1.0',
-        # 'features.14.conv.2','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
-
-        # best coverage (threshold =0.6)
-        # target_layers = ['features.2.conv.0.0','features.3.conv.2','features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0',
-        # 'features.14.conv.2','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
-
-        # best coverage (threshold =0.7-0.89)
-        # target_layers = ['features.2.conv.0.0','features.3.conv.2','features.5.conv.1.0','features.6.conv.1.0','features.8.conv.1.0',
-        # 'features.9.conv.1.0','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
-
-        # best coverage (threshold =0.9/0.91)
-        # target_layers = ['features.2.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0','features.6.conv.1.0',
-        # 'features.8.conv.1.0','features.9.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
-
-
-        # best coverage (threshold =0.92/0.94)
-        # target_layers = ['features.1.conv.1','features.2.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
-        # 'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.17.conv.2','classifier.1']
-
-        # best coverage (threshold =0.93)
-        # target_layers = ['features.2.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0','features.6.conv.1.0',
-        # 'features.8.conv.1.0','features.9.conv.1.0','features.17.conv.1.0','features.17.conv.2','classifier.1']
+        #best coverage (threshold =0.7-0.89)
+        target_layers = ['features.2.conv.0.0','features.3.conv.2','features.5.conv.1.0','features.6.conv.1.0','features.8.conv.1.0',
+        'features.9.conv.1.0','features.17.conv.1.0','features.17.conv.2','features.18.0','classifier.1']
 
         #best coverage (threshold =0.95)
-        target_layers = ['features.2.conv.0.0','features.3.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
-        'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.17.conv.2','classifier.1']
-
-        # best coverage (threshold =0.96/0.99)
-        # target_layers = ['features.1.conv.1','features.2.conv.0.0','features.3.conv.0.0','features.3.conv.1.0','features.3.conv.2',
-        # 'features.5.conv.1.0','features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','classifier.1']
-
-        # best coverage (threshold =0.97)
-        # target_layers = ['features.2.conv.0.0','features.2.conv.2','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
-        # 'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.14.conv.2','classifier.1']
-
-        # best coverage (threshold =0.98)
-        # target_layers = ['features.1.conv.1','features.2.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
-        # 'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.10.conv.1.0','classifier.1']
-
-
-        # best coverage (threshold =1)
-        # target_layers = ['features.1.conv.1','features.2.conv.0.0','features.3.conv.0.0','features.3.conv.1.0','features.3.conv.2',
-        # 'features.5.conv.1.0','features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.10.conv.1.0']
-
-
-
-
+        # target_layers = ['features.2.conv.0.0','features.3.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
+        # 'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.17.conv.2','classifier.1']
 
         loaders = [
         'CIFAR100-train',
@@ -346,16 +293,7 @@ if __name__ == "__main__":
                 # print(corrs)
                 # quit()
 
-                # correct = get_filtered_samples(ds=ds,
-                # split='CIFAR100-test',
-                # correct=True,
-                # conf_range=[100,100]
-                # )
-                # quit()
-                plot_conceptogram(path = Path.cwd()/'temp_plots/conceptos/',
-                name='mobilenet_correct', 
-                ds=ds,
-                )
+
                 
                 drillers = {}
                 for peep_layer in target_layers:
@@ -379,59 +317,59 @@ if __name__ == "__main__":
                                 print(f'No Classifier found for {drill_key} at {driller._empp_file}')
 
                 correct = get_filtered_samples(ds=ds,
-                split='CIFAR100-test',
-                correct=True,
-                )
-
-
+                        split='CIFAR100-test',
+                        #correct=False,
+                        conf_range=[0,30],
+                        localization_range = [0.05, 0.06],
+                        phs = ph,
+                        target_modules = target_layers # best config
+                        )
+                quit()
                 scores, protoclasses = proto_score(
-                                datasets = ds,
-                                peepholes = ph,
-                                proto_key = 'CIFAR100-test',
-                                score_name = 'LACS',
-                                target_modules = target_layers,
-                                verbose = verbose,
-                                )
+                        datasets = ds,
+                        peepholes = ph,
+                        proto_key = 'CIFAR100-test',
+                        score_name = 'LACS',
+                        target_modules = target_layers,
+                        verbose = verbose,
+                        )
 
-                avg_scores = {}
+                plot_conceptogram(path = Path.cwd()/'temp_plots/conceptos/mobilenet',
+                        name='low_local_not_conf', 
+                        datasets=ds,
+                        peepholes=ph,
+                        loaders=['CIFAR100-test'],
+                        target_modules=target_layers,
+                        samples=[1674],
+                        classes =Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
+                        scores=scores,
+                        )
+                quit()
 
-                for ds_key in scores:
-                        avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
-                print(avg_scores)
+                # avg_scores = {}
+
+                # for ds_key in scores:
+                #         avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
+                # print(avg_scores)
 
                 # quit()
-                out =localization_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", target_modules=target_layers, plot = True,
-                save_dir = plots_path)
-                results = ds._dss["CIFAR100-test"]["result"]
+                # out =localization_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", target_modules=target_layers, plot = True,
+                # save_dir = plots_path)
+                # results = ds._dss["CIFAR100-test"]["result"]
 
-                means = localization_means(Ls=out["Ls"], results=results)
-                print(means)
+                # means = localization_means(Ls=out["Ls"], results=results)
+                # print(means)
                 #plot_empp_posteriors(drillers=drillers, save_dir=drill_path)
                 #coverage = empp_coverage_scores(drillers=drillers, threshold=0.9, plot=False, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_mobilenet_06.png')
                 #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
                 # compare_relative_coverage_all_clusters( all_drillers = drillers_dict,
                 #         threshold=0.8, plot= True, save_path=plots_path, filename='relative_coverage_all_clusters_mobilenet.png')
 
-                # proto_scores_runs = []
                 # localization_runs = []
                 # localization_metric_runs = []
 
                 # for i in range(20):
                 #         random_layers = random.sample(target_layers, 10)
-
-                #         scores, protoclasses = proto_score(
-                #                 datasets=ds,
-                #                 peepholes=ph,
-                #                 proto_key='CIFAR100-test',
-                #                 score_name='LACS',
-                #                 target_modules=random_layers,
-                #                 verbose=verbose,
-                #         )
-
-                #         avg_scores = {}
-                #         for ds_key in scores:
-                #                 avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
-                #         proto_scores_runs.append(avg_scores)
 
                 #         out = localization_from_peepholes(
                 #                 phs=ph,
@@ -453,11 +391,7 @@ if __name__ == "__main__":
                 #                 "L_avg": out["L_avg"],
                 #         })
 
-                # # --- aggregate protoscore ---
-                # avg_proto_scores = {}
-                # for key in proto_scores_runs[0]:
-                #         xs = torch.stack([torch.as_tensor(run[key]).float() for run in proto_scores_runs])
-                #         avg_proto_scores[key] = xs.mean()
+                
 
                 # # --- aggregate localization means (exclude counts from averaging) ---
                 # avg_localization = {}
@@ -477,8 +411,6 @@ if __name__ == "__main__":
                 #         xs = torch.stack([torch.as_tensor(run[key]).float() for run in localization_metric_runs])
                 #         avg_loc_metrics[key] = torch.nanmean(xs)
 
-                # print("Average ProtoScores over random layers:")
-                # print(avg_proto_scores)
 
                 # print("\nAverage localization means over random layers:")
                 # print(avg_localization)

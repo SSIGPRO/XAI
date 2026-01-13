@@ -37,8 +37,10 @@ from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
 from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
-from calculate_layer_importance import layer_importance_lolo_deltas_per_loader_okko as layer_importance, topk_layers_per_loader 
 from peepholelib.utils.localization import *
+from peepholelib.plots.conceptograms import plot_conceptogram 
+from peepholelib.utils.get_samples import *
+from calculate_layer_importance import localization_delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
 
 
 def get_st_list(state_dict):
@@ -103,7 +105,7 @@ if __name__ == "__main__":
         # Directories definitions
         #--------------------------------
         cifar_path = '/srv/newpenny/dataset/CIFAR100'
-        ds_path = Path.cwd()/'../data/datasets'
+        ds_path = Path('/srv/newpenny/XAI/generated_data/TPAMI/parsed_datasets/CIFAR100_ViT')
 
         # model parameters
         seed = 29
@@ -143,39 +145,42 @@ if __name__ == "__main__":
     
         nn = torchvision.models.vit_b_16()
         n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
-        # target_layers = list(dict.fromkeys(get_st_list(nn.state_dict().keys())))
+        target_layers = list(dict.fromkeys(get_st_list(nn.state_dict().keys())))
         # #best
         # target_layers = ['encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
         # 'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
         # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
 
-        # # #worst
+        #worst
         # target_layers = ['encoder.layers.encoder_layer_0.mlp.3','encoder.layers.encoder_layer_1.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3','encoder.layers.encoder_layer_2.mlp.0',
         # 'encoder.layers.encoder_layer_2.mlp.3','encoder.layers.encoder_layer_3.mlp.0','encoder.layers.encoder_layer_3.mlp.3', 
         # 'encoder.layers.encoder_layer_4.mlp.0','encoder.layers.encoder_layer_4.mlp.3','encoder.layers.encoder_layer_6.mlp.3']
 
-        # 10 best auc
-        #target_layers = ['encoder.layers.encoder_layer_3.mlp.3', 'encoder.layers.encoder_layer_2.mlp.3', 'encoder.layers.encoder_layer_1.mlp.3',
-        #'encoder.layers.encoder_layer_0.mlp.0', 'encoder.layers.encoder_layer_0.mlp.3',
+        # # 10 best auc
+        # target_layers = ['encoder.layers.encoder_layer_3.mlp.3', 'encoder.layers.encoder_layer_2.mlp.3', 'encoder.layers.encoder_layer_1.mlp.3',
+        # 'encoder.layers.encoder_layer_0.mlp.0', 'encoder.layers.encoder_layer_0.mlp.3',
         # 'encoder.layers.encoder_layer_10.mlp.0',
         # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
 
-        #best frp95
+        # target_layers = ['encoder.layers.encoder_layer_0.mlp.0', 'encoder.layers.encoder_layer_0.mlp.3', 'encoder.layers.encoder_layer_1.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3',
+        # 'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_10.mlp.0', 'encoder.layers.encoder_layer_10.mlp.3',
+        # 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
+
+        # worst delta auc
+        # target_layers = ['encoder.layers.encoder_layer_4.mlp.0', 'encoder.layers.encoder_layer_5.mlp.0', 'encoder.layers.encoder_layer_5.mlp.3',
+        # 'encoder.layers.encoder_layer_6.mlp.0', 'encoder.layers.encoder_layer_6.mlp.3', 'encoder.layers.encoder_layer_7.mlp.0',
+        # 'encoder.layers.encoder_layer_7.mlp.3', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
+        # 'encoder.layers.encoder_layer_9.mlp.3']
+
+        # #best frp95
         # target_layers = ['encoder.layers.encoder_layer_2.mlp.3', 'encoder.layers.encoder_layer_5.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3',
         # 'encoder.layers.encoder_layer_8.mlp.3', 'encoder.layers.encoder_layer_9.mlp.3','encoder.layers.encoder_layer_10.mlp.0',
         # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
 
-        target_layers = ['heads.head',
-        'encoder.layers.encoder_layer_11.mlp.0',
-        'encoder.layers.encoder_layer_11.mlp.3',
-        'encoder.layers.encoder_layer_10.mlp.3',
-        'encoder.layers.encoder_layer_10.mlp.0',
-        'encoder.layers.encoder_layer_9.mlp.0',
-        'encoder.layers.encoder_layer_9.mlp.3',
-        'encoder.layers.encoder_layer_8.mlp.3',
-        'encoder.layers.encoder_layer_8.mlp.0',
-        'encoder.layers.encoder_layer_7.mlp.0'
-        ]
+        # best
+        target_layers = ['encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
+        'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0','encoder.layers.encoder_layer_10.mlp.3',
+        'encoder.layers.encoder_layer_11.mlp.0','encoder.layers.encoder_layer_11.mlp.3', 'heads.head' ]
 
 
 
@@ -267,26 +272,30 @@ if __name__ == "__main__":
                         loaders = loaders,
                         verbose = verbose 
                         )
-                corrs = localization_pmax_correlations(
-                        phs=ph,
-                        ds=ds,
-                        ds_key="CIFAR100-test",
-                        target_modules=target_layers,
-                        save_dir="/home/claranunesbarrancos/repos/XAI/src/temp_plots/localization" ,  
-                        file_name="conf_vs_localization_vit.png"
-                        )
+                # corrs = localization_pmax_correlations(
+                #         phs=ph,
+                #         ds=ds,
+                #         ds_key="CIFAR100-test",
+                #         target_modules=target_layers,
+                #         save_dir="/home/claranunesbarrancos/repos/XAI/src/temp_plots/localization" ,  
+                #         file_name="conf_vs_localization_vit.png"
+                #         )
 
-                print(corrs)
-                quit()
-                # deltas = layer_importance(score_fn=proto_score,
-                #         datasets=ds, peepholes=peepholes,
-                #         target_modules=target_layers, loaders=loaders,
-                #         score_name="LACS", proto_key="CIFAR100-train",
-                #         batch_size=bs, verbose=True,
+                # print(corrs)
+                # quit()
+                # deltas = layer_importance(ds=ds, phs=peepholes,
+                #         loader = "CIFAR100-test",
+                #         target_modules=target_layers, 
                 #         )
-                # topk = topk_layers_per_loader(deltas, k=5,
-                #         mode="fpr95",     # or "fpr95" or "joint"
-                #         )
+                # quit()
+                # correct = get_filtered_samples(ds=ds,
+                # split='CIFAR100-test',
+                # #correct=False,
+                # conf_range=[0,40],
+                # localization_range = [0.06, 0.1],
+                # phs = ph,
+                # target_modules = target_layers # best config
+                # )
                 # quit()
 
                 scores, protoclasses = proto_score(
@@ -298,18 +307,24 @@ if __name__ == "__main__":
                         verbose = verbose,
                         )
 
-                avg_scores = {}
+                plot_conceptogram(path = Path.cwd()/'temp_plots/conceptos/vit',
+                        name='low_local_not_conf', 
+                        datasets=ds,
+                        peepholes=ph,
+                        loaders=['CIFAR100-test'],
+                        target_modules=target_layers,
+                        samples=[695],
+                        classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
+                        scores=scores,
+                )
+                quit()
 
-                for ds_key in scores:
-                        avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
-                print(avg_scores)
+                # out =localization_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", target_modules=target_layers, plot = True,
+                # save_dir = plots_path)
+                # results = ds._dss["CIFAR100-test"]["result"]
 
-                out =localization_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", target_modules=target_layers, plot = True,
-                save_dir = plots_path)
-                results = ds._dss["CIFAR100-test"]["result"]
-
-                means = localization_means(Ls=out["Ls"], results=results)
-                print(means)
+                # means = localization_means(Ls=out["Ls"], results=results)
+                # print(means)
 
                 # quit()
                 # drillers = {}
@@ -334,26 +349,11 @@ if __name__ == "__main__":
                 # coverage = empp_coverage_scores(drillers=drillers, threshold=0.95, plot=False, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_vgg_550clusters.png')
                # empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
         
-                # proto_scores_runs = []
                 # localization_runs = []
                 # localization_metric_runs = []
 
                 # for i in range(20):
                 #         random_layers = random.sample(target_layers, 10)
-
-                #         scores, protoclasses = proto_score(
-                #                 datasets=ds,
-                #                 peepholes=ph,
-                #                 proto_key='CIFAR100-test',
-                #                 score_name='LACS',
-                #                 target_modules=random_layers,
-                #                 verbose=verbose,
-                #         )
-
-                #         avg_scores = {}
-                #         for ds_key in scores:
-                #                 avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
-                #         proto_scores_runs.append(avg_scores)
 
                 #         out = localization_from_peepholes(
                 #                 phs=ph,
@@ -375,11 +375,6 @@ if __name__ == "__main__":
                 #                 "L_avg": out["L_avg"],
                 #         })
 
-                # # --- aggregate protoscore ---
-                # avg_proto_scores = {}
-                # for key in proto_scores_runs[0]:
-                #         xs = torch.stack([torch.as_tensor(run[key]).float() for run in proto_scores_runs])
-                #         avg_proto_scores[key] = xs.mean()
 
                 # # --- aggregate localization means (exclude counts from averaging) ---
                 # avg_localization = {}
@@ -398,9 +393,6 @@ if __name__ == "__main__":
                 # for key in localization_metric_runs[0]:
                 #         xs = torch.stack([torch.as_tensor(run[key]).float() for run in localization_metric_runs])
                 #         avg_loc_metrics[key] = torch.nanmean(xs)
-
-                # print("Average ProtoScores over random layers:")
-                # print(avg_proto_scores)
 
                 # print("\nAverage localization means over random layers:")
                 # print(avg_localization)

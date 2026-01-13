@@ -46,7 +46,7 @@ from peepholelib.plots.ood import plot_ood
 from peepholelib.plots.calibration import plot_calibration
 from peepholelib.plots.atks import auc_atks 
 
-from calculate_layer_importance import layer_importance_lolo_deltas_per_loader_okko as layer_importance, topk_layers_per_loader 
+from calculate_layer_importance import localization_delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
 
 
 def average_random_layer_scores(*,ds, ph, target_layers_pool, scores_file, target_k=10,           
@@ -221,7 +221,7 @@ if __name__ == "__main__":
                                 'classifier.6',
                         ]
         # # best (0.95)
-        target_layers = ['features.21','features.24','classifier.0','classifier.3', 'classifier.6']
+        #target_layers = ['features.21','features.24','classifier.0','classifier.3', 'classifier.6']
 
         # # best (0.9)
         # target_layers = ['features.24','features.28','classifier.0','classifier.3', 'classifier.6']
@@ -298,17 +298,14 @@ if __name__ == "__main__":
                         verbose = verbose 
                         )
 
-                # deltas = layer_importance(score_fn=proto_score,
-                #         datasets=ds, peepholes=peepholes,
-                #         target_modules=target_layers, loaders=loaders,
-                #         score_name="LACS", proto_key="CIFAR100-train",
-                #         batch_size=bs,
-                #         append_scores=scores, verbose=True,
-                #         )
-                # topk = topk_layers_per_loader(deltas, k=5,
-                #         mode="fpr95",     # or "fpr95" or "joint"
-                #         )
-                # quit()
+                deltas = layer_importance(ds=ds, phs=peepholes,
+                        loader = "CIFAR100-test",
+                        target_modules=target_layers, 
+                        )
+                topk = topk_layers(deltas, k=20,
+                        negatives = True
+                        )
+                quit()
 
                 #if (not 'CIFAR100-test' in scores) or (('CIFAR100-test' in scores) and (not 'LACS' in scores['CIFAR100-test'])): 
                 #get scores

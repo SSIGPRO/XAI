@@ -49,7 +49,7 @@ import random
 from copy import deepcopy
 from typing import Dict, List, Optional
 
-from calculate_layer_importance import layer_importance_lolo_deltas_per_loader_okko as layer_importance, topk_layers_per_loader 
+from calculate_layer_importance import localization_delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
 
 
 def average_random_layer_scores(*,ds, ph, target_layers_pool, scores_file, target_k=10,           
@@ -179,7 +179,7 @@ if __name__ == "__main__":
 
         plots_path = Path.cwd()/'temp_plots/conf/mobilenet/avg'
 
-        scores_file = Path('/home/claranunesbarrancos/repos/XAI/src/mobilenet/scores/temp_score_cifar100_avg')
+        scores_file = Path('/home/claranunesbarrancos/repos/XAI/src/mobilenet/scores/temp_score_cifar100_worst')
         scores_file.parent.mkdir(parents=True, exist_ok=True)
         if scores_file.exists():
                 scores = torch.load(scores_file)
@@ -326,46 +326,43 @@ if __name__ == "__main__":
                 #         verbose = verbose 
                 #         )
  
-                # deltas = layer_importance(score_fn=proto_score,
-                #         datasets=ds, peepholes=peepholes,
-                #         target_modules=target_layers, loaders=loaders,
-                #         score_name="LACS", proto_key="CIFAR100-train",
-                #         batch_size=bs,
-                #         append_scores=scores, verbose=True,
-                #         )
-                # topk = topk_layers_per_loader(deltas, k=30,
-                #         mode="fpr95",     # or "fpr95" or "joint"
-                #         )
-                # quit()
+                deltas = layer_importance(ds=ds, phs=peepholes,
+                        loader = "CIFAR100-test",
+                        target_modules=target_layers, 
+                        )
+                topk = topk_layers(deltas, k=50,
+                        negatives = True
+                        )
+                quit()
 
-                if (not 'CIFAR100-test' in scores) or (('CIFAR100-test' in scores) and (not 'LACS' in scores['CIFAR100-test'])): 
+                # if (not 'CIFAR100-test' in scores) or (('CIFAR100-test' in scores) and (not 'LACS' in scores['CIFAR100-test'])): 
                 #get scores
-                        # scores, protoclasses = proto_score(
-                        #         datasets = ds,
-                        #         peepholes = ph,
-                        #         proto_key = 'CIFAR100-train',
-                        #         score_name = 'LACS',
-                        #         batch_size = bs, 
-                        #         target_modules = target_layers,
-                        #         append_scores = scores,
-                        #         verbose = verbose,
-                        #         )
+                scores, protoclasses = proto_score(
+                        datasets = ds,
+                        peepholes = ph,
+                        proto_key = 'CIFAR100-train',
+                        score_name = 'LACS',
+                        batch_size = bs, 
+                        target_modules = target_layers,
+                        append_scores = scores,
+                        verbose = verbose,
+                        )
                                 
                         #torch.save(scores, scores_file)
-                        scores_avg = average_random_layer_scores(
-                                ds=ds,
-                                ph=ph,
-                                target_layers_pool=target_layers,
-                                target_k=10,
-                                batch_size=bs,
-                                verbose=verbose,
-                                scores_file=scores_file,
-                        )
-                        scores = scores_avg
-                        print(scores_avg)
+                scores_avg = average_random_layer_scores(
+                        ds=ds,
+                        ph=ph,
+                        target_layers_pool=target_layers,
+                        target_k=10,
+                        batch_size=bs,
+                        verbose=verbose,
+                        scores_file=scores_file,
+                )
+                scores = scores_avg
+                print(scores_avg)
 
-                else: 
-                        print('proto scores found')
+                # else: 
+                #         print('proto scores found')
         
                 # if (not 'CIFAR100-test' in scores) or (('CIFAR100-test' in scores) and (not 'MSP' in scores['CIFAR100-test'])): 
                 #         scores = mconf_score(
