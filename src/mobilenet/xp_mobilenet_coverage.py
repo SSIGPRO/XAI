@@ -3,14 +3,15 @@ from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import cuml
-cuml.accel.install()
+# import cuml
+# cuml.accel.install()
 
 # python stuff
 from time import time
 from functools import partial
 import random
-
+from matplotlib import pyplot as plt
+import matplotlib as mpl
 
 # torch stuff
 import torch
@@ -37,13 +38,23 @@ from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, con
 from peepholelib.peepholes.parsers import trim_corevectors
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
-from peepholelib.models.viz import viz_singular_values_2
+# from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
-from peepholelib.utils.viz_corevecs import plot_tsne, plot_tsne_CUDA
-from peepholelib.utils.localization import *
-from peepholelib.utils.get_samples import *
-from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
-from peepholelib.plots.conceptograms import plot_conceptogram 
+# from peepholelib.utils.viz_corevecs import plot_tsne, plot_tsne_CUDA
+# from peepholelib.utils.localization import *
+# from peepholelib.utils.get_samples import *
+# from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
+# from peepholelib.plots.conceptograms import plot_conceptogram 
+
+# mpl.use("pgf")
+# mpl.rcParams.update({
+#     "pgf.texsystem": "pdflatex",
+#     "pgf.preamble": r"\usepackage{mathpazo}",
+#     'text.usetex': True,
+#     'pgf.rcfonts': False,
+# })
+
+plt.rc('font', size=10)          # default text
 
 
 def load_all_drillers(**kwargs):
@@ -121,7 +132,9 @@ if __name__ == "__main__":
         
         verbose = True 
         
-        target_layers = [ 'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2',
+        target_layers = [ 
+               'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0',
+               'features.2.conv.1.0','features.2.conv.2',
         'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2',
         'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
         'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
@@ -293,7 +306,6 @@ if __name__ == "__main__":
                 # print(corrs)
                 # quit()
 
-
                 
                 drillers = {}
                 for peep_layer in target_layers:
@@ -305,7 +317,6 @@ if __name__ == "__main__":
                                 nl_model=n_classes,
                                 n_features=feature_sizes[peep_layer],
                                 parser=cv_parsers[peep_layer],
-
                                 device=device
                         )
 
@@ -315,6 +326,20 @@ if __name__ == "__main__":
                                 driller.load()
                         else:
                                 print(f'No Classifier found for {drill_key} at {driller._empp_file}')
+                coverage = empp_coverage_scores(drillers=drillers, threshold=0.8, plot=False)
+                for drill_key, driller in drillers.items():
+                       
+                        if drill_key == 'features.6.conv.1.0' or drill_key == 'features.8.conv.2' or drill_key == 'classifier.1':
+
+                                plt.imshow(1-driller._empp.detach().cpu().numpy(), cmap='bone')
+                                plt.title(f'c={coverage[drill_key]}')
+                                plt.xticks([]) 
+                                plt.yticks([]) 
+                                # plt.tight_layout()
+                                plt.savefig(f'Ep_{drill_key}.png', dpi=300, bbox_inches='tight')
+
+                quit()
+                
 
                 correct = get_filtered_samples(ds=ds,
                         split='CIFAR100-test',
