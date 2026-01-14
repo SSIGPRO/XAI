@@ -67,19 +67,25 @@ if __name__ == "__main__":
             'CIFAR100-train',
             'CIFAR100-val',
             'CIFAR100-test',
-            #'CIFAR100-C-val-c0',
-            #'CIFAR100-C-test-c0' 
+            'CIFAR100-C-val-c0',
+            'CIFAR100-C-test-c0' 
             ]
+
+    # number of channels in a conv layer. numbers from `nn`
+    feature_sizes = {
+            'features.7': 128,
+            'features.14': 256,
+            'features.28': 512,
+            }
 
     #--------------------------------
     # Model 
     #--------------------------------
 
-    nn = vgg16()
     n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
     model = ModelWrap(
-            model=nn,
-            target_modules=target_layers,
+            model = vgg16(),
+            target_modules = target_layers,
             device=device
             )
 
@@ -149,14 +155,6 @@ if __name__ == "__main__":
     #--------------------------------
     # Peepholes
     #--------------------------------
-
-    # number of channels in a conv layer. Get numbers from `nn`
-    feature_sizes = {
-            'features.7': 128,
-            'features.14': 256,
-            'features.28': 512,
-            }
-    
     drillers = {}
     for peep_layer in target_layers:
         drillers[peep_layer] = DMD(
@@ -191,14 +189,11 @@ if __name__ == "__main__":
                 ) 
         
         for drill_key, driller in drillers.items():
-            if (drill_path/'precision.pt').exists():
-                print(f'Loading DMD for {drill_key}') 
-                driller.load()
-            else:
+            if not driller.load():
                 t0 = time()
                 print(f'Fitting DMD for {drill_key} time = ', time()-t0)
                 driller.fit(
-                        dataset = ds, 
+                        datasets = ds, 
                         corevectors = cv, 
                         loader = 'CIFAR100-train',
                         verbose=verbose

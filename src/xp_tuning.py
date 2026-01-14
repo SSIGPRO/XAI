@@ -2,31 +2,31 @@ import sys
 from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
-# python stuff
-import pandas as pd
-import seaborn as sb
-from matplotlib import pyplot as plt
-import numpy as np
-
-# Our stuff
-import peepholelib
-from peepholelib.coreVectors.coreVectors import CoreVectors 
-from peepholelib.peepholes.parsers import trim_corevectors
-from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
-from peepholelib.peepholes.peepholes import Peepholes
-from peepholelib.utils.analyze import compute_top_k_accuracy
-
 # torch stuff
 import torch
 from cuda_selector import auto_cuda
+from torchvision.models import vgg16
+
+# Our stuff
+import peepholelib
+
+from peepholelib.models.model_wrap import ModelWrap 
+
+from peepholelib.datasets.parsedDataset import ParsedDataset 
+from peepholelib.coreVectors.coreVectors import CoreVectors 
+from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
+from peepholelib.peepholes.peepholes import Peepholes
+from peepholelib.utils.topk_acc import compute_top_k_accuracy
+
+from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
+from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
+from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
 
 # Tuner
-import tempfile
 from functools import partial
 import ray
 from ray import tune
 from ray import train
-from ray.train import Checkpoint, get_checkpoint
 from ray.tune.search import ConcurrencyLimiter
 from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.search.optuna import OptunaSearch
@@ -38,11 +38,15 @@ ray.init(runtime_env = {"py_modules": [peepholelib]})
 def peephole_wrap(config, **kwargs):
     peep_size = config['peep_size']
     n_cls = config['n_classifier']
-    
+     
+    model_path = kwargs['model_path']
+    model_name = kwargs['model_name']
+    ds = kwargs['datasets']
     cv = kwargs['corevectors']
     ph_path = kwargs['ph_path']
     ph_name = kwargs['ph_name']
     peep_layer = kwargs['peep_layer']
+    Reducer = kwargs['reducer_class']
     bs = kwargs['batch_size']
     verbose = kwargs['verbose']
     k = kwargs['k']
@@ -63,38 +67,65 @@ def peephole_wrap(config, **kwargs):
 
         with peepholes as ph: 
             ph.load_only(
-                    loaders = ['train', 'test', 'val'],
+                    loaders = ['CIFAR100-train', 'CIFAR100-val'],
                     verbose = True
                     )
             
             topk_acc = compute_top_k_accuracy(
-                    peepholes = ph._phs['val'][peep_layer]['peepholes'],    
-                    targets = cv._dss['val']['label'],
+                    peepholes = ph._phs['CIFAR100-val'][peep_layer],    
+                    targets = ds._dss['CIFAR100-val']['label'],
                     k=k
                     )
     else:
-        parser_cv = partial(
-                trim_corevectors,
-                module = peep_layer,
+        #--------------------------------
+        # instances
+        #--------------------------------
+        model = ModelWrap(
+                model = vgg16(),
+                target_modules = [peep_layer],
+                device = _device
+                )
+                                                
+        model.update_output(
+                output_layer = 'classifier.6', 
+                to_n_classes = 100,
+                overwrite = True 
+                )
+                                                
+        model.load_checkpoint(
+                name = model_name,
+                path = model_path,
+                verbose = verbose
+                )
+
+        svd = Reducer(
+                path = svds_path,
+                layer = peep_layer,
+                model = model,
                 cv_dim = peep_size,
-                ) 
+                device = _device
+                )
 
         driller = tGMM(
                 path = ph_path,
                 name = 'classifier',
+                target_module = peep_layer,
                 nl_classifier = n_cls,
                 nl_model = 100,
                 n_features = peep_size, 
-                parser = parser_cv,
+                cls_kwargs = {
+                    'covariance_regularization': 1e-4,
+                    'convergence_tolerance': 1e-2
+                    },
+                reducer = svd,
                 device = _device
                 )
-                                                                         
-        driller.fit(corevectors = cv._corevds['train'], verbose=verbose)
-        driller.compute_empirical_posteriors(
-                dataset = cv._dss['train'],
-                corevectors = cv._corevds['train'],
-                bs = bs,
-                verbose=verbose,
+
+        driller.fit(
+                datasets = ds,
+                corevectors = cv,
+                loader = 'CIFAR100-train',
+                verbose=verbose
                 )
         driller.save()
 
@@ -106,6 +137,7 @@ def peephole_wrap(config, **kwargs):
 
         with peepholes as ph:
             ph.get_peepholes(
+                datasets = ds,
                 corevectors = cv,
                 target_modules = [peep_layer],
                 batch_size = bs,
@@ -115,15 +147,12 @@ def peephole_wrap(config, **kwargs):
                 )
             
             topk_acc = compute_top_k_accuracy(
-                    peepholes = ph._phs['val'][peep_layer]['peepholes'],
-                    targets = cv._dss['val']['label'],
+                    peepholes = ph._phs['CIFAR100-val'][peep_layer],
+                    targets = ds._dss['CIFAR100-val']['label'],
                     k=k
                     )
 
-    # Final report: no checkpoint anymore
-    with tempfile.TemporaryDirectory() as tempdir: 
-        checkpoint = Checkpoint.from_directory(tempdir)
-        train.report({'topk_acc': topk_acc}, checkpoint=checkpoint)
+        train.report({'topk_acc': topk_acc})
 
     return 
 
@@ -140,6 +169,13 @@ if __name__ == "__main__":
     bs = 2**9 
     n_threads = 1
 
+    ds_path = Path.cwd()/'../data/datasets'
+
+    svds_path = Path.cwd()/'../data/svds'
+
+    model_path = '/srv/newpenny/XAI/models'
+    model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
+
     cvs_name = 'corevectors'
     cvs_path = Path.cwd()/'../data/corevectors'
     
@@ -155,42 +191,52 @@ if __name__ == "__main__":
     
     corr_path = Path.cwd()/'temp_plots/correlations'
     corr_path.mkdir(parents=True, exist_ok=True)
+    loaders = ['CIFAR100-train', 'CIFAR100-test', 'CIFAR100-val']
 
     # Peepholelib
     target_layers = [
-            'features.24',
             'features.26',
             'features.28',
             'classifier.0',
-            'classifier.3',
-            'classifier.6',
             ]
 
     # Ray Tune
-    num_samples = 50
+    num_samples = 2 
+    red_classes = {
+            'features.26': Conv2dToeplitzSVD,
+            'features.28': Conv2dAvgKernelSVD,
+            'classifier.0': LinearSVD,
+            }
 
     #--------------------------------
-    # CoreVectors 
+    # Datasets and CoreVectors 
     #--------------------------------
+    datasets = ParsedDataset(
+            path = ds_path,
+            )
+
     corevecs = CoreVectors(
             path = cvs_path,
             name = cvs_name,
             )
 
-    with corevecs as cv: 
-        # load corevds 
+    with datasets as ds, corevecs as cv: 
+        ds.load_only(
+                loaders = loaders,
+                verbose = verbose
+                )
+
         cv.load_only(
-                loaders = ['train', 'test', 'val'],
+                loaders = loaders,
                 verbose = verbose 
                 ) 
 
         #--------------------------------
         # Tunning 
         #--------------------------------
-
         config = {
-                'peep_size': tune.randint(1, 300+1),
-                'n_classifier': tune.randint(1, 300+1),
+                'peep_size': tune.randint(1, 30+1),
+                'n_classifier': tune.randint(1, 30+1),
                 }
 
         if device == 'cpu':
@@ -210,11 +256,15 @@ if __name__ == "__main__":
                 trainable = tune.with_resources(
                         partial(
                             peephole_wrap,
+                            model_path = model_path,
+                            model_name = model_name,
+                            datasets = ds,
                             corevectors = cv,
                             ph_path = phs_path,
                             ph_name = phs_name+'.'+peep_layer,
                             peep_layer = peep_layer,
                             batch_size = bs,
+                            reducer_class = red_classes[peep_layer],
                             k = 3,
                             verbose = verbose
                             ),

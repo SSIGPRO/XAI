@@ -24,7 +24,6 @@ from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
-from peepholelib.coreVectors.dimReduction.svds.conv2d_kernel_svd import Conv2dKernelSVD
 from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
 
 # peepholes
@@ -33,7 +32,7 @@ from peepholelib.peepholes.peepholes import Peepholes
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -46,7 +45,7 @@ if __name__ == "__main__":
     bs = 512 
     n_threads = 1
 
-    model_dir = '/srv/newpenny/XAI/models'
+    model_path = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
      
     svds_path = Path.cwd()/'../data/svds'
@@ -64,37 +63,36 @@ if __name__ == "__main__":
     
     # Peepholelib
     target_layers = [
-            #'features.26',
+            'features.26',
             'features.28',
-            #'classifier.0',
+            'classifier.0',
             ]
     
     cv_dims = {
-            #'features.26': 30,
+            'features.26': 30,
             'features.28': 50,
-            #'classifier.0': 30,
+            'classifier.0': 30,
             }
 
     svd_rank = 300
-    n_cluster = 50 
+    n_cluster = 4 
     
     loaders = [
             'CIFAR100-train',
             'CIFAR100-val',
             'CIFAR100-test',  
-            #'CIFAR100-C-val-c0',
-            #'CIFAR100-C-test-c0' 
+            'CIFAR100-C-val-c0',
+            'CIFAR100-C-test-c0' 
             ]
 
     #--------------------------------
     # Model 
     #--------------------------------
     
-    nn = vgg16()
     n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
 
     model = ModelWrap(
-            model = nn,
+            model = vgg16(),
             target_modules = target_layers,
             device = device
             )
@@ -107,7 +105,7 @@ if __name__ == "__main__":
                                             
     model.load_checkpoint(
             name = model_name,
-            path = model_dir,
+            path = model_path,
             verbose = verbose
             )
                                             
@@ -132,28 +130,29 @@ if __name__ == "__main__":
         sample_in = ds._dss['CIFAR100-train']['image'][0]
 
         svds = {
-                #'features.26': Conv2dToeplitzSVD(
-                #    path = svds_path,
-                #    layer = 'features.26',
-                #    model = model,
-                #    rank = svd_rank,
-                #    sample_in = sample_in,
-                #    device = device,
-                #    ),
+                'features.26': Conv2dToeplitzSVD(
+                    path = svds_path,
+                    layer = 'features.26',
+                    model = model,
+                    rank = svd_rank,
+                    cv_dim = cv_dims['features.26'],
+                    sample_in = sample_in,
+                    ),
                 'features.28': Conv2dAvgKernelSVD(
                     path = svds_path,
                     layer = 'features.28',
                     model = model,
                     rank = svd_rank,
-                    device = device,
+                    cv_dim = cv_dims['features.28'],
                     ),
-                #'classifier.0': LinearSVD(
-                #    path = svds_path,
-                #    layer = 'classifier.0',
-                #    model = model,
-                #    rank = svd_rank,
-                #    verbose = verbose
-                #    ),
+                'classifier.0': LinearSVD(
+                    path = svds_path,
+                    layer = 'classifier.0',
+                    model = model,
+                    rank = svd_rank,
+                    cv_dim = cv_dims['classifier.0'],
+                    verbose = verbose
+                    ),
                 }
     print('time: ', time()-t0)
 
@@ -198,29 +197,20 @@ if __name__ == "__main__":
     #--------------------------------
     # Peepholes
     #--------------------------------
-    feature_sizes = {
-            #'features.26': cv_dims['features.26'],
-            # for channel_wise corevectors, the size is out_size * cv_dim
-            # TODO: get 196 from somewhere
-            'features.28': cv_dims['features.28'],
-            #'classifier.0': cv_dims['classifier.0'],
-            }
-
     drillers = {}
     for peep_layer in target_layers:
-        cv_parser = partial(
-                    svds[peep_layer].parser,
-                    cv_dim = cv_dims[peep_layer]
-                    )
-
         drillers[peep_layer] = tGMM(
                 path = drill_path,
-                name = f'{drill_name}.GMM.{peep_layer}.{n_classes}.{feature_sizes[peep_layer]}.{n_cluster}',
+                name = f'{drill_name}.GMM.{peep_layer}.{n_classes}.{cv_dims[peep_layer]}.{n_cluster}',
                 target_module = peep_layer,
                 nl_classifier = n_cluster,
                 nl_model = n_classes,
-                n_features = feature_sizes[peep_layer],
-                parser = cv_parser,
+                n_features = cv_dims[peep_layer],
+                cls_kwargs = {
+                    'covariance_regularization': 1e-4,
+                    'convergence_tolerance': 1e-2
+                    },
+                reducer = svds[peep_layer],
                 device = device
                 )
 
@@ -243,27 +233,17 @@ if __name__ == "__main__":
                 ) 
 
         for drill_key, driller in drillers.items():
-            if (driller._empp_file).exists():
-                print(f'Loading Classifier for {drill_key}') 
-                driller.load()
-            else:
+            if not driller.load():
                 t0 = time()
                 print(f'Fitting classifier for {drill_key}')
                 driller.fit(
+                        datasets = ds,
                         corevectors = cv,
                         loader = 'CIFAR100-train',
                         verbose=verbose
                         )
                 print(f'Fitting time for {drill_key}  = ', time()-t0)
 
-                driller.compute_empirical_posteriors(
-                        datasets = ds,
-                        corevectors = cv,
-                        loader = 'CIFAR100-train',
-                        batch_size = bs,
-                        verbose=verbose
-                        )
-        
                 # save classifiers
                 print(f'Saving classifier for {drill_key}')
                 driller.save()
