@@ -1,0 +1,238 @@
+import sys
+from pathlib import Path as Path
+sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
+
+# python stuff
+from time import time
+from functools import partial
+
+# Our stuff
+# model
+from peepholelib.models.model_wrap import ModelWrap 
+
+# dataset
+from peepholelib.datasets.cifar100 import Cifar100
+from peepholelib.datasets.parsedDataset import ParsedDataset
+from peepholelib.coreVectors.coreVectors import CoreVectors
+
+# corevecs
+from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD 
+from peepholelib.models.model_wrap import get_in_activations
+
+# peepholes
+from peepholelib.peepholes.DeepMahalanobisDistance.DMD import DeepMahalanobisDistance as DMD
+from peepholelib.peepholes.peepholes import Peepholes
+
+# torch stuff
+import torch
+from torchvision.models import vgg16
+from cuda_selector import auto_cuda
+
+if __name__ == "__main__":
+    use_cuda = torch.cuda.is_available()
+    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    print(f"Using {device} device")
+
+    #--------------------------------
+    # Directories definitions
+    #--------------------------------
+    cifar_path = '/srv/newpenny/dataset/CIFAR100'
+    ds_path = Path.cwd()/'../data/datasets'
+
+    # model parameters
+    bs = 64 
+    n_threads = 1 
+
+    model_dir = '/srv/newpenny/XAI/models'
+    model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
+
+    svds_path = Path.cwd()/'../data/svds'
+    
+    cvs_path = Path.cwd()/'../data/corevectors'
+    cvs_name = 'dmd_avg_k'
+
+    drill_path = Path.cwd()/'../data/drillers'
+    drill_name = 'dmd_avg_k'
+
+    phs_path = Path.cwd()/'../data/peepholes'
+    phs_name = 'dmd_avg_k'
+
+    verbose = True 
+
+    cv_dim = 50
+
+    # Peepholelib
+    target_layers = [
+            'features.7',
+            'features.14',
+            'features.28',
+            ]
+
+    svd_rank = 300
+
+    loaders = [
+            'CIFAR100-train',
+            'CIFAR100-val',
+            'CIFAR100-test',
+            #'CIFAR100-C-val-c0',
+            #'CIFAR100-C-test-c0' 
+            ]
+
+    #--------------------------------
+    # Model 
+    #--------------------------------
+
+    nn = vgg16()
+    n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
+    model = ModelWrap(
+            model=nn,
+            target_modules=target_layers,
+            device=device
+            )
+
+    model.update_output(
+            output_layer = 'classifier.6', 
+            to_n_classes = n_classes,
+            overwrite = True 
+            )
+
+    model.load_checkpoint(
+            name = model_name,
+            path = model_dir,
+            verbose = verbose
+            )
+
+    #--------------------------------
+    # Dataset 
+    #--------------------------------
+
+    # Assuming we have a parsed dataset in ds_path
+    datasets = ParsedDataset(
+            path = ds_path,
+            )
+
+    #--------------------------------
+    # SVDs 
+    #--------------------------------
+    t0 = time()
+    svds = dict()
+    for _layer in target_layers:
+        svds[_layer] = Conv2dAvgKernelSVD(
+                    path = svds_path,
+                    layer = _layer,
+                    model = model,
+                    rank = svd_rank,
+                    device = device,
+                    )
+    print('time: ', time()-t0)
+
+    #--------------------------------
+    # CoreVectors 
+    #--------------------------------
+    corevecs = CoreVectors(
+            path = cvs_path,
+            name = cvs_name,
+            model = model,
+            )
+    
+    with datasets as ds, corevecs as cv: 
+        ds.load_only(
+                loaders = loaders,
+                verbose = verbose
+                )
+
+        cv.get_coreVectors(
+                datasets = ds,
+                reducers = svds,
+                activations_parser = get_in_activations,
+                save_input = True,
+                save_output = False,
+                batch_size = bs,
+                n_threads = n_threads,
+                verbose = verbose
+                )
+
+    #--------------------------------
+    # Peepholes
+    #--------------------------------
+
+    drillers = {}
+    for peep_layer in target_layers:
+        cv_parser = partial(
+                    svds[peep_layer].parser,
+                    cv_dim = cv_dim
+                    )
+
+        drillers[peep_layer] = DMD(
+                path = drill_path,
+                name = f'{drill_name}.{peep_layer}',
+                target_module = peep_layer,
+                nl_model = n_classes,
+                n_features = cv_dim,
+                model = model,
+                magnitude = 0.004,
+                reducer = svds[peep_layer],
+                act_parser = get_in_activations,
+                cv_parser = cv_parser,
+                std_transform = [0.229, 0.224, 0.225],
+                save_input = True,
+                save_output = False,
+                device = device,
+                )
+        
+    peepholes = Peepholes(
+            path = phs_path,
+            name = phs_name,
+            device = device
+            )
+        
+    # fitting classifiers
+    with datasets as ds, corevecs as cv:
+        ds.load_only(
+                loaders = loaders,
+                verbose = verbose
+                )
+
+        cv.load_only(
+                loaders = loaders,
+                verbose = True
+                ) 
+        
+        for drill_key, driller in drillers.items():
+            if (drill_path/'precision.pt').exists():
+                print(f'Loading DMD for {drill_key}') 
+                driller.load()
+            else:
+                t0 = time()
+                print(f'Fitting DMD for {drill_key} time = ', time()-t0)
+                driller.fit(
+                        dataset = ds, 
+                        corevectors = cv, 
+                        loader = 'CIFAR100-train',
+                        verbose=verbose
+                        )
+            
+                # save classifiers
+                print(f'Saving classifier for {drill_key}')
+                driller.save()
+
+    with datasets as ds, corevecs as cv, peepholes as ph:
+        ds.load_only(
+                loaders = loaders,
+                verbose = verbose
+                )
+
+        cv.load_only(
+                loaders = loaders,
+                verbose = True
+                ) 
+
+        ph.get_peepholes(
+                datasets = ds,
+                corevectors = cv,
+                target_modules = target_layers,
+                batch_size = bs,
+                drillers = drillers,
+                n_threads = n_threads,
+                verbose = verbose,
+                )
