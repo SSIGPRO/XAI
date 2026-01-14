@@ -7,15 +7,7 @@ sys.path.insert(0, (Path.home()/'repos/XAI/src/conv_red').as_posix())
 from functools import partial
 from matplotlib import pyplot as plt
 
-# torch stuff
-import torch
-from cuda_selector import auto_cuda
-
 # Our stuff
-# Model
-from peepholelib.models.model_wrap import ModelWrap 
-
-# datasets
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.cifarC import CifarC
 from peepholelib.datasets.SVHN import SVHN 
@@ -37,31 +29,10 @@ from configs.common import *
 
 if __name__ == "__main__":
     print(f'{args}') 
-    use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    
+    
     print(f"Using {device} device")
 
-    #--------------------------------
-    # Model 
-    #--------------------------------
-    
-    model = ModelWrap(
-            model = Model(),
-            device = device
-            )
-                                            
-    model.update_output(
-            output_layer = output_layer, 
-            to_n_classes = n_classes,
-            overwrite = True 
-            )
-                                            
-    model.load_checkpoint(
-            name = model_name,
-            path = model_dir,
-            verbose = verbose
-            )
-                                            
     #--------------------------------
     # Datasets 
     #--------------------------------

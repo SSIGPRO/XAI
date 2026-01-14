@@ -138,14 +138,12 @@ if __name__ == "__main__":
                 #    model = model,
                 #    rank = svd_rank,
                 #    sample_in = sample_in,
-                #    device = device,
                 #    ),
                 'features.28': Conv2dAvgKernelSVD(
                     path = svds_path,
                     layer = 'features.28',
                     model = model,
                     rank = svd_rank,
-                    device = device,
                     ),
                 #'classifier.0': LinearSVD(
                 #    path = svds_path,
