@@ -7,12 +7,11 @@ sys.path.insert(0, (Path.home()/'repos/XAI/src/conv_red').as_posix())
 from functools import partial
 from matplotlib import pyplot as plt
 
-
 # torch stuff
 import torch
 from cuda_selector import auto_cuda
 
-###### Our stuff
+# Our stuff
 # Model
 from peepholelib.models.model_wrap import ModelWrap 
 
@@ -37,7 +36,6 @@ from peepholelib.adv_atk.attacksDS import AttacksDS
 from configs.common import *
 
 if __name__ == "__main__":
-    print(bs, output_layer, model_dir)
     print(f'{args}') 
     use_cuda = torch.cuda.is_available()
     device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")

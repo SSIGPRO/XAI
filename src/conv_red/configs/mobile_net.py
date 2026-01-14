@@ -15,6 +15,7 @@ ds_path = Path.home()/'repos/XAI/data/vit/datasets'
 output_layer = 'heads.head'
 bs = 2**7 # CW
 
+
 target_layers = [
         f'encoder.layers.encoder_layer_{i}.mlp.{j}' for i in range(12) for j in [0,3]
         ]
