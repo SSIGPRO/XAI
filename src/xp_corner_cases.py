@@ -41,47 +41,6 @@ from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM
 from peepholelib.peepholes.peepholes import Peepholes
 # from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
-# from peepholelib.utils.viz_corevecs import plot_tsne, plot_tsne_CUDA
-# from peepholelib.utils.localization import *
-# from peepholelib.utils.get_samples import *
-# from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
-# from peepholelib.plots.conceptograms import plot_conceptogram 
-
-def load_all_drillers(**kwargs):
-    n_cluster_list = kwargs.get('n_cluster_list', None)
-    target_layers = kwargs.get('target_layers', None)
-    device = kwargs.get('device', None)
-    feature_sizes = kwargs.get('feature_sizes', None)
-    cv_parsers = kwargs.get('cv_parsers', None)
-    base_drill_path = kwargs.get('drill_path', None) 
-
-    all_drillers = {}
-
-    for n_cluster in n_cluster_list:
-        # assuming u have a folder with all the drillers and u name it like drillers_{n_cluster}
-        drill_path = base_drill_path / f"drillers_{n_cluster}" 
-
-        drillers = {}
-        for peep_layer in target_layers:
-            drillers[peep_layer] = tGMM(
-                path=drill_path,
-                name=f"classifier.{peep_layer}",  
-                label_key = 'label',
-                nl_classifier=n_cluster,
-                nl_model=n_classes,
-                n_features=feature_sizes[peep_layer],
-                parser=cv_parsers[peep_layer],
-                device=device
-            )
-
-        for drill_key, driller in drillers.items():
-            if driller._empp_file.exists():
-                print(f'Loading Classifier for {drill_key}')
-                driller.load()
-
-        all_drillers[n_cluster] = drillers
-
-    return all_drillers
 
 if __name__ == "__main__":
         use_cuda = torch.cuda.is_available()
@@ -96,228 +55,187 @@ if __name__ == "__main__":
         # Directories definitions
         #--------------------------------
         cifar_path = '/srv/newpenny/dataset/CIFAR100'
-        ds_path = Path('/srv/newpenny/XAI/CN/mobilenet_data')
 
         # model parameters
         seed = 29
         bs = 512
         n_threads = 1
-
-        model_dir = '/srv/newpenny/XAI/models'
-        model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
-        
-        svds_path = '/srv/newpenny/XAI/CN/mobilenet_data'
-        svds_name = 'svds' 
-        
-        cvs_path = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/corevectors'
-        cvs_name = 'corevectors'
-
-        drill_path = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/drillers_all/drillers_100'
-        drill_name = 'classifier'
-
-        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/peepholes_all/peepholes_100'
         phs_name = 'peepholes'
-
-        plots_path = Path.cwd()/'temp_plots/coverage/'
-        
         verbose = True 
+        loaders = [
+                'CIFAR100-train',
+                'CIFAR100-val',
+                'CIFAR100-test',
+                ]
+        classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')
+        mean = torch.tensor([0.438, 0.418, 0.377]).view(3,1,1)
+        std = torch.tensor([0.300, 0.287, 0.294]).view(3,1,1)
+
+        models = {}
+
+        ### MobileNet
+
+        phs_path_mobile = Path.cwd()/'/srv/newpenny/XAI/CN/mobilenet_data/peepholes_all/peepholes_100'
         
-        target_layers_all = [ 
-                'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0',
-                'features.2.conv.1.0','features.2.conv.2',
-                'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2',
-                'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
-                'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
-                'features.6.conv.0.0','features.6.conv.1.0', 'features.6.conv.2',
-                'features.7.conv.0.0', 'features.7.conv.1.0','features.7.conv.2',
-                'features.8.conv.0.0', 'features.8.conv.1.0', 'features.8.conv.2',
-                'features.9.conv.0.0', 'features.9.conv.1.0', 'features.9.conv.2',  
-                'features.10.conv.0.0', 'features.10.conv.1.0', 'features.10.conv.2',
-                'features.11.conv.0.0', 'features.11.conv.1.0', 'features.11.conv.2',
-                'features.12.conv.0.0', 'features.12.conv.1.0',  'features.12.conv.2',
-                'features.13.conv.0.0', 'features.13.conv.1.0', 'features.13.conv.2',
-                'features.14.conv.0.0', 'features.14.conv.1.0', 'features.14.conv.2',
-                'features.15.conv.0.0', 'features.15.conv.1.0', 'features.15.conv.2',
-                'features.16.conv.0.0', 'features.16.conv.1.0', 'features.16.conv.2', 
-                'features.17.conv.0.0', 'features.17.conv.1.0', 'features.17.conv.2',
-                'features.18.0', 'classifier.1',
-               ]
+        ds_path_mobile = Path('/srv/newpenny/XAI/CN/mobilenet_data')
 
-        #worst c
-        target_layers_worst_c = [
-                'features.1.conv.0.0','features.4.conv.1.0','features.4.conv.2', 
-                'features.7.conv.2','features.8.conv.0.0',
-                'features.8.conv.2','features.9.conv.0.0', 'features.11.conv.1.0',
-                'features.12.conv.1.0','features.13.conv.2'
-                 ]
-
-        # best auc
-        target_layers_best_auc = [
-                'features.1.conv.1','features.2.conv.0.0', 'features.3.conv.1.0', 
-                'features.5.conv.1.0', 'features.6.conv.1.0','features.8.conv.1.0',
-                'features.17.conv.1.0', 'features.17.conv.2', 'features.18.0', 'classifier.1'
-                ]
-
-        # worst auc
-        target_layers_worst_auc = [
-                'features.11.conv.1.0', 'features.11.conv.2', 'features.14.conv.1.0',
-                'features.14.conv.2', 'features.15.conv.0.0',  'features.15.conv.1.0',
-                'features.15.conv.2', 'features.16.conv.0.0', 'features.16.conv.1.0', 'features.16.conv.2'
-                ]
-
-        # #best fr95
-        # target_layers=[
-        #         'features.14.conv.2', 'features.17.conv.0.0', 'features.17.conv.2', 'features.15.conv.2', 'features.11.conv.2','features.17.conv.1.0', 
-        #         'features.14.conv.1.0','features.15.conv.0.0','features.18.0', 'classifier.1'
-        # ]
-        #best coverage (threshold =0.7-0.89)
-        target_layers_best_c = [
+        target_layers_mobile = [
                 'features.2.conv.0.0','features.3.conv.2','features.5.conv.1.0',
                 'features.6.conv.1.0','features.8.conv.1.0',
                 'features.9.conv.1.0','features.17.conv.1.0','features.17.conv.2',
                 'features.18.0','classifier.1'
                 ]
 
-        #best coverage (threshold =0.95)
-        # target_layers = ['features.2.conv.0.0','features.3.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
-        # 'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.17.conv.2','classifier.1']
-
-        tl_config = {
-                #'All': target_layers_all,
-                'Random': random.sample(target_layers_all, 10),
-                'Best c': target_layers_best_c,
-                'Worst c': target_layers_worst_c,
-                'Best ΔAUC': target_layers_best_auc,
-                'Worst ΔAUC': target_layers_worst_auc,
+        samples_mobile = {
+                'HCLL': 899,
+                'HCHL': 131,
+                'LCLL': 127,
+                'LCHL': 0
         }
 
-        loaders = [
-                'CIFAR100-train',
-                'CIFAR100-val',
-                'CIFAR100-test',
+        models['Mobile'] = {
+                'phs': phs_path_mobile,
+                'ds': ds_path_mobile,
+                'tl': target_layers_mobile,
+                'samples': samples_mobile
+                }
+
+        ### ViT
+
+        ds_path_vit = Path('/srv/newpenny/XAI/generated_data/TPAMI/parsed_datasets/CIFAR100_ViT')
+
+        phs_path_vit =  Path('/srv/newpenny/XAI/CN/vit_data/peepholes_all/peepholes_100')
+
+        target_layers_vit = [
+                        'encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
+                        'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
+                        'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head'
                 ]
 
-    #--------------------------------
-    # Model 
-    #--------------------------------
-    
-        # nn = torchvision.models.mobilenet_v2(pretrained=True)
+        samples_vit = {
+                'HCLL': 871,
+                'HCHL': 19,
+                'LCLL': 695,
+                'LCHL': 2568
+        }
 
-        # n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
+        models['ViT'] = {
+                'phs': phs_path_vit,
+                'ds': ds_path_vit,
+                'tl': target_layers_vit,
+                'samples': samples_vit
+                }
 
-        # model = ModelWrap(
-        #         model = nn,
-        #         device = device
-        #         )
-                                                
-        # model.update_output(
-        #         output_layer = 'classifier.1', 
-        #         to_n_classes = n_classes,
-        #         overwrite = True 
-        #         )
-                                                
-        # model.load_checkpoint(
-        #         name = model_name,
-        #         path = model_dir,
-        #         verbose = verbose
-        #         )
-                                                
-        # model.set_target_modules(
-        #         target_modules = target_layers_all,
-        #         verbose = verbose
-        #         )
+        ### VGG
 
-        datasets = ParsedDataset(
-                path = ds_path,
-                )
-                
-        classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')
-        
-    #--------------------------------
-    # CoreVectors 
-    #--------------------------------
-        # corevecs = CoreVectors(
-        #         path = cvs_path,
-        #         name = cvs_name,
-        #         model = model,
-        #         )
+        ds_path_vgg = '/srv/newpenny/XAI/generated_data/TPAMI/parsed_datasets/CIFAR100_VGG16'
 
-    #--------------------------------
-    # Peepholes
-    #--------------------------------
+        phs_path_vgg = Path('/srv/newpenny/XAI/CN/vgg_data/peepholes_all/peepholes_100')
 
-        # cv_parsers = {}
-        # feature_sizes = {}
-        # for layer in target_layers:
+        target_layers_vgg = ['features.26','features.28','classifier.0','classifier.3', 'classifier.6']
 
-        #         if layer == "classifier.1":
-        #                 features_cv_dim = 100
-        #         else:
-        #                 features_cv_dim = 300
-        #         cv_parsers[layer] = partial(trim_corevectors,
-        #                 module = layer,
-        #                 cv_dim = features_cv_dim)
-        #         feature_sizes[layer] = features_cv_dim
+        samples_vgg =  {
+                'HCLL': 41,
+                'HCHL': 312,
+                'LCLL': 33,
+                'LCHL': 7405
+        }
 
-        # drillers_dict = load_all_drillers(
-        #     n_cluster_list = [10, 50, 100, 150, 200, 250, 300, 400, 600],  
-        #     target_layers = target_layers,
-        #     drill_path = drill_path,
-        #     device = device,
-        #     feature_sizes = feature_sizes,
-        #     cv_parsers = cv_parsers
-        #     )
+        models['vgg'] = {
+                'phs': phs_path_vgg,
+                'ds': ds_path_vgg,
+                'tl': target_layers_vgg,
+                'samples': samples_vgg
+                }
 
-        peepholes = Peepholes(
-                path = phs_path,
-                name = phs_name,
-                device = device
-                )
+        for model, config in models.items():
 
-        with datasets as ds, peepholes as ph: #, corevecs as cv
-
-                ds.load_only(
-                        loaders = loaders,
-                        verbose = verbose
+                datasets = ParsedDataset(
+                        path = config['ds'],
+                        )
+                        
+                peepholes = Peepholes(
+                        path = config['phs'],
+                        name = phs_name,
+                        device = device
                         )
 
-                # cv.load_only(
-                #         loaders = loaders,
-                #         verbose = verbose 
-                #         )
-                # layer = 'features.9.conv.1.0'
-                # X = cv._corevds['CIFAR100-train'][layer]
-                # X_reduced = X[:, :10]
+                with datasets as ds, peepholes as ph:
+
+                        ds.load_only(
+                                loaders = loaders,
+                                verbose = verbose
+                                )
+
+                        ph.load_only(
+                                loaders = loaders,
+                                verbose = verbose 
+                                )
+
+                        _conceptograms = torch.stack(
+                                        [ph._phs['CIFAR100-test'][layer]['peepholes'] for layer in config['tl']],
+                                        dim=1
+                                )
+
+                        _r = ds._dss['CIFAR100-test']['result']
+
+                        fig = plt.figure(figsize=(12,8))
+
+                        gs = gridspec.GridSpec(
+                                2, 4,
+                                height_ratios=[1.2, 5],
+                                width_ratios=[2, 2, 2, 2],
+                                hspace=0.15,
+                                wspace=0.2
+                                )
+
+                        axs_img = [fig.add_subplot(gs[0, j]) for j in range(4)]
                         
-                # X_np = X_reduced.cpu().numpy()
+                        axs_mat = [fig.add_subplot(gs[1, j]) for j in range(4)]
 
-                # plot_tsne_CUDA(corevector = cv,
-                #         ds = ds,
-                #         save_path = Path('/home/claranunesbarrancos/repos/XAI/src/temp_plots/corevectors'),
-                #         layer = layer,
-                #         file_name = "features6conv10_mobilenet_supersuperclass_tsne",
-                #         n_classes = 10,
-                #         )
+                        for i, (corner, idx) in enumerate(config['samples'].items()):
 
-                #quit()
+                                img = ds._dss['CIFAR100-test']['image'][idx]
+                                img = (img * std + mean).clamp(0, 1)
+
+                                axs_img[i].imshow(img.cpu().permute(1,2,0))
+                                # axs_img[i].axis("off")
+                                axs_img[i].set_title(corner)
+                                axs_img[i].set_frame_on(True)
+
+                                color = "green" if _r[idx] == 1 else "red"
+                                for spine in axs_img[i].spines.values():
+                                        spine.set_edgecolor(color)
+                                        spine.set_linewidth(5)
+
+                                _c = _conceptograms[idx]
+
+                                axs_mat[i].imshow(
+                                                1 - _c.T,
+                                                aspect="auto",
+                                                vmin=0.0,
+                                                vmax=1.0,
+                                                cmap="bone"
+                                        )
+
+                                xticks = torch.linspace(0, len(config['tl'])-1, steps=4).long()
+                                axs_mat[i].set_xticks(xticks)
+                                axs_mat[i].set_yticks([])
                         
-                ph.load_only(
-                        loaders = loaders,
-                        verbose = verbose 
-                        )
+                        fig.savefig('prova.png')
+                        quit()
 
-                samples = torch.randint(high=len(ds._dss['CIFAR100-test']), size=(5,)).tolist()
+
+
+
+                        
+
 
                 for idx in samples:
 
                         n_cols = len(tl_config)
 
-                        fig = plt.figure(figsize=(16, 10))
-                        gs = gridspec.GridSpec(
-                                1, n_cols + 1,
-                                width_ratios=[2.5] + [3]*n_cols,  # image smaller than matrices
-                                wspace=0.2
-                                )
+                        
 
                         # ── Denormalize image
                         img = ds._dss['CIFAR100-test']['image'][idx]

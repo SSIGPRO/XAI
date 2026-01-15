@@ -7,12 +7,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from time import time
 from functools import partial
 import random
+from matplotlib import pyplot as plt
+plt.rc('font', size=10)          
+import matplotlib.gridspec as gridspec
 
 # torch stuff
 import torch
 from cuda_selector import auto_cuda
 import torchvision
-
 
 ###### Our stuff
 
@@ -37,10 +39,10 @@ from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
 from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
-from peepholelib.utils.localization import *
-from peepholelib.plots.conceptograms import plot_conceptogram 
-from peepholelib.utils.get_samples import *
-from calculate_layer_importance import localization_delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
+# from peepholelib.utils.localization import *
+# from peepholelib.plots.conceptograms import plot_conceptogram 
+# from peepholelib.utils.get_samples import *
+# from calculate_layer_importance import localization_delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
 
 
 def get_st_list(state_dict):
@@ -145,98 +147,103 @@ if __name__ == "__main__":
     
         nn = torchvision.models.vit_b_16()
         n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
-        target_layers = list(dict.fromkeys(get_st_list(nn.state_dict().keys())))
-        # #best
-        # target_layers = ['encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
-        # 'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
-        # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
+        target_layers_all = list(dict.fromkeys(get_st_list(nn.state_dict().keys())))
+        
+        # best
+        target_layers_best_c = [
+                        'encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
+                        'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0',
+                        'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head'
+                ]
 
-        #worst
-        # target_layers = ['encoder.layers.encoder_layer_0.mlp.3','encoder.layers.encoder_layer_1.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3','encoder.layers.encoder_layer_2.mlp.0',
-        # 'encoder.layers.encoder_layer_2.mlp.3','encoder.layers.encoder_layer_3.mlp.0','encoder.layers.encoder_layer_3.mlp.3', 
-        # 'encoder.layers.encoder_layer_4.mlp.0','encoder.layers.encoder_layer_4.mlp.3','encoder.layers.encoder_layer_6.mlp.3']
+        # worst
+        target_layers_worst_c = [
+                      'encoder.layers.encoder_layer_0.mlp.3','encoder.layers.encoder_layer_1.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3','encoder.layers.encoder_layer_2.mlp.0',
+                      'encoder.layers.encoder_layer_2.mlp.3','encoder.layers.encoder_layer_3.mlp.0','encoder.layers.encoder_layer_3.mlp.3', 
+                      'encoder.layers.encoder_layer_4.mlp.0','encoder.layers.encoder_layer_4.mlp.3','encoder.layers.encoder_layer_6.mlp.3'
+                ]
 
         # # 10 best auc
-        # target_layers = ['encoder.layers.encoder_layer_3.mlp.3', 'encoder.layers.encoder_layer_2.mlp.3', 'encoder.layers.encoder_layer_1.mlp.3',
-        # 'encoder.layers.encoder_layer_0.mlp.0', 'encoder.layers.encoder_layer_0.mlp.3',
-        # 'encoder.layers.encoder_layer_10.mlp.0',
-        # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
 
-        # target_layers = ['encoder.layers.encoder_layer_0.mlp.0', 'encoder.layers.encoder_layer_0.mlp.3', 'encoder.layers.encoder_layer_1.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3',
-        # 'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_10.mlp.0', 'encoder.layers.encoder_layer_10.mlp.3',
-        # 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
+        target_layers_best_auc = [
+                'encoder.layers.encoder_layer_0.mlp.0', 'encoder.layers.encoder_layer_0.mlp.3', 'encoder.layers.encoder_layer_1.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3',
+                'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_10.mlp.0', 'encoder.layers.encoder_layer_10.mlp.3',
+                'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head'
+                ]
 
         # worst delta auc
-        # target_layers = ['encoder.layers.encoder_layer_4.mlp.0', 'encoder.layers.encoder_layer_5.mlp.0', 'encoder.layers.encoder_layer_5.mlp.3',
-        # 'encoder.layers.encoder_layer_6.mlp.0', 'encoder.layers.encoder_layer_6.mlp.3', 'encoder.layers.encoder_layer_7.mlp.0',
-        # 'encoder.layers.encoder_layer_7.mlp.3', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
-        # 'encoder.layers.encoder_layer_9.mlp.3']
+        target_layers_worst_auc = [
+                        'encoder.layers.encoder_layer_4.mlp.0', 'encoder.layers.encoder_layer_5.mlp.0', 'encoder.layers.encoder_layer_5.mlp.3',
+                        'encoder.layers.encoder_layer_6.mlp.0', 'encoder.layers.encoder_layer_6.mlp.3', 'encoder.layers.encoder_layer_7.mlp.0',
+                        'encoder.layers.encoder_layer_7.mlp.3', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
+                        'encoder.layers.encoder_layer_9.mlp.3'
+                        ]
+      
 
-        # #best frp95
-        # target_layers = ['encoder.layers.encoder_layer_2.mlp.3', 'encoder.layers.encoder_layer_5.mlp.0', 'encoder.layers.encoder_layer_1.mlp.3',
-        # 'encoder.layers.encoder_layer_8.mlp.3', 'encoder.layers.encoder_layer_9.mlp.3','encoder.layers.encoder_layer_10.mlp.0',
-        # 'encoder.layers.encoder_layer_10.mlp.3', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
+        tl_config = {
+                #'All': target_layers_all,
+                'Random': random.sample(target_layers_all, 10),
+                'Worst ΔAUC': target_layers_worst_auc,
+                'Best ΔAUC': target_layers_best_auc,
+                'Worst c': target_layers_worst_c,
+                'Best c': target_layers_best_c,            
+        }
 
-        # best
-        target_layers = ['encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_8.mlp.3',
-        'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0','encoder.layers.encoder_layer_10.mlp.3',
-        'encoder.layers.encoder_layer_11.mlp.0','encoder.layers.encoder_layer_11.mlp.3', 'heads.head' ]
+        # print(f'Target layers: {target_layers}')        
 
-
-
-        print(f'Target layers: {target_layers}')        
-
-        model = ModelWrap(
-                model = nn,
-                device = device
-                )
+        # model = ModelWrap(
+        #         model = nn,
+        #         device = device
+        #         )
                                                 
-        model.update_output(
-                output_layer = 'heads.head', 
-                to_n_classes = n_classes,
-                overwrite = True 
-                )
+        # model.update_output(
+        #         output_layer = 'heads.head', 
+        #         to_n_classes = n_classes,
+        #         overwrite = True 
+        #         )
                                                 
-        model.load_checkpoint(
-                name = model_name,
-                path = model_dir,
-                verbose = verbose
-                )
+        # model.load_checkpoint(
+        #         name = model_name,
+        #         path = model_dir,
+        #         verbose = verbose
+        #         )
                                                 
-        model.set_target_modules(
-                target_modules = target_layers,
-                verbose = verbose
-                )
+        # model.set_target_modules(
+        #         target_modules = target_layers,
+        #         verbose = verbose
+        #         )
 
         datasets = ParsedDataset(
                 path = ds_path,
                 )
+        
+        classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')
 
     #--------------------------------
     # CoreVectors 
     #--------------------------------
-        corevecs = CoreVectors(
-                path = cvs_path,
-                name = cvs_name,
-                model = model,
-                )
+        # corevecs = CoreVectors(
+        #         path = cvs_path,
+        #         name = cvs_name,
+        #         model = model,
+        #         )
 
     #--------------------------------
     # Peepholes
     #--------------------------------
 
-        cv_parsers = {}
-        feature_sizes = {}
-        for layer in target_layers:
+        # cv_parsers = {}
+        # feature_sizes = {}
+        # for layer in target_layers:
 
-                if layer == "heads.head":
-                        features_cv_dim = 100
-                else:
-                        features_cv_dim = 200
-                cv_parsers[layer] = partial(trim_corevectors,
-                        module = layer,
-                        cv_dim = features_cv_dim)
-                feature_sizes[layer] = features_cv_dim
+        #         if layer == "heads.head":
+        #                 features_cv_dim = 100
+        #         else:
+        #                 features_cv_dim = 200
+        #         cv_parsers[layer] = partial(trim_corevectors,
+        #                 module = layer,
+        #                 cv_dim = features_cv_dim)
+        #         feature_sizes[layer] = features_cv_dim
 
 
         # drillers_dict = load_all_drillers(
@@ -258,20 +265,97 @@ if __name__ == "__main__":
                 device = device
                 )
        
-        with datasets as ds, corevecs as cv, peepholes as ph:
+        with datasets as ds, peepholes as ph: #corevecs as cv,
                 ds.load_only(
                         loaders = loaders,
                         verbose = verbose
                         )
 
-                cv.load_only(
-                        loaders = loaders,
-                        verbose = verbose 
-                        ) 
+                # cv.load_only(
+                #         loaders = loaders,
+                #         verbose = verbose 
+                #         ) 
                 ph.load_only(
                         loaders = loaders,
                         verbose = verbose 
                         )
+                sm = torch.nn.Softmax(dim=1)
+
+                samples = torch.randint(high=len(ds._dss['CIFAR100-test']), size=(5,)).tolist()
+
+                for idx in [4063]:
+
+                        n_cols = len(tl_config)
+
+                        fig = plt.figure(figsize=(10,2))
+                        gs = gridspec.GridSpec(
+                                1, n_cols + 1,
+                                width_ratios=[1.2] + [3]*n_cols,  # image smaller than matrices
+                                wspace=0.2
+                                )
+
+                        # ── Denormalize image
+                        img = ds._dss['CIFAR100-test']['image'][idx]
+
+                        mean = torch.tensor([0.438, 0.418, 0.377]).view(3,1,1)
+                        std = torch.tensor([0.300, 0.287, 0.294]).view(3,1,1)
+
+                        img = (img * std + mean).clamp(0, 1)
+
+                        # ── Image subplot (first column)
+                        ax_img = fig.add_subplot(gs[0, 0])
+                        ax_img.imshow(img.cpu().permute(1,2,0))
+                        ax_img.axis("off")
+                        ax_img.set_title(classes[int(ds._dss['CIFAR100-test']['label'][idx])].capitalize())
+
+                        # ── Conceptograms (remaining columns)
+                        axs = [fig.add_subplot(gs[0, i+1]) for i in range(n_cols)]
+
+                        for i, (config, tl) in enumerate(tl_config.items()):
+                                if config == 'Random':
+                                        tl = [l for l in target_layers_all if l in tl]
+                                
+                                _p = sm(ds._dss['CIFAR100-test']['output'])
+                                p = _p[idx]
+
+                                top10 = torch.topk(p, k=20).indices
+                                top10_sorted, _ = torch.sort(top10)
+                                print(top10_sorted)
+
+                                _conceptograms = torch.stack(
+                                        [ph._phs['CIFAR100-test'][layer]['peepholes'] for layer in tl],
+                                        dim=1
+                                )
+                                
+                                #_c = _conceptograms[idx]
+                                _c = torch.cat((_conceptograms[idx], p.unsqueeze(dim=0)), dim=0)
+                                _c_sub = _c[:,top10_sorted]
+
+                                axs[i].imshow(
+                                        1 - _c_sub.T,
+                                        aspect='auto',
+                                        vmin=0.0,
+                                        vmax=1.0,
+                                        cmap='bone'
+                                )
+
+                                # if config == 'Best c':
+                                #         _, idx_topk = torch.topk(_c.sum(dim=0), 3, sorted=True)
+                                #         classes_topk = [classes[i] for i in idx_topk.tolist()]
+                                #         tick_labels = [f'{cls.capitalize()}' for i, cls in enumerate(classes_topk)]
+                                #         axs[i].set_yticks(idx_topk, tick_labels)
+                                #         axs[i].yaxis.tick_right()
+                                # else: axs[i].set_yticks([])
+
+                                # xticks = torch.linspace(0, len(tl)-1, steps=4).long()
+                                # axs[i].set_xticks(xticks)
+                                axs[i].set_xticks([])
+                                axs[i].set_yticks([])
+                                axs[i].set_title(config)
+
+                                plt.tight_layout()
+                        fig.savefig(f'comparison_{idx}.png', bbox_inches="tight")
+                quit()
                 # corrs = localization_pmax_correlations(
                 #         phs=ph,
                 #         ds=ds,
