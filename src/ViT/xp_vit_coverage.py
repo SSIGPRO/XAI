@@ -8,13 +8,16 @@ from time import time
 from functools import partial
 import random
 from matplotlib import pyplot as plt
-plt.rc('font', size=10)          
+          
 import matplotlib.gridspec as gridspec
-
+import numpy as np
+from sklearn.metrics import confusion_matrix
+from scipy.stats import pearsonr, spearmanr
 # torch stuff
 import torch
 from cuda_selector import auto_cuda
 import torchvision
+import torch  
 
 ###### Our stuff
 
@@ -43,7 +46,7 @@ from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto
 # from peepholelib.plots.conceptograms import plot_conceptogram 
 # from peepholelib.utils.get_samples import *
 # from calculate_layer_importance import localization_delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
-
+from peepholelib.utils.localization import localization_from_conceptogram
 
 def get_st_list(state_dict):
     '''
@@ -271,6 +274,25 @@ if __name__ == "__main__":
                         verbose = verbose
                         )
 
+                label = ds._dss['CIFAR100-test']['label'].detach().cpu().numpy()
+                pred = ds._dss['CIFAR100-test']['pred'].detach().cpu().numpy()
+
+                cm = confusion_matrix(label, pred)
+
+                cm_norm = cm / cm.sum(axis=1, keepdims=True)
+
+                plt.figure(figsize=(10, 8))
+                plt.imshow(cm_norm, vmin=0.0, vmax=1.0)
+                plt.colorbar()
+                plt.xlabel("Predicted label")
+                plt.ylabel("True label")
+                plt.title("Confusion Matrix (normalized)")
+                plt.tight_layout()
+                plt.savefig('cm.png')
+
+                per_class_acc = np.diag(cm) / cm.sum(axis=1)
+
+
                 # cv.load_only(
                 #         loaders = loaders,
                 #         verbose = verbose 
@@ -279,6 +301,88 @@ if __name__ == "__main__":
                         loaders = loaders,
                         verbose = verbose 
                         )
+
+                _c = torch.stack(
+                                        [ph._phs['CIFAR100-test'][layer]['peepholes'] for layer in target_layers_best_c],
+                                        dim=1
+                                )
+
+                _c2 = _c**2
+                loc = _c2.sum(dim=(1,2))/(_c.sum(dim=(1,2)))**2
+
+                loc_max = 1/(len(target_layers_best_c))
+                loc_min = 1/(len(target_layers_best_c)*len(classes))
+
+                loc_np = loc.detach().cpu().numpy().squeeze() 
+                
+                
+                loc = (loc_np - loc_min)/(loc_max-loc_min) 
+                
+                
+                y_true = label  # already numpy (N,)
+
+                num_classes = int(np.max(y_true)) + 1  # or 100 for CIFAR-100
+
+                # --- mean loc per class ---
+                mean_loc_per_class = np.full(num_classes, np.nan, dtype=np.float64)
+                count_per_class    = np.zeros(num_classes, dtype=np.int64)
+
+                for c in range(num_classes):
+                        idx = (y_true == c)
+                        count_per_class[c] = idx.sum()
+                        if count_per_class[c] > 0:
+                                mean_loc_per_class[c] = loc[idx].mean()
+
+                # --- per-class accuracy (robust) ---
+                # If you already computed per_class_acc = np.diag(cm) / cm.sum(axis=1),
+                # make it safe for any empty classes:
+                per_class_acc_safe = per_class_acc.copy()
+                per_class_acc_safe = np.nan_to_num(per_class_acc_safe, nan=np.nan)  # keep NaNs if class missing
+
+                # --- correlate across classes (exclude missing classes) ---
+                valid = np.isfinite(mean_loc_per_class) & np.isfinite(per_class_acc_safe)
+
+                x = mean_loc_per_class[valid]   # mean loc per class
+                y = per_class_acc_safe[valid]   # accuracy per class
+
+                pear_r, pear_p = pearsonr(x, y)
+                spear_r, spear_p = spearmanr(x, y)
+
+                print(f"Classes used: {valid.sum()}/{num_classes}")
+                print(f"Pearson r  = {pear_r:.4f} (p={pear_p:.3g})")
+                print(f"Spearman ρ = {spear_r:.4f} (p={spear_p:.3g})")
+
+                plt.figure(figsize=(6, 5))
+
+                # scatter
+                plt.scatter(x, y, alpha=0.7)
+
+                for xi, yi, c in zip(x, y, classes):
+                        class_name = classes[int(c)]
+                        plt.text(
+                                xi, yi,
+                                class_name,
+                                fontsize=7,
+                                alpha=0.8
+                        )
+
+                # optional: linear fit (visual aid only)
+                m, b = np.polyfit(x, y, 1)
+                xx = np.linspace(x.min(), x.max(), 100)
+                plt.plot(xx, m * xx + b)
+
+                plt.xlabel("Mean LOC (per class)")
+                plt.ylabel("Accuracy (per class)")
+                plt.title(
+                f"LOC vs Accuracy\n"
+                f"Pearson r={pear_r:.3f}, Spearman ρ={spear_r:.3f}"
+                )
+
+                plt.grid(True, alpha=0.3)
+                plt.tight_layout()
+                plt.savefig('prova.png')
+                
+                quit()
                 sm = torch.nn.Softmax(dim=1)
 
                 samples = torch.randint(high=len(ds._dss['CIFAR100-test']), size=(5,)).tolist()
@@ -287,10 +391,10 @@ if __name__ == "__main__":
 
                         n_cols = len(tl_config)
 
-                        fig = plt.figure(figsize=(10,2))
+                        fig = plt.figure(figsize=(16,8))
                         gs = gridspec.GridSpec(
                                 1, n_cols + 1,
-                                width_ratios=[1.2] + [3]*n_cols,  # image smaller than matrices
+                                width_ratios=[3]*(n_cols+1),  # image smaller than matrices
                                 wspace=0.2
                                 )
 
@@ -318,9 +422,9 @@ if __name__ == "__main__":
                                 _p = sm(ds._dss['CIFAR100-test']['output'])
                                 p = _p[idx]
 
-                                top10 = torch.topk(p, k=20).indices
-                                top10_sorted, _ = torch.sort(top10)
-                                print(top10_sorted)
+                                # top10 = torch.topk(p, k=20).indices
+                                # top10_sorted, _ = torch.sort(top10)
+                                # print(top10_sorted)
 
                                 _conceptograms = torch.stack(
                                         [ph._phs['CIFAR100-test'][layer]['peepholes'] for layer in tl],
@@ -329,29 +433,35 @@ if __name__ == "__main__":
                                 
                                 #_c = _conceptograms[idx]
                                 _c = torch.cat((_conceptograms[idx], p.unsqueeze(dim=0)), dim=0)
-                                _c_sub = _c[:,top10_sorted]
-
+                                
                                 axs[i].imshow(
-                                        1 - _c_sub.T,
+                                        1 - _c.T,
                                         aspect='auto',
                                         vmin=0.0,
                                         vmax=1.0,
                                         cmap='bone'
                                 )
 
-                                # if config == 'Best c':
-                                #         _, idx_topk = torch.topk(_c.sum(dim=0), 3, sorted=True)
-                                #         classes_topk = [classes[i] for i in idx_topk.tolist()]
-                                #         tick_labels = [f'{cls.capitalize()}' for i, cls in enumerate(classes_topk)]
-                                #         axs[i].set_yticks(idx_topk, tick_labels)
-                                #         axs[i].yaxis.tick_right()
-                                # else: axs[i].set_yticks([])
+                                if config == 'Best c':
+                                        _, idx_topk = torch.topk(_c.sum(dim=0), 3, sorted=True)
+                                        classes_topk = [classes[i] for i in idx_topk.tolist()]
+                                        tick_labels = [f'{cls.capitalize()}' for i, cls in enumerate(classes_topk)]
+                                        axs[i].set_yticks(idx_topk, tick_labels, fontsize=15)
+                                        axs[i].yaxis.tick_right()
+                                else: axs[i].set_yticks([])
 
-                                # xticks = torch.linspace(0, len(tl)-1, steps=4).long()
-                                # axs[i].set_xticks(xticks)
-                                axs[i].set_xticks([])
-                                axs[i].set_yticks([])
-                                axs[i].set_title(config)
+                                xticks = torch.linspace(0, len(tl)-1, steps=4).long()
+
+                                axs[i].set_xticks(xticks)
+
+                                axs[i].set_xlabel(config, fontsize=15)
+
+                                loc_min = 1/(len(tl)*len(classes))
+                                loc_max = 1/len(tl)
+                                loc = localization_from_conceptogram(M=_c)
+                                _l = (loc-loc_min)/(loc_max-loc_min)
+
+                                axs[i].set_title(f'σ: {_l:.2f}', fontsize=15)
 
                                 plt.tight_layout()
                         fig.savefig(f'comparison_{idx}.png', bbox_inches="tight")
