@@ -1,7 +1,7 @@
 # Python stuff
 from pathlib import Path as Path
 
-# Our stuff
+# Peepholelib stuff
 from torchvision.models import mobilenet_v2 as Model
 from peepholelib.datasets.functional.transforms import mobilenet_v2 as transform
 
@@ -16,6 +16,6 @@ model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr
 #------------------
 
 output_layer = 'classifier.1'
-bs_model_scale = 1 
+bs_model_scale = 2**2 
 
-target_layers = [f'features.{i}.conv.2' for i in [14, 17]]# range(2,18,3)]
+target_layers = [f'features.{i}.conv.2' for i in [8, 11, 14, 17]]#[2, 5, 8, 11, 14, 17]]

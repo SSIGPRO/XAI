@@ -4,32 +4,41 @@ from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 sys.path.insert(0, (Path.home()/'repos/XAI/src/conv_red').as_posix())
 
+from statistics import geometric_mean as geomean
+from filelock import FileLock
+
 # torch stuff
 import torch
 from cuda_selector import auto_cuda
 
-# Our stuff
+# Peepholelib stuff
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.models.model_wrap import ModelWrap 
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.peepholes.peepholes import Peepholes
+from peepholelib.plots.atks import auc_atks 
 
 from configs.common import *
     
 if __name__ == "__main__":
     print(f'{args}') 
-    use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
-    print(f"Using {device} device")
+    # TODO: find an way to lock cpus for multiprocesses make
+    lock_file = '../locks/peepholes.cuda.lock'
+    lock = FileLock(lock_file)
+        use_cuda = torch.cuda.is_available()
+        device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
+        print(f"Using {device} device")
 
-    #------------------
-    # Model 
-    #------------------
-    model = ModelWrap(
-            model = Model(),
-            target_modules = target_layers,
-            device = device
-            )
+        bs = int(bs_base*bs_model_scale*bs_red_scale*bs_analysis_scale)
+
+        #------------------
+        # Model 
+        #------------------
+        model = ModelWrap(
+                model = Model(),
+                target_modules = target_layers,
+                device = device
+                )
                                             
     model.update_output(
             output_layer = output_layer, 
@@ -40,7 +49,7 @@ if __name__ == "__main__":
     model.load_checkpoint(
             path = model_path,
             name = model_name,
-            verbose = True 
+            verbose = verbose 
             )
 
     #--------------------------------
@@ -62,7 +71,7 @@ if __name__ == "__main__":
     #--------------------------------
     # Peepholes
     #--------------------------------
-    # TODO: temp for testing
+    # testing values
     hyperps = test_configs(model._target_modules)
 
     # Function analysis specific kwargs for drillers
@@ -98,7 +107,7 @@ if __name__ == "__main__":
 
     peepholes = Peepholes(
             path = phs_path,
-            name = phs_name,
+            name = phs_name+'.test',
             device = device
             )
 
@@ -128,8 +137,42 @@ if __name__ == "__main__":
                     datasets = ds,
                     corevectors = cv,
                     target_modules = target_layers,
-                    batch_size = int(bs_base*bs_model_scale*bs_red_scale*bs_analysis_scale),
+                    batch_size = bs,
                     drillers = drillers,
                     n_threads = n_threads,
                     verbose = verbose
                     )
+            
+            scores = {}
+            for score_name, score_fn in score_fns.items():
+                scores = score_fn(
+                        datasets = ds,
+                        peepholes = ph,
+                        score_name = score_name,
+                        batch_size = bs,
+                        target_modules = target_layers,
+                        append_scores = scores,
+                        verbose = verbose
+                        )
+                if type(scores) == tuple: scores = scores[0]
+
+            aucs_ood = auc_atks(
+                    datasets = ds,
+                    scores = scores,
+                    **auc_kwargs_ood,
+                    verbose = verbose
+                    )
+
+            aucs_aa = auc_atks(
+                    datasets = ds,
+                    scores = scores,
+                    **auc_kwargs_aa,
+                    verbose = verbose
+                    )
+
+            _aucs = [list(aucs_ood[d].values())[0] for d in auc_kwargs_ood['atk_loaders']] 
+            avg_auc_ood = geomean(_aucs)
+
+            _aucs = [list(aucs_aa[d].values())[0] for d in auc_kwargs_aa['atk_loaders']] 
+            avg_auc_aa = geomean(_aucs) 
+            print('geom auc OOD: ', avg_auc_ood, 'geom auch AA', avg_auc_aa)

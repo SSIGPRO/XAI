@@ -14,12 +14,15 @@ analyses := macs dmd
 # Parsing names 
 # ----------------
 datasets := $(foreach ds, $(models), $(DATA_DIR)/$(ds)/datasets)
-corevectors := $(foreach p, $(foreach ds, $(models), $(DATA_DIR)/$(ds)/corevectors), $(foreach r, $(reductions), $(p)/$(r)))
-peepholes := $(foreach pp, $(foreach p, $(foreach ds, $(models), $(DATA_DIR)/$(ds)/peepholes), $(foreach r, $(reductions), $(p)/$(r))), $(foreach a, $(analyses), $(pp)/$(a)))
+corevectors := $(foreach p, $(foreach m, $(models), $(DATA_DIR)/$(m)/corevectors), $(foreach r, $(reductions), $(p)/$(r)))
+peepholes := $(foreach pp, $(foreach p, $(foreach m, $(models), $(DATA_DIR)/$(m)/peepholes), $(foreach r, $(reductions), $(p)/$(r))), $(foreach a, $(analyses), $(pp)/$(a)))
+tunings := $(foreach pp, $(foreach p, $(foreach m, $(models), $(DATA_DIR)/$(m)/peepholes), $(foreach r, $(reductions), $(p)/$(r))), $(foreach a, $(analyses), $(pp)/$(a)/hyperparams.pickle))
 
 # ----------------
 #  Rules
 # ----------------
+#.PHONY: $(tunings)
+
 all:
 	@echo "hello world"
 
@@ -31,7 +34,8 @@ xp_datasets: $(datasets)
 xp_corevectors: $(corevectors) 
 
 xp_peepholes: $(peepholes) 
-	@echo $(peepholes)
+
+xp_tuning: $(tunings) 
 
 # ----------------
 # Actual Rules
@@ -55,4 +59,9 @@ $(1):
 endef
 $(foreach a, $(analyses), $(foreach r, $(reductions), $(foreach m, $(models), $(eval $(call phs_template, $(DATA_DIR)/$(m)/peepholes/$(r)/$(a), $(m), $(r), $(a))))))
 
-
+# Tunings 
+define tune_template =
+$(1):
+	python tuning/xp_tuning.py -m $(2) -r $(3) -a $(4) -d $(DATA_DIR)
+endef
+$(foreach a, $(analyses), $(foreach r, $(reductions), $(foreach m, $(models), $(eval $(call tune_template, $(DATA_DIR)/$(m)/peepholes/$(r)/$(a)/hyperparams.pickle, $(m), $(r), $(a))))))

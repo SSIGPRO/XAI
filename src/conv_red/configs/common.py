@@ -9,8 +9,6 @@ parser.add_argument('-d', '--data_path', default=Path.cwd()/'../../data')
 args = parser.parse_args()
 
 # import configs
-from configs.common import *
-
 if args.model == 'vgg':
     from configs.vgg import *
 elif args.model == 'mobilenet':
@@ -36,6 +34,7 @@ cifarc_path = '/srv/newpenny/dataset/CIFAR-100-C'
 svhn_path = '/srv/newpenny/dataset/SVHN' 
 places_path = '/srv/newpenny/dataset/Places365'
 
+# TODO: restruct this to have svds, corevector, .. etc at leaf folders
 ds_path = Path(args.data_path)/args.model/'datasets'
 
 svds_path = Path(args.data_path)/args.model/'svds'/args.reduction
@@ -49,6 +48,12 @@ drill_name = 'driller'
 phs_path = Path(args.data_path)/args.model/'peepholes'/args.reduction/args.analysis
 phs_name = 'phs' 
 
+tune_storage_path = Path(args.data_path)/args.model/'tuning'/args.reduction/args.analysis
+
+hyper_params_file = phs_path/f'hyperparams.pickle'
+
+plots_path = Path.cwd()/'temp_plots'
+
 #--------------------------------
 # Runing
 #--------------------------------
@@ -56,8 +61,9 @@ seed = 2
 n_threads = 1
 verbose = True 
 n_classes = 100
-bs_base = 2**12
+bs_base = 2**10
 bs_atk_scale = 2**-4
+tune_num_samples = 50
 
 #--------------------------------
 # Defs 

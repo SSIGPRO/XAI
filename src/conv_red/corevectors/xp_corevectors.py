@@ -4,11 +4,13 @@ from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 sys.path.insert(0, (Path.home()/'repos/XAI/src/conv_red').as_posix())
 
+from filelock import FileLock
+
 # torch stuff
 import torch
 from cuda_selector import auto_cuda
 
-# Our stuff
+# Peephoelib stuff
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.models.model_wrap import ModelWrap 
 from peepholelib.coreVectors.coreVectors import CoreVectors
@@ -17,18 +19,21 @@ from configs.common import *
     
 if __name__ == "__main__":
     print(f'{args}') 
-    use_cuda = torch.cuda.is_available()
-    device = torch.device('cpu')#auto_cuda('utilization')) if use_cuda else torch.device("cpu")
-    print(f"Using {device} device")
+    lock_file = '../locks/corevectors.cuda.lock'
+    lock = FileLock(lock_file)
+    with lock.acquire(timeout=-1):
+        use_cuda = torch.cuda.is_available()
+        device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
+        print(f"Using {device} device")
 
-    #------------------
-    # Model 
-    #------------------
-    model = ModelWrap(
-            model = Model(),
-            target_modules = target_layers,
-            device = device
-            )
+        #------------------
+        # Model 
+        #------------------
+        model = ModelWrap(
+                model = Model(),
+                target_modules = target_layers,
+                device = device
+                )
                                             
     model.update_output(
             output_layer = output_layer, 
@@ -93,7 +98,7 @@ if __name__ == "__main__":
                 activations_parser = act_parser,
                 save_input = save_input,
                 save_output = save_output,
-                batch_size = int(bs_base*bs_red_scale),
+                batch_size = int(bs_base*bs_model_scale*bs_red_scale),
                 n_threads = n_threads,
                 verbose = verbose
                 )

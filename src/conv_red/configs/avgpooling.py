@@ -9,15 +9,24 @@ save_output = True
 def get_reducer_kwargs(tl):
     ret = {}
     for _n, _l in tl.items():
-        ret[_n] = {}
+        ret[_n] = {'fs': _l.out_channels}
     return ret
 
-# TODO: temp for testing
+# temp for testing
 def test_configs(tl):
     ret = {}
     for _n, _l in tl.items():
         ret[_n] = {
                 'cv_dim': _l.out_channels,
                 'n_clusters': 30,
+                'magnitude': 0.004,
+                }
+    return ret
+
+def reduction_param_space(red_kw):
+    ret = {}
+    for _l, _kw in red_kw.items():
+        ret[_l] = {
+                'cv_dim': _kw['fs'],
                 }
     return ret

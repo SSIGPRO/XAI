@@ -5,14 +5,14 @@ sys.path.insert(0, (Path.home()/'repos/XAI/src/conv_red').as_posix())
 
 # python stuff
 from functools import partial
+from filelock import FileLock
 
 # torch stuff
 import torch
 from cuda_selector import auto_cuda
 
-# Our stuff
+# Peephoelib stuff
 from peepholelib.models.model_wrap import ModelWrap 
-
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.cifarC import CifarC
 from peepholelib.datasets.SVHN import SVHN 
@@ -20,7 +20,6 @@ from peepholelib.datasets.Places import Places
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.parsers import from_dataset
 from peepholelib.datasets.functional.samplers import random_subsampling 
-
 
 # ATK dataset
 from peepholelib.adv_atk.BIM import myBIM
@@ -31,20 +30,23 @@ from peepholelib.adv_atk.attacksDS import AttacksDS
 
 from configs.common import *
 
+lock_file = '../locks/datasets.cuda.lock'
 if __name__ == "__main__":
     print(f'{args}') 
-    use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
-    print(f"Using {device} device")
+    lock = FileLock(lock_file)
+    with lock.acquire(timeout=-1):
+        use_cuda = torch.cuda.is_available()
+        device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
+        print(f"Using {device} device")
 
-    #------------------
-    # Model 
-    #------------------
-    model = ModelWrap(
-            model = Model(),
-            target_modules = target_layers,
-            device = device
-            )
+        #------------------
+        # Model 
+        #------------------
+        model = ModelWrap(
+                model = Model(),
+                target_modules = target_layers,
+                device = device
+                )
                                             
     model.update_output(
             output_layer = output_layer, 
@@ -95,7 +97,7 @@ if __name__ == "__main__":
     _dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 0.005
+                perc = 0.5
                 ) for k in _dss.keys()
             }
 
