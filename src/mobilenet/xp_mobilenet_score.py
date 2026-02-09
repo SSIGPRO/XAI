@@ -49,7 +49,7 @@ import random
 from copy import deepcopy
 from typing import Dict, List, Optional
 
-from calculate_layer_importance import localization_delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
+from calculate_layer_importance import delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
 
 
 def average_random_layer_scores(*,ds, ph, target_layers_pool, scores_file, target_k=10,           
@@ -326,13 +326,11 @@ if __name__ == "__main__":
                 #         verbose = verbose 
                 #         )
  
-                deltas = layer_importance(ds=ds, phs=peepholes,
+                deltas = layer_importance(ds=ds, phs=peepholes, sparse_method="gini",
                         loader = "CIFAR100-test",
                         target_modules=target_layers, 
                         )
-                topk = topk_layers(deltas, k=50,
-                        negatives = True
-                        )
+                topk = topk_layers(deltas=deltas, k=50, negatives=True)
                 quit()
 
                 # if (not 'CIFAR100-test' in scores) or (('CIFAR100-test' in scores) and (not 'LACS' in scores['CIFAR100-test'])): 

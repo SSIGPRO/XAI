@@ -29,11 +29,12 @@ from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, con
 
 # peepholes
 from peepholelib.peepholes.parsers import trim_corevectors
-from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
+from peepholelib.peepholes.classifiers.tgmm_feature import GMM_feature as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
 from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
+from peepholelib.plots.conceptograms import *
 
 
 
@@ -41,7 +42,7 @@ if __name__ == "__main__":
         use_cuda = torch.cuda.is_available()
         device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
         # torch.cuda.empty_cache()
-        #device  = torch.device('cuda:2')
+        device  = torch.device('cuda:0')
         #device = torch.device("cpu")
         print(f"Using {device} device")
 
@@ -65,13 +66,13 @@ if __name__ == "__main__":
         cvs_path = Path('/srv/newpenny/XAI/CN/vgg_data/corevectors')
         cvs_name = 'corevectors'
 
-        drill_path = Path('/srv/newpenny/XAI/CN/vgg_data/drillers_all/drillers_100')
-        drill_name = 'classifier'
+        drill_path = Path('/srv/newpenny/XAI/CN/vgg_data/drillers_all/drillers_features')
+        drill_name = 'classifier_f'
 
-        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vgg_data/peepholes_all/peepholes_100'
-        phs_name = 'peepholes'
+        phs_path = Path.cwd()/'/srv/newpenny/XAI/CN/vgg_data/peepholes_all/peepholes_features'
+        phs_name = 'peepholes_f'
 
-        plots_path = Path.cwd()/'temp_plots/coverage/'
+        plots_path = Path.cwd()/'temp_plots/conceptos/'
         
         verbose = True 
         
@@ -177,8 +178,6 @@ if __name__ == "__main__":
                         svd_fns = svd_fns,
                         verbose = verbose
                         )
-                viz_singular_values_2(model, svds_path)
-                quit()
     #--------------------------------
     # CoreVectors 
     #--------------------------------
@@ -402,7 +401,7 @@ if __name__ == "__main__":
                 }
 
         drillers = {}
-        for peep_layer in target_layers:
+        for peep_layer in ['features.0', 'classifier.3']:
                 drillers[peep_layer] = tGMM(
                         path = drill_path,
                         name = drill_name+'.'+peep_layer,
@@ -420,45 +419,8 @@ if __name__ == "__main__":
                 device = device
                 )
 
-        # fitting classifiers
-        with datasets as ds, corevecs as cv:
-                ds.load_only(
-                        loaders = loaders,
-                        verbose = verbose
-                        )
-
-                cv.load_only(
-                        loaders = loaders,
-                        verbose = verbose 
-                        ) 
-
-                for drill_key, driller in drillers.items():
-                        if (driller._empp_file).exists():
-                                print(f'Loading Classifier for {drill_key}') 
-                                driller.load()
-                        else:
-                                t0 = time()
-                                print(f'Fitting classifier for {drill_key}')
-                                driller.fit(
-                                        corevectors = cv,
-                                        loader = 'CIFAR100-train',
-                                        verbose=verbose
-                                        )
-                                print(f'Fitting time for {drill_key}  = ', time()-t0)
-
-                                driller.compute_empirical_posteriors(
-                                        datasets = ds,
-                                        corevectors = cv,
-                                        loader = 'CIFAR100-train',
-                                        batch_size = bs,
-                                        verbose=verbose
-                                        )
-                        
-                                # save classifiers
-                                print(f'Saving classifier for {drill_key}')
-                                driller.save()
-
-        # with datasets as ds, corevecs as cv, peepholes as ph:
+        #fitting classifiers
+        # with datasets as ds, corevecs as cv:
         #         ds.load_only(
         #                 loaders = loaders,
         #                 verbose = verbose
@@ -469,38 +431,68 @@ if __name__ == "__main__":
         #                 verbose = verbose 
         #                 ) 
 
-        #         ph.get_peepholes(
-        #                 datasets = ds,
-        #                 corevectors = cv,
-        #                 target_modules = target_layers,
-        #                 batch_size = bs,
-        #                 drillers = drillers,
-        #                 n_threads = n_threads,
-        #                 verbose = verbose
-        #                 )
-        #         ph.load_only(
-        #                 loaders = loaders,
-        #                 verbose = verbose 
-        #                 )
+        #         for drill_key, driller in drillers.items():
+        #                 if (driller._empp_file).exists():
+        #                         print(f'Loading Classifier for {drill_key}') 
+        #                         driller.load()
+        #                 else:
+        #                         t0 = time()
+        #                         print(f'Fitting classifier for {drill_key}')
+        #                         driller.fit(
+        #                                 corevectors = cv,
+        #                                 loader = 'CIFAR100-train',
+        #                                 verbose=verbose
+        #                                 )
+        #                         print(f'Fitting time for {drill_key}  = ', time()-t0)
 
-        #         scores, protoclasses = proto_score(
-        #         datasets = ds,
-        #         peepholes = ph,
-        #         proto_key = 'CIFAR100-test',
-        #         score_name = 'LACS',
-        #         target_modules = target_layers,
-        #         verbose = verbose,
-        #         )
+        #                         driller.compute_empirical_posteriors(
+        #                                 datasets = ds,
+        #                                 corevectors = cv,
+        #                                 loader = 'CIFAR100-train',
+        #                                 batch_size = bs,
+        #                                 verbose=verbose
+        #                                 )
+                        
+        #                         # save classifiers
+        #                         print(f'Saving classifier for {drill_key}')
+        #                         driller.save()
 
-        #         avg_scores = {}
+        with datasets as ds, corevecs as cv, peepholes as ph:
+                ds.load_only(
+                        loaders = loaders,
+                        verbose = verbose
+                        )
 
-        #         for ds_key in scores:
-        #                 avg_scores[ds_key] = scores[ds_key]['LACS'].mean()
-        #         print(avg_scores)
-        
-                #coverage = empp_coverage_scores(drillers=drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/temp_plots/coverage', file_name='coverage_vgg_100clusters.png')
-                #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
-                # compare_relative_coverage_all_clusters(
-                #         root_dir = '/home/claranunesbarrancos/repos/XAI/data/drillers_all',
-                #         threshold=0.8,
-                #         )     
+                cv.load_only(
+                        loaders = loaders,
+                        verbose = verbose 
+                        ) 
+
+                # ph.get_feature_peepholes_2(
+                #         datasets = ds,
+                #         corevectors = cv,
+                #         target_modules = ['features.0', 'classifier.3'],
+                #         batch_size = bs,
+                #         drillers = drillers,
+                #         n_threads = n_threads,
+                #         verbose = True
+                #         )
+                ph.load_only(
+                        loaders = loaders,
+                        verbose = verbose 
+                        )
+                plot_feature_conceptogram(
+                        path = plots_path,
+                        name = 'f_conceptogram',
+                        datasets = ds,
+                        peepholes = ph,
+                        loaders = ['CIFAR100-test'],
+                        samples = [50],
+                        target_modules = ['classifier.3'],
+                        classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
+                        #protoclasses = protoclasses,
+                        #scores = scores,
+                        verbose = verbose,
+                        )
+
+              

@@ -18,29 +18,25 @@ import torchvision
 
 # Model
 from peepholelib.models.model_wrap import ModelWrap 
-from peepholelib.models.svd_fns import linear_svd
 
 # datasets
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset 
-from peepholelib.datasets.functional.parsers import from_dataset
-from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, linear_svd_projection_ViT
 
 # peepholes
 from peepholelib.peepholes.parsers import trim_corevectors
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
-from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
 from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
 from peepholelib.utils.localization import *
+from peepholelib.utils.gini_index import *
 from peepholelib.plots.conceptograms import plot_conceptogram 
 from peepholelib.utils.get_samples import *
-from calculate_layer_importance import localization_delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
+from calculate_layer_importance import delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
 
 
 def get_st_list(state_dict):
@@ -182,6 +178,16 @@ if __name__ == "__main__":
         'encoder.layers.encoder_layer_9.mlp.0', 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0','encoder.layers.encoder_layer_10.mlp.3',
         'encoder.layers.encoder_layer_11.mlp.0','encoder.layers.encoder_layer_11.mlp.3', 'heads.head' ]
 
+        # best auc (gini)
+        # target_layers = ['encoder.layers.encoder_layer_1.mlp.0', 'encoder.layers.encoder_layer_3.mlp.0', 'encoder.layers.encoder_layer_8.mlp.0', 'encoder.layers.encoder_layer_9.mlp.0',
+        # 'encoder.layers.encoder_layer_9.mlp.3', 'encoder.layers.encoder_layer_10.mlp.0', 'encoder.layers.encoder_layer_10.mlp.3',
+        # 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3', 'heads.head']
+
+        # worst auc (gini)
+        # target_layers = ['encoder.layers.encoder_layer_0.mlp.0', 'encoder.layers.encoder_layer_2.mlp.3', 'encoder.layers.encoder_layer_4.mlp.0',
+        # 'encoder.layers.encoder_layer_5.mlp.0','encoder.layers.encoder_layer_5.mlp.3', 'encoder.layers.encoder_layer_6.mlp.0', 'encoder.layers.encoder_layer_6.mlp.3',
+        # 'encoder.layers.encoder_layer_7.mlp.0', 'encoder.layers.encoder_layer_7.mlp.3', 'encoder.layers.encoder_layer_8.mlp.3']
+
 
 
         print(f'Target layers: {target_layers}')        
@@ -272,21 +278,24 @@ if __name__ == "__main__":
                         loaders = loaders,
                         verbose = verbose 
                         )
-                # corrs = localization_pmax_correlations(
-                #         phs=ph,
-                #         ds=ds,
-                #         ds_key="CIFAR100-test",
-                #         target_modules=target_layers,
-                #         save_dir="/home/claranunesbarrancos/repos/XAI/src/temp_plots/localization" ,  
-                #         file_name="conf_vs_localization_vit.png"
-                #         )
+                corrs = gini_pmax_correlations(
+                        phs=ph,
+                        ds=ds,
+                        ds_key="CIFAR100-test",
+                        target_modules=target_layers,
+                        save_dir="/home/claranunesbarrancos/repos/XAI/src/temp_plots/correlation" ,  
+                        file_name="conf_vs_gini_vit.png"
+                        )
 
-                # print(corrs)
-                # quit()
+                print(corrs)
+                quit()
                 # deltas = layer_importance(ds=ds, phs=peepholes,
                 #         loader = "CIFAR100-test",
                 #         target_modules=target_layers, 
+                #         sparce_method = "gini"
                 #         )
+                # topk = topk_layers(deltas=deltas, k=20, negatives=True)
+
                 # quit()
                 # correct = get_filtered_samples(ds=ds,
                 # split='CIFAR100-test',
@@ -298,26 +307,30 @@ if __name__ == "__main__":
                 # )
                 # quit()
 
-                scores, protoclasses = proto_score(
-                        datasets = ds,
-                        peepholes = ph,
-                        proto_key = 'CIFAR100-test',
-                        score_name = 'LACS',
-                        target_modules = target_layers,
-                        verbose = verbose,
-                        )
+                # scores, protoclasses = proto_score(
+                #         datasets = ds,
+                #         peepholes = ph,
+                #         proto_key = 'CIFAR100-test',
+                #         score_name = 'LACS',
+                #         target_modules = target_layers,
+                #         verbose = verbose,
+                #         )
 
-                plot_conceptogram(path = Path.cwd()/'temp_plots/conceptos/vit',
-                        name='low_local_not_conf', 
-                        datasets=ds,
-                        peepholes=ph,
-                        loaders=['CIFAR100-test'],
-                        target_modules=target_layers,
-                        samples=[695],
-                        classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
-                        scores=scores,
-                )
-                quit()
+                # plot_conceptogram(path = Path.cwd()/'temp_plots/conceptos/vit',
+                #         name='low_local_not_conf', 
+                #         datasets=ds,
+                #         peepholes=ph,
+                #         loaders=['CIFAR100-test'],
+                #         target_modules=target_layers,
+                #         samples=[695],
+                #         classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
+                #         scores=scores,
+                # )
+                # quit()
+
+                
+                gini = gini_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", device = device, target_modules=target_layers)
+                print(gini)
 
                 # out =localization_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", target_modules=target_layers, plot = True,
                 # save_dir = plots_path)
@@ -399,3 +412,22 @@ if __name__ == "__main__":
 
                 # print("\nAverage localization AUC/FPR95 over random layers:")
                 # print(avg_loc_metrics)
+
+                # g_avgs  = []
+                # aucs = []
+                # fprs = []
+
+                # for i in range(20):
+                #         random_layers = random.sample(target_layers, 10)
+                #         gini = gini_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", device = device, target_modules=random_layers)
+                #         g_avgs .append(gini["g_avg"])
+                #         aucs.append(gini["auc"])
+                #         fprs.append(gini["fpr95"])
+                # g_avgs = torch.tensor(g_avgs, dtype=torch.float64)
+                # aucs = torch.tensor(aucs, dtype=torch.float64)
+                # fprs = torch.tensor(fprs, dtype=torch.float64)
+
+                # print("Over 20 random layer subsets:")
+                # print(f"Average Gini: {g_avgs.mean():.6f} ± {g_avgs.std():.6f}")
+                # print(f"AUC:          {aucs.mean():.4f} ± {aucs.std():.4f}")
+                # print(f"FPR@95:       {fprs.mean():.4f} ± {fprs.std():.4f}")

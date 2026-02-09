@@ -21,29 +21,28 @@ from cuda_selector import auto_cuda
 
 # Model
 from peepholelib.models.model_wrap import ModelWrap 
-from peepholelib.models.svd_fns import linear_svd, conv2d_toeplitz_svd
 
 # datasets
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset 
-from peepholelib.datasets.functional.parsers import from_dataset
-from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds import linear_svd_projection, conv2d_toeplitz_svd_projection
 
 # peepholes
 from peepholelib.peepholes.parsers import trim_corevectors
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
-from peepholelib.models.viz import viz_singular_values_2
 from peepholelib.utils.viz_empp import *
 from peepholelib.utils.viz_corevecs import plot_tsne, plot_tsne_CUDA
 from peepholelib.utils.localization import *
+from peepholelib.utils.gini_index import *
 from peepholelib.utils.get_samples import *
 from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
 from peepholelib.plots.conceptograms import plot_conceptogram 
+
+from calculate_layer_importance import delta_auc_lolo as layer_importance, topk_layers_by_delta_auc as topk_layers 
+
 
 
 def load_all_drillers(**kwargs):
@@ -121,7 +120,7 @@ if __name__ == "__main__":
         
         verbose = True 
         
-        target_layers = [ 'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2',
+        target_layers = [ 'features.1.conv.0.0', 'features.1.conv.1','features.2.conv.0.0','features.2.conv.1.0','features.2.conv.2', 
         'features.3.conv.0.0', 'features.3.conv.1.0', 'features.3.conv.2',
         'features.4.conv.0.0', 'features.4.conv.1.0', 'features.4.conv.2',
         'features.5.conv.0.0', 'features.5.conv.1.0', 'features.5.conv.2',
@@ -165,6 +164,14 @@ if __name__ == "__main__":
         #best coverage (threshold =0.95)
         # target_layers = ['features.2.conv.0.0','features.3.conv.0.0','features.3.conv.1.0','features.3.conv.2','features.5.conv.1.0',
         # 'features.6.conv.1.0','features.8.conv.1.0','features.9.conv.1.0','features.17.conv.2','classifier.1']
+
+        # best delta auc (gini)
+        # target_layers = ['features.14.conv.1.0', 'features.14.conv.2', 'features.15.conv.2', 'features.16.conv.1.0', 'features.16.conv.2', 'features.17.conv.0.0',
+        # 'features.17.conv.1.0', 'features.17.conv.2', 'features.18.0', 'classifier.1']
+
+        # WORST DELTA AUC (GINI)
+        #target_layers = ['features.3.conv.0.0','features.4.conv.0.0', 'features.6.conv.2', 'features.7.conv.0.0', 'features.9.conv.0.0',  'features.9.conv.1.0', 'features.9.conv.2', 'features.10.conv.0.0',
+        # 'features.10.conv.2', 'features.13.conv.1.0']
 
         loaders = [
         'CIFAR100-train',
@@ -281,17 +288,17 @@ if __name__ == "__main__":
                         verbose = verbose 
                         )
 
-                # corrs = localization_pmax_correlations(
-                #         phs=ph,
-                #         ds=ds,
-                #         ds_key="CIFAR100-test",
-                #         target_modules=target_layers,
-                #         save_dir="/home/claranunesbarrancos/repos/XAI/src/temp_plots/localization" ,  
-                #         file_name="conf_vs_localization_mobilenet.png"
-                #         )
+                corrs = gini_pmax_correlations(
+                        phs=ph,
+                        ds=ds,
+                        ds_key="CIFAR100-test",
+                        target_modules=target_layers,
+                        save_dir="/home/claranunesbarrancos/repos/XAI/src/temp_plots/correlation" ,  
+                        file_name="conf_vs_gini_mobilenet.png"
+                        )
 
-                # print(corrs)
-                # quit()
+                print(corrs)
+                quit()
 
 
                 
@@ -316,35 +323,35 @@ if __name__ == "__main__":
                         else:
                                 print(f'No Classifier found for {drill_key} at {driller._empp_file}')
 
-                correct = get_filtered_samples(ds=ds,
-                        split='CIFAR100-test',
-                        #correct=False,
-                        conf_range=[0,30],
-                        localization_range = [0.05, 0.06],
-                        phs = ph,
-                        target_modules = target_layers # best config
-                        )
-                quit()
-                scores, protoclasses = proto_score(
-                        datasets = ds,
-                        peepholes = ph,
-                        proto_key = 'CIFAR100-test',
-                        score_name = 'LACS',
-                        target_modules = target_layers,
-                        verbose = verbose,
-                        )
+                # correct = get_filtered_samples(ds=ds,
+                #         split='CIFAR100-test',
+                #         #correct=False,
+                #         conf_range=[0,30],
+                #         localization_range = [0.05, 0.06],
+                #         phs = ph,
+                #         target_modules = target_layers # best config
+                #         )
+                # quit()
+                # scores, protoclasses = proto_score(
+                #         datasets = ds,
+                #         peepholes = ph,
+                #         proto_key = 'CIFAR100-test',
+                #         score_name = 'LACS',
+                #         target_modules = target_layers,
+                #         verbose = verbose,
+                #         )
 
-                plot_conceptogram(path = Path.cwd()/'temp_plots/conceptos/mobilenet',
-                        name='low_local_not_conf', 
-                        datasets=ds,
-                        peepholes=ph,
-                        loaders=['CIFAR100-test'],
-                        target_modules=target_layers,
-                        samples=[1674],
-                        classes =Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
-                        scores=scores,
-                        )
-                quit()
+                # plot_conceptogram(path = Path.cwd()/'temp_plots/conceptos/mobilenet',
+                #         name='low_local_not_conf', 
+                #         datasets=ds,
+                #         peepholes=ph,
+                #         loaders=['CIFAR100-test'],
+                #         target_modules=target_layers,
+                #         samples=[1674],
+                #         classes =Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
+                #         scores=scores,
+                #         )
+                # quit()
 
                 # avg_scores = {}
 
@@ -359,6 +366,12 @@ if __name__ == "__main__":
 
                 # means = localization_means(Ls=out["Ls"], results=results)
                 # print(means)
+
+
+                gini = gini_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", target_modules=target_layers)
+                print(gini)
+
+
                 #plot_empp_posteriors(drillers=drillers, save_dir=drill_path)
                 #coverage = empp_coverage_scores(drillers=drillers, threshold=0.9, plot=False, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='coverage_mobilenet_06.png')
                 #empp_relative_coverage_scores(drillers=ph._drillers, threshold=0.8, plot=True, save_path='/home/claranunesbarrancos/repos/XAI/src/clustering_xp/temp_plots', file_name='relative_cluster_coverage_vgg_550clusters.png')
@@ -417,3 +430,21 @@ if __name__ == "__main__":
 
                 # print("\nAverage localization AUC/FPR95 over random layers:")
                 # print(avg_loc_metrics)
+                # g_avgs  = []
+                # aucs = []
+                # fprs = []
+
+                # for i in range(20):
+                #         random_layers = random.sample(target_layers, 10)
+                #         gini = gini_from_peepholes(phs=ph, ds=ds, ds_key="CIFAR100-test", device = device, target_modules=random_layers)
+                #         g_avgs .append(gini["g_avg"])
+                #         aucs.append(gini["auc"])
+                #         fprs.append(gini["fpr95"])
+                # g_avgs = torch.tensor(g_avgs, dtype=torch.float64)
+                # aucs = torch.tensor(aucs, dtype=torch.float64)
+                # fprs = torch.tensor(fprs, dtype=torch.float64)
+
+                # print("Over 20 random layer subsets:")
+                # print(f"Average Gini: {g_avgs.mean():.6f} ± {g_avgs.std():.6f}")
+                # print(f"AUC:          {aucs.mean():.4f} ± {aucs.std():.4f}")
+                # print(f"FPR@95:       {fprs.mean():.4f} ± {fprs.std():.4f}")

@@ -75,23 +75,18 @@ if __name__ == "__main__":
 
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
 
-    cvs_path = Path.cwd()/'../data/corevectors'
-    cvs_name = 'corevectors'
 
     plots_path = Path.cwd()/'temp_plots/coverage/'
 
-    target_layers = [
-        'features.7', 'features.10', 'features.12', 'features.14', 'features.17',
-        'features.19', 'features.21', 'features.24', 'features.26', 'features.28',
-        'classifier.0', 'classifier.3',
-        'classifier.6',
-    ]
 
     loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test']
-    n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
-
+    
+    cvs_path = Path('/srv/newpenny/XAI/CN/vgg_data/corevectors')
+    cvs_name = 'corevectors'
 
     verbose = True
+
+    target_layers = ['features.0', 'features.7','features.26','features.28','classifier.0','classifier.3', 'classifier.6']
 
     #--------------------------------
     # Dataset and CoreVectors 
@@ -100,6 +95,8 @@ if __name__ == "__main__":
     dataset = ParsedDataset(
             path = ds_path,
             )
+    print(dataset._dss['CIFAR100-test'].keys())
+    quit()
 
     corevecs = CoreVectors(
         path=cvs_path,
@@ -122,51 +119,56 @@ if __name__ == "__main__":
         for layer in target_layers:
 
             X = cv._corevds['CIFAR100-train'][layer][:]
-            X_reduced = X[:, :50]
+            print(X.shape)
+            method = 'cosine'
+            if layer in {'features.0', 'features.7'}:
+                X = X[:, :5]
+                method = 'euclidean'
+            
             y = ds._dss["CIFAR100-train"][:]["label"]  
 
             db = DBSCAN(
-                eps=10,
-                min_samples=10,
-                metric = 'precomputed',
+                eps=0.2,
+                min_samples=50,
+                metric = method,
 
             )
             # using a custom distance metrix  (manhattan)
             # X_distance = cp.array(X_reduced.detach().cpu().numpy())
             # dist_matrix = cp.array(pairwise_distances(X_distance.get(), metric='manhattan'))
 
-            X = X_reduced.detach().cpu().numpy()  
-            VI = np.linalg.inv(np.cov(X, rowvar=False))
-            dist_matrix = distance.cdist(X, X, metric='mahalanobis', VI=VI)
+            X = X.detach().cpu().numpy()  
+            # VI = np.linalg.inv(np.cov(X, rowvar=False))
+            # dist_matrix = distance.cdist(X, X, metric='mahalanobis', VI=VI)
 
             with cuml.accel.profile():
                 # Fit model on corevectors
-                pred_labels = db.fit_predict(dist_matrix)
+                pred_labels = db.fit_predict(X)
 
                 if hasattr(pred_labels, "to_array"):  
-                    pred_labels = labels.to_array()
+                    pred_labels = pred_labels.to_array()
                 pred_labels = torch.tensor(np.array(pred_labels, copy=False), dtype=torch.long)
 
 
-            # map labels to do the empirical posterior
-            unique_labels = pred_labels.unique()
-            mapping = {old.item(): new for new, old in enumerate(unique_labels)}
-            pred_labels_remapped = pred_labels.clone()
-            for old, new in mapping.items():
-                pred_labels_remapped[pred_labels == old] = new
+            # # map labels to do the empirical posterior
+            # unique_labels = pred_labels.unique()
+            # mapping = {old.item(): new for new, old in enumerate(unique_labels)}
+            # pred_labels_remapped = pred_labels.clone()
+            # for old, new in mapping.items():
+            #     pred_labels_remapped[pred_labels == old] = new
 
-            pred_labels = pred_labels_remapped
+            # pred_labels = pred_labels_remapped
 
-            empp = compute_empp_dbscan(
-                hard_labels=pred_labels,
-                y=y.detach().int().cpu().numpy(),
-                n_classes=n_classes
-            )
+            # empp = compute_empp_dbscan(
+            #     hard_labels=pred_labels,
+            #     y=y.detach().int().cpu().numpy(),
+            #     n_classes=n_classes
+            # )
 
-            drillers[layer] = {
-                "_empp": empp
-            }
-            print("emp: ", empp)
+            # drillers[layer] = {
+            #     "_empp": empp
+            # }
+            # print("emp: ", empp)
 
             # -----------------------------------------------------
             # some cluster diagnostics
@@ -188,8 +190,8 @@ if __name__ == "__main__":
             for lbl, sz in sizes_sorted[:5]:
                 print(f"   Cluster {lbl}: {sz} points")
 
-    coverage = empp_coverage_scores(
-        drillers=drillers,
-        threshold=0.8,
-    )
+    # coverage = empp_coverage_scores(
+    #     drillers=drillers,
+    #     threshold=0.8,
+    # )
 
