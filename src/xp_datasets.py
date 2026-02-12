@@ -20,7 +20,6 @@ from peepholelib.models.model_wrap import ModelWrap
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.cifarC import CifarC
 from peepholelib.datasets.parsedDataset import ParsedDataset 
-from peepholelib.datasets.functional.parsers import from_dataset
 from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
@@ -95,43 +94,26 @@ if __name__ == "__main__":
                 )
             }
 
-    _dss_parsers = {
-            'CIFAR100': from_dataset,
-            'CIFARC': from_dataset,
-            }
-
     _dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 0.01
+                perc = 0.001
                 ) for k in _dss.keys()
             }
 
     #######################
     # parsing datasets
     #######################
-    
-    # parse the original datasets into ds_path
-    ParsedDataset.parse_ds(
-            save_path = ds_path,
-            model = model,
-            datasets = _dss,
-            ds_parsers = _dss_parsers, 
+    dataset = ParsedDataset.create_ds(
+            path = ds_path,
+            dataset_wraps = _dss,
             ds_samplers = _dss_samplers, 
             batch_size = bs,
-            n_threads = n_threads,
-            verbose = verbose
-            )
+            ) 
 
     #######################
     # creating attk dataset 
     #######################
-
-    # create a DatasetBase object for the parsed dataset
-    ds = ParsedDataset(
-            path = ds_path,
-            )
-
     # atks will be saved in atk_path
     atk_ds = AttacksDS(
             path = atk_path,
@@ -152,43 +134,53 @@ if __name__ == "__main__":
                 model = model,
                 ),
             }
-    
-    # Apply attks to ds
-    with ds, atk_ds:
+
+    # parse the original datasets into ds_path
+    with dataset as ds:
         ds.load_only(
                 loaders = ['CIFAR100-test'],
-                verbose = verbose 
+                mode = 'r+',
+                verbose = verbose
                 )
 
-        atk_ds.apply_attacks(
-                dataset = ds,
-                loaders = ['CIFAR100-test'],
-                attacks = atks,
+        ds.parse_ds(
+                model = model,
                 batch_size = bs,
-                verbose = verbose 
+                n_threads = n_threads,
+                verbose = verbose
                 )
+    
+        # Apply attks to ds
+        with atk_ds:
+            atk_ds.apply_attacks(
+                    dataset = ds,
+                    loaders = ['CIFAR100-test'],
+                    attacks = atks,
+                    batch_size = bs,
+                    verbose = verbose 
+                    )
 
-    #######################
-    # lazy stacking 
-    #######################
-    Path('./temp_plots').mkdir(parents=True, exist_ok=True)
-    with ds, atk_ds:
-        ds.load_only(
-                loaders = ['CIFAR100-test', 'CIFAR100-C-test-c0'],
-                verbose = verbose 
-                )
+        #######################
+        # lazy stacking 
+        #######################
+        Path('./temp_plots').mkdir(parents=True, exist_ok=True)
+        with ds, atk_ds:
+            ds.load_only(
+                    loaders = ['CIFAR100-test', 'CIFAR100-C-test-c0'],
+                    verbose = verbose 
+                    )
 
-        atk_ds.load_only(
-                loaders = ['BIM-CIFAR100-test', 'CW-CIFAR100-test', 'DF-CIFAR100-test', 'PGD-CIFAR100-test'],
-                verbose = verbose 
-                )
+            atk_ds.load_only(
+                    loaders = ['BIM-CIFAR100-test', 'CW-CIFAR100-test', 'DF-CIFAR100-test', 'PGD-CIFAR100-test'],
+                    verbose = verbose 
+                    )
 
-        ds.lazy_stack(others = [atk_ds])
-        
-        from matplotlib import pyplot as plt
-        for k, v in ds._dss.items():
-           plt.figure()
-           plt.imshow(v['image'][4].squeeze(dim=0).permute(1,2,0))
-           plt.title(k)
-           plt.savefig(f'./temp_plots/{k}.png')
-           plt.close()
+            ds.lazy_stack(others = [atk_ds])
+            
+            from matplotlib import pyplot as plt
+            for k, v in ds._dss.items():
+               plt.figure()
+               plt.imshow(v['image'][4].squeeze(dim=0).permute(1,2,0))
+               plt.title(k)
+               plt.savefig(f'./temp_plots/{k}.png')
+               plt.close()
