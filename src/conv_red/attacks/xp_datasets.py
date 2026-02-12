@@ -14,9 +14,6 @@ from cuda_selector import auto_cuda
 from peepholelib.models.model_wrap import ModelWrap 
 
 from peepholelib.datasets.cifar100 import Cifar100
-from peepholelib.datasets.cifarC import CifarC
-from peepholelib.datasets.SVHN import SVHN 
-from peepholelib.datasets.Places import Places 
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.parsers import from_dataset
 from peepholelib.datasets.functional.samplers import random_subsampling 
@@ -67,29 +64,11 @@ if __name__ == "__main__":
                 path = cifar_path,
                 transform = transform,
                 seed = seed
-                ),
-            'CIFARC': CifarC(
-                path = cifarc_path,
-                transform = transform,
-                seed = seed
-                ),
-            'SVHN': SVHN(
-                path = svhn_path,
-                transform = transform,
-                seed = seed
-                ),
-            'Places': Places(
-                path = places_path,
-                transform = transform,
-                seed = seed
                 )
             }
 
     _dss_parsers = {
-            'CIFAR100': from_dataset,
-            'CIFARC': from_dataset,
-            'SVHN': from_dataset,
-            'Places': from_dataset,
+            'CIFAR100': from_dataset
             }
 
     _dss_samplers = {
