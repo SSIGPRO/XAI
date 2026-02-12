@@ -2,38 +2,27 @@ from pathlib import Path as Path
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-m', '--model',  choices=['vgg','mobilenet'], default='vgg')
-parser.add_argument('-r', '--reduction', choices=['avgpooling', 'toeplitz', 'kernel'], default='kernel')
-parser.add_argument('-a', '--analysis', choices=['macs', 'dmd'], default='macs')
+parser.add_argument('-m', '--model', choices=['vgg', 'wrn'], default='wrn')
 parser.add_argument('-d', '--data_path', default=Path.cwd()/'../../data')
 args = parser.parse_args()
 
+<<<<<<< HEAD
 # import configs
+=======
+# just vgg for the moment
+
+>>>>>>> d2de4fa (start)
 if args.model == 'vgg':
     from configs.vgg import *
-elif args.model == 'mobilenet':
-    from configs.mobilenet import *
-
-if args.reduction == 'avgpooling':
-    from configs.avgpooling import *
-elif args.reduction == 'toeplitz':
-    from configs.toeplitz import *
-elif args.reduction == 'kernel':
-    from configs.kernel import *
-
-if args.analysis == 'macs':
-    from configs.macs import *
-elif args.analysis == 'dmd':
-    from configs.dmd import *
+elif args.model == 'wrn':
+    from configs.wrn import *
 
 #--------------------------------
 # Paths and Definitions 
 #--------------------------------
-cifar_path = '/srv/newpenny/dataset/CIFAR100'
-cifarc_path = '/srv/newpenny/dataset/CIFAR-100-C'
-svhn_path = '/srv/newpenny/dataset/SVHN' 
-places_path = '/srv/newpenny/dataset/Places365'
+# focusing on CIFAR100
 
+<<<<<<< HEAD
 # TODO: restruct this to have svds, corevector, .. etc at leaf folders
 ds_path = Path(args.data_path)/args.model/'datasets'
 
@@ -54,36 +43,34 @@ hyper_params_file = phs_path/f'hyperparams.pickle'
 
 plots_path = Path.cwd()/'temp_plots'
 
+=======
+cifar_path = '/srv/newpenny/dataset/CIFAR100'
+ds_path = Path(args.data_path)/args.model/'datasets'
+
+>>>>>>> d2de4fa (start)
 #--------------------------------
-# Runing
+# Running
 #--------------------------------
+
 seed = 2
 n_threads = 1
 verbose = True 
 n_classes = 100
+<<<<<<< HEAD
 bs_base = 2**10
 bs_atk_scale = 2**-4
 tune_num_samples = 50
+=======
+bs_base = 2**8
+bs_atk_scale = 2**-2 #-4 og
+>>>>>>> d2de4fa (start)
 
 #--------------------------------
 # Defs 
 #--------------------------------
+
 loaders = [
         'CIFAR100-train',
         'CIFAR100-val',
         'CIFAR100-test',
-        'CIFAR100-C-val-c4',
-        'CIFAR100-C-test-c4',
-        'SVHN-val',
-        'SVHN-test',
-        'Places365-val',
-        'Places365-test',
-        'CW-CIFAR100-val',
-        'CW-CIFAR100-test',
-        'BIM-CIFAR100-val',
-        'BIM-CIFAR100-test',
-        #'DF-CIFAR100-val',
-        #'DF-CIFAR100-test',
-        #'PGD-CIFAR100-val',
-        #'PGD-CIFAR100-test',
         ]

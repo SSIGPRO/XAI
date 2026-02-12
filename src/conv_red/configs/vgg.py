@@ -3,9 +3,13 @@ from pathlib import Path as Path
 
 # Torch stuff
 from torchvision.models import vgg16 as Model
+<<<<<<< HEAD
 
 # Peepholelib stuff
 from peepholelib.datasets.functional.transforms import vgg16_cifar100 as transform
+=======
+from peepholelib.datasets.functional.transforms import vgg16_transform as transform
+>>>>>>> d2de4fa (start)
 
 #------------------
 # Paths 
