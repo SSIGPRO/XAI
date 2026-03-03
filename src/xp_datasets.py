@@ -20,6 +20,7 @@ from peepholelib.models.model_wrap import ModelWrap
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.cifarC import CifarC
 from peepholelib.datasets.parsedDataset import ParsedDataset 
+from peepholelib.datasets.functional.inference_fns import img_classification_full as inference_fn 
 from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
@@ -104,11 +105,15 @@ if __name__ == "__main__":
     #######################
     # parsing datasets
     #######################
-    dataset = ParsedDataset.create_ds(
+    dataset = ParsedDataset.parse_ds(
             path = ds_path,
             dataset_wraps = _dss,
             ds_samplers = _dss_samplers, 
+            keys_to_copy = ['image', 'label'],
+            inference_fn = partial(inference_fn, model=model), # comment for fine tuning the model
             batch_size = bs,
+            n_threads = 1,
+            verbose = verbose
             ) 
 
     #######################
@@ -139,17 +144,9 @@ if __name__ == "__main__":
     with dataset as ds:
         ds.load_only(
                 loaders = ['CIFAR100-test'],
-                mode = 'r+',
                 verbose = verbose
                 )
 
-        ds.parse_ds(
-                model = model,
-                batch_size = bs,
-                n_threads = n_threads,
-                verbose = verbose
-                )
-    
         # Apply attks to ds
         with atk_ds:
             atk_ds.apply_attacks(
