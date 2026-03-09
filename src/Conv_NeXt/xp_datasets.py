@@ -21,7 +21,7 @@ from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.cifarC import CifarC
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.inference_fns import img_classification_full as inference_fn 
-from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
+from peepholelib.datasets.functional.transforms import convnext_base_cifar100 as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # ATK dataset
