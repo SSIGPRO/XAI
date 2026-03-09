@@ -37,7 +37,11 @@ if __name__ == "__main__":
     #--------------------------------
     ds_path = '/srv/newpenny/dataset/CIFAR100'
 
+<<<<<<< HEAD
     basic_dir = Path.cwd()/f'../data/{name_model}_{name_dataset}'
+=======
+    basic_dir = Path.cwd()/f'../../data'#/srv/newpenny/XAI/conceptograms/LC/{name_model}_{name_dataset}/')
+>>>>>>> cf8a22b ( Save change before rebase)
 
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     tune_dir = basic_dir / "checkpoints" / run_id
