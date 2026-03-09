@@ -21,7 +21,7 @@ from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.cifarC import CifarC
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.inference_fns import img_classification_full as inference_fn 
-from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
+from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # ATK dataset
@@ -33,7 +33,7 @@ from peepholelib.adv_atk.attacksDS import AttacksDS
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -47,8 +47,7 @@ if __name__ == "__main__":
     # model parameters
     seed = 29
     
-    # bs = 512+256+128 # BIM
-    bs = 256+128 # CW
+    bs = 2**8
     n_threads = 1
 
     model_dir = '/srv/newpenny/XAI/models'
@@ -59,7 +58,6 @@ if __name__ == "__main__":
     #--------------------------------
     # Model 
     #--------------------------------
-    
     nn = vgg16()
     n_classes = 100#len(ds.get_classes()) 
     model = ModelWrap(
@@ -86,36 +84,50 @@ if __name__ == "__main__":
     _dss = {
             'CIFAR100': Cifar100(
                 path = cifar_path,
-                transform = ds_transform,
+                std_transform = ds_transform,
                 seed = seed
-                ),
-            'CIFARC': CifarC(
-                path = cifarc_path,
-                seed = seed
-                )
+                )#,
+            #'CIFARC': CifarC(
+            #    path = cifarc_path,
+            #    std_transform = ds_transform,
+            #    seed = seed
+            #    )
             }
 
     _dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 0.001
+                perc = 0.1
                 ) for k in _dss.keys()
             }
 
     #######################
     # parsing datasets
     #######################
-    dataset = ParsedDataset.parse_ds(
+    dataset = ParsedDataset.parse_dataset(
             path = ds_path,
             dataset_wraps = _dss,
             ds_samplers = _dss_samplers, 
             keys_to_copy = ['image', 'label'],
-            inference_fn = partial(inference_fn, model=model), # comment for fine tuning the model
             batch_size = bs,
             n_threads = 1,
             verbose = verbose
             ) 
 
+    with dataset as ds:
+        ds.load_only(
+                loaders = ['CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test'],
+                verbose = verbose
+                )
+
+        ds.parse_inference(
+                name = 'vgg',
+                inference_fn = partial(inference_fn, model=model), # comment for fine tuning the model
+                batch_size = bs,
+                n_threads = 1,
+                verbose = verbose
+                )
+    quit()
     #######################
     # creating attk dataset 
     #######################
@@ -140,7 +152,6 @@ if __name__ == "__main__":
                 ),
             }
 
-    # parse the original datasets into ds_path
     with dataset as ds:
         ds.load_only(
                 loaders = ['CIFAR100-test'],
@@ -157,27 +168,3 @@ if __name__ == "__main__":
                     verbose = verbose 
                     )
 
-        #######################
-        # lazy stacking 
-        #######################
-        Path('./temp_plots').mkdir(parents=True, exist_ok=True)
-        with ds, atk_ds:
-            ds.load_only(
-                    loaders = ['CIFAR100-test', 'CIFAR100-C-test-c0'],
-                    verbose = verbose 
-                    )
-
-            atk_ds.load_only(
-                    loaders = ['BIM-CIFAR100-test', 'CW-CIFAR100-test', 'DF-CIFAR100-test', 'PGD-CIFAR100-test'],
-                    verbose = verbose 
-                    )
-
-            ds.lazy_stack(others = [atk_ds])
-            
-            from matplotlib import pyplot as plt
-            for k, v in ds._dss.items():
-               plt.figure()
-               plt.imshow(v['image'][4].squeeze(dim=0).permute(1,2,0))
-               plt.title(k)
-               plt.savefig(f'./temp_plots/{k}.png')
-               plt.close()

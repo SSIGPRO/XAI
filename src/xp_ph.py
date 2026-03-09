@@ -81,8 +81,8 @@ if __name__ == "__main__":
             'CIFAR100-train',
             'CIFAR100-val',
             'CIFAR100-test',  
-            'CIFAR100-C-val-c0',
-            'CIFAR100-C-test-c0' 
+            #'CIFAR100-C-val-c0',
+            #'CIFAR100-C-test-c0' 
             ]
 
     #--------------------------------
