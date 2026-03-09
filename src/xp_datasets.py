@@ -20,8 +20,10 @@ from peepholelib.models.model_wrap import ModelWrap
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.cifarC import CifarC
 from peepholelib.datasets.parsedDataset import ParsedDataset 
-from peepholelib.datasets.functional.inference_fns import img_classification_full as inference_fn 
-from peepholelib.datasets.functional.transforms import vgg16_cifar100 as ds_transform 
+
+from peepholelib.datasets.functional.inference_fns import img_classification_full as img_cls_inf, img_classification_atks as img_cls_atk_inf 
+from peepholelib.datasets.functional.transforms import TransformWrap 
+from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # ATK dataset
@@ -29,11 +31,10 @@ from peepholelib.adv_atk.BIM import myBIM
 from peepholelib.adv_atk.CW import myCW
 from peepholelib.adv_atk.DeepFool import myDeepFool
 from peepholelib.adv_atk.PGD import myPGD
-from peepholelib.adv_atk.attacksDS import AttacksDS 
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -47,8 +48,7 @@ if __name__ == "__main__":
     # model parameters
     seed = 29
     
-    # bs = 512+256+128 # BIM
-    bs = 256+128 # CW
+    bs = 2**8
     n_threads = 1
 
     model_dir = '/srv/newpenny/XAI/models'
@@ -59,7 +59,6 @@ if __name__ == "__main__":
     #--------------------------------
     # Model 
     #--------------------------------
-    
     nn = vgg16()
     n_classes = 100#len(ds.get_classes()) 
     model = ModelWrap(
@@ -86,7 +85,6 @@ if __name__ == "__main__":
     _dss = {
             'CIFAR100': Cifar100(
                 path = cifar_path,
-                transform = ds_transform,
                 seed = seed
                 ),
             'CIFARC': CifarC(
@@ -98,31 +96,34 @@ if __name__ == "__main__":
     _dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 0.001
+                perc = 0.5
                 ) for k in _dss.keys()
             }
 
-    #######################
-    # parsing datasets
-    #######################
-    dataset = ParsedDataset.parse_ds(
-            path = ds_path,
-            dataset_wraps = _dss,
-            ds_samplers = _dss_samplers, 
-            keys_to_copy = ['image', 'label'],
-            inference_fn = partial(inference_fn, model=model), # comment for fine tuning the model
-            batch_size = bs,
-            n_threads = 1,
-            verbose = verbose
-            ) 
+    loaders = [
+            'CIFAR100-train',
+            'CIFAR100-test',
+            'CIFAR100-val',
+            'CIFAR100-C-train-c0',
+            'CIFAR100-C-val-c0',
+            'CIFAR100-C-test-c0',
+            'CIFAR100-C-train-c1',
+            'CIFAR100-C-val-c1',
+            'CIFAR100-C-test-c1',
+            'CIFAR100-C-train-c2',
+            'CIFAR100-C-val-c2',
+            'CIFAR100-C-test-c2',
+            'CIFAR100-C-train-c3',
+            'CIFAR100-C-val-c3',
+            'CIFAR100-C-test-c3',
+            'CIFAR100-C-train-c4',
+            'CIFAR100-C-val-c4',
+            'CIFAR100-C-test-c4',
+            ]
 
-    #######################
-    # creating attk dataset 
-    #######################
-    # atks will be saved in atk_path
-    atk_ds = AttacksDS(
-            path = atk_path,
-            )
+    _transforms = {
+            k: TransformWrap(transform=ds_transform, input_key='image') for k in loaders 
+            }
 
     atks = {
             'CW': myCW(
@@ -140,44 +141,46 @@ if __name__ == "__main__":
                 ),
             }
 
-    # parse the original datasets into ds_path
+    # create inference functions for each atk
+    atks_inf_fns = {
+            atk_name: partial(
+                img_cls_atk_inf,
+                attack = atk,
+                label_key = 'label'
+                ) for atk_name, atk in atks.items()
+            }
+
+
+    #######################
+    # parsing datasets
+    #######################
+    dataset = ParsedDataset(
+            path = ds_path
+            )
+
     with dataset as ds:
-        ds.load_only(
-                loaders = ['CIFAR100-test'],
+        ds.parse_dataset(
+                dataset_wraps = _dss,
+                ds_samplers = _dss_samplers, 
+                keys_to_copy = ['image', 'label'],
+                batch_size = bs,
+                n_threads = 1,
+                verbose = verbose
+                ) 
+
+        ds.parse_inference(
+                inference_fns = {'vgg': partial(img_cls_inf, model=model)},
+                transforms = _transforms,
+                batch_size = bs,
+                n_threads = 1,
                 verbose = verbose
                 )
 
-        # Apply attks to ds
-        with atk_ds:
-            atk_ds.apply_attacks(
-                    dataset = ds,
-                    loaders = ['CIFAR100-test'],
-                    attacks = atks,
-                    batch_size = bs,
-                    verbose = verbose 
-                    )
+        ds.parse_inference(
+                loaders = ['CIFAR100-test-vgg'],
+                inference_fns = atks_inf_fns, 
+                transforms = _transforms,
+                batch_size = bs,
+                verbose = verbose 
+                )
 
-        #######################
-        # lazy stacking 
-        #######################
-        Path('./temp_plots').mkdir(parents=True, exist_ok=True)
-        with ds, atk_ds:
-            ds.load_only(
-                    loaders = ['CIFAR100-test', 'CIFAR100-C-test-c0'],
-                    verbose = verbose 
-                    )
-
-            atk_ds.load_only(
-                    loaders = ['BIM-CIFAR100-test', 'CW-CIFAR100-test', 'DF-CIFAR100-test', 'PGD-CIFAR100-test'],
-                    verbose = verbose 
-                    )
-
-            ds.lazy_stack(others = [atk_ds])
-            
-            from matplotlib import pyplot as plt
-            for k, v in ds._dss.items():
-               plt.figure()
-               plt.imshow(v['image'][4].squeeze(dim=0).permute(1,2,0))
-               plt.title(k)
-               plt.savefig(f'./temp_plots/{k}.png')
-               plt.close()

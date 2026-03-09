@@ -25,6 +25,7 @@ if __name__ == "__main__":
     # TODO: find an way to lock cpus for multiprocesses make
     lock_file = '../locks/peepholes.cuda.lock'
     lock = FileLock(lock_file)
+    with lock.acquire(timeout=-1):
         use_cuda = torch.cuda.is_available()
         device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
         print(f"Using {device} device")
@@ -39,7 +40,7 @@ if __name__ == "__main__":
                 target_modules = target_layers,
                 device = device
                 )
-                                            
+    
     model.update_output(
             output_layer = output_layer, 
             to_n_classes = n_classes,
@@ -50,6 +51,11 @@ if __name__ == "__main__":
             path = model_path,
             name = model_name,
             verbose = verbose 
+            )
+
+    model.prepend_normalizer(
+            mean = normalization_mean,
+            std = normalization_std
             )
 
     #--------------------------------
@@ -114,11 +120,13 @@ if __name__ == "__main__":
     with datasets as ds, corevecs as cv: 
         ds.load_only(
                 loaders = loaders,
+                transforms = transforms,
+                inference_names = inference_names,
                 verbose = verbose
                 )
 
         cv.load_only(
-                loaders = loaders,
+                loaders = list(ds._dss.keys()),
                 verbose = verbose
                 ) 
 
@@ -127,7 +135,7 @@ if __name__ == "__main__":
                 driller.fit(
                         datasets = ds,
                         corevectors = cv,
-                        loader = 'CIFAR100-train',
+                        loader = 'CIFAR100-train-'+args.model,
                         verbose=verbose
                         )
                 driller.save()
@@ -143,6 +151,7 @@ if __name__ == "__main__":
                     verbose = verbose
                     )
             
+            score_fns = get_score_fns(args.model)
             scores = {}
             for score_name, score_fn in score_fns.items():
                 scores = score_fn(
@@ -156,6 +165,7 @@ if __name__ == "__main__":
                         )
                 if type(scores) == tuple: scores = scores[0]
 
+            auc_kwargs_ood = get_auc_kwargs_ood(args.model)
             aucs_ood = auc_atks(
                     datasets = ds,
                     scores = scores,
@@ -163,6 +173,7 @@ if __name__ == "__main__":
                     verbose = verbose
                     )
 
+            auc_kwargs_aa = get_auc_kwargs_aa(args.model)
             aucs_aa = auc_atks(
                     datasets = ds,
                     scores = scores,
@@ -170,9 +181,17 @@ if __name__ == "__main__":
                     verbose = verbose
                     )
 
-            _aucs = [list(aucs_ood[d].values())[0] for d in auc_kwargs_ood['atk_loaders']] 
-            avg_auc_ood = geomean(_aucs)
-
-            _aucs = [list(aucs_aa[d].values())[0] for d in auc_kwargs_aa['atk_loaders']] 
-            avg_auc_aa = geomean(_aucs) 
-            print('geom auc OOD: ', avg_auc_ood, 'geom auch AA', avg_auc_aa)
+            report = {}
+            _aucs = []
+            for k in auc_kwargs_ood['atk_loaders']:
+                report['AUC '+k] = list(aucs_ood[k].values())[0]
+                _aucs.append(report['AUC '+k]) 
+            report['AUC OoD'] = geomean(_aucs)
+                                                                 
+            _aucs = []
+            for k in auc_kwargs_aa['atk_loaders']:
+                report['AUC '+k] = list(aucs_aa[k].values())[0]
+                _aucs.append(report['AUC '+k]) 
+            report['AUC AA'] = geomean(_aucs)
+            
+            print('Report: ', report)

@@ -14,20 +14,11 @@ from configs.common import *
 if __name__ == "__main__":
     hyperp_files = list(Path(args.data_path).glob('*/peepholes/*/*/hyperparams.pickle')) 
    
-    dfs = [pd.read_pickle(hf)[['ood_auc', 'aa_auc', 'model', 'reduction', 'analysis']] for hf in hyperp_files] 
+    dfs = [pd.read_pickle(hf)[['AUC OoD', 'AUC AA', 'model', 'reduction', 'analysis']] for hf in hyperp_files] 
     df = pd.concat(dfs, ignore_index=True)
 
-    # Captalize names
-    _cn_map = {
-            'ood_auc': 'AUC OoD',
-            'aa_auc': 'AUC AA'
-            }
-    df = df.rename(columns=_cn_map)
-    df['analysis'] = df['analysis'].apply(lambda x: x.upper())
-    df['model'] = df['model'].apply(lambda x: x.upper() if x == 'vgg' else 'MobileNet')
-
     # plotting
-    grid = sb.FacetGrid(data=df, row='model', col='analysis', hue='reduction')
+    grid = sb.FacetGrid(data=df, row='analysis', col='model', hue='reduction')
     grid.map(
             sb.scatterplot,
             'AUC OoD',

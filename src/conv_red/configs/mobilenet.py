@@ -1,9 +1,6 @@
-# Python stuff
-from pathlib import Path as Path
-
 # Peepholelib stuff
 from torchvision.models import mobilenet_v2 as Model
-from peepholelib.datasets.functional.transforms import mobilenet_v2 as transform
+from peepholelib.datasets.functional.transforms import mobilenet_v2_transform as transform
 
 #------------------
 # Paths 

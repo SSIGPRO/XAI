@@ -18,15 +18,14 @@ from peepholelib.datasets.cifarC import CifarC
 from peepholelib.datasets.SVHN import SVHN 
 from peepholelib.datasets.Places import Places 
 from peepholelib.datasets.parsedDataset import ParsedDataset 
-from peepholelib.datasets.functional.parsers import from_dataset
 from peepholelib.datasets.functional.samplers import random_subsampling 
+from peepholelib.datasets.functional.inference_fns import img_classification_full as img_cls_inf, img_classification_atks as img_cls_atk_inf 
 
 # ATK dataset
 from peepholelib.adv_atk.BIM import myBIM
 from peepholelib.adv_atk.CW import myCW
 from peepholelib.adv_atk.DeepFool import myDeepFool
 from peepholelib.adv_atk.PGD import myPGD
-from peepholelib.adv_atk.attacksDS import AttacksDS 
 
 from configs.common import *
 
@@ -47,7 +46,7 @@ if __name__ == "__main__":
                 target_modules = target_layers,
                 device = device
                 )
-                                            
+    
     model.update_output(
             output_layer = output_layer, 
             to_n_classes = n_classes,
@@ -60,6 +59,11 @@ if __name__ == "__main__":
             verbose = True 
             )
 
+    model.prepend_normalizer(
+            mean = normalization_mean,
+            std = normalization_std
+            )
+
     #--------------------------------
     # Datasets 
     #--------------------------------
@@ -67,31 +71,20 @@ if __name__ == "__main__":
     _dss = {
             'CIFAR100': Cifar100(
                 path = cifar_path,
-                transform = transform,
                 seed = seed
                 ),
             'CIFARC': CifarC(
                 path = cifarc_path,
-                transform = transform,
                 seed = seed
                 ),
             'SVHN': SVHN(
                 path = svhn_path,
-                transform = transform,
                 seed = seed
                 ),
             'Places': Places(
                 path = places_path,
-                transform = transform,
                 seed = seed
                 )
-            }
-
-    _dss_parsers = {
-            'CIFAR100': from_dataset,
-            'CIFARC': from_dataset,
-            'SVHN': from_dataset,
-            'Places': from_dataset,
             }
 
     _dss_samplers = {
@@ -105,56 +98,55 @@ if __name__ == "__main__":
     # parsing datasets
     #######################
     
-    # parse the original datasets into ds_path
-    ds = ParsedDataset.parse_ds(
-            save_path = ds_path,
-            model = model,
-            datasets = _dss,
-            ds_parsers = _dss_parsers, 
-            ds_samplers = _dss_samplers, 
-            batch_size = bs_base,
-            n_threads = n_threads,
-            verbose = verbose
-            )
-
-    # close PTDs
-    ds.__exit__(None, None, None)
-
-    #######################
-    # creating attk dataset 
-    #######################
-    # atks will be saved in ds_path
-    atk_ds = AttacksDS(
+    # Instantiate DSs 
+    dataset = ParsedDataset(
             path = ds_path,
             )
 
+    # instantiate atks
     atks = {
-            'CW': myCW(
+            'BIM-'+args.model: myBIM(
+                model = model,
+                ),
+            'CW-'+args.model: myCW(
                 model = model,
                 max_steps = 100,
                 ),
-            'BIM': myBIM(
-                model = model,
-                ),
-            #'DF': myDeepFool(
-            #    model = model,
-            #    ),
-            #'PGD': myPGD(
-            #    model = model,
-            #    ),
             }
-    
-    # Apply attks to ds
-    with ds, atk_ds:
-        ds.load_only(
-                loaders = ['CIFAR100-val', 'CIFAR100-test'],
-                verbose = verbose 
+
+    # create inference functions for each atk
+    atks_inf_fns = {
+            atk_name: partial(
+                img_cls_atk_inf,
+                attack = atk,
+                label_key = 'label'
+                ) for atk_name, atk in atks.items()
+            }
+
+    with dataset as ds:
+        ds.parse_dataset(
+                dataset_wraps = _dss,
+                ds_samplers = _dss_samplers, 
+                keys_to_copy = ['image', 'label'],
+                batch_size = bs_base,
+                n_threads = n_threads,
+                verbose = verbose
                 )
 
-        atk_ds.apply_attacks(
-                dataset = ds,
+        ds.parse_inference(
+                inference_fns = {args.model: partial(img_cls_inf, model=model)},
+                transforms = transforms,
+                batch_size = bs_base,
+                n_threads = n_threads,
+                verbose = verbose
+                )
+
+        # Apply attacks
+        ds.parse_inference(
                 loaders = ['CIFAR100-val', 'CIFAR100-test'],
-                attacks = atks,
+                inference_fns = atks_inf_fns, 
+                transforms = transforms,
                 batch_size = int(bs_base*bs_atk_scale),
+                n_threads = n_threads,
                 verbose = verbose 
                 )

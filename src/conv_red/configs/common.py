@@ -2,17 +2,19 @@ from pathlib import Path as Path
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-m', '--model',  choices=['vgg','mobilenet'], default='vgg')
+parser.add_argument('-m', '--model',  choices=['VGG','MobileNet', 'ResNet'], default='VGG')
 parser.add_argument('-r', '--reduction', choices=['avgpooling', 'toeplitz', 'kernel'], default='kernel')
-parser.add_argument('-a', '--analysis', choices=['macs', 'dmd'], default='macs')
+parser.add_argument('-a', '--analysis', choices=['MACS', 'DMD'], default='MACS')
 parser.add_argument('-d', '--data_path', default=Path.cwd()/'../../data')
 args = parser.parse_args()
 
 # import configs
-if args.model == 'vgg':
+if args.model == 'VGG':
     from configs.vgg import *
-elif args.model == 'mobilenet':
+elif args.model == 'MobileNet':
     from configs.mobilenet import *
+elif args.model == 'ResNet':
+    from configs.resnet import *
 
 if args.reduction == 'avgpooling':
     from configs.avgpooling import *
@@ -21,10 +23,15 @@ elif args.reduction == 'toeplitz':
 elif args.reduction == 'kernel':
     from configs.kernel import *
 
-if args.analysis == 'macs':
+if args.analysis == 'MACS':
     from configs.macs import *
-elif args.analysis == 'dmd':
+elif args.analysis == 'DMD':
     from configs.dmd import *
+
+from peepholelib.datasets.functional.transforms import TransformWrap 
+from peepholelib.datasets.functional.transforms import means as _means, stds as _stds 
+normalization_mean = _means['CIFAR100']
+normalization_std = _stds['CIFAR100']
 
 #--------------------------------
 # Paths and Definitions 
@@ -35,7 +42,7 @@ svhn_path = '/srv/newpenny/dataset/SVHN'
 places_path = '/srv/newpenny/dataset/Places365'
 
 # TODO: restruct this to have svds, corevector, .. etc at leaf folders
-ds_path = Path(args.data_path)/args.model/'datasets'
+ds_path = Path(args.data_path)/'datasets'
 
 svds_path = Path(args.data_path)/args.model/'svds'/args.reduction
 
@@ -63,7 +70,7 @@ verbose = True
 n_classes = 100
 bs_base = 2**10
 bs_atk_scale = 2**-4
-tune_num_samples = 50
+tune_num_samples = 50 
 
 #--------------------------------
 # Defs 
@@ -78,12 +85,20 @@ loaders = [
         'SVHN-test',
         'Places365-val',
         'Places365-test',
-        'CW-CIFAR100-val',
-        'CW-CIFAR100-test',
-        'BIM-CIFAR100-val',
-        'BIM-CIFAR100-test',
-        #'DF-CIFAR100-val',
-        #'DF-CIFAR100-test',
-        #'PGD-CIFAR100-val',
-        #'PGD-CIFAR100-test',
         ]
+
+transforms = {
+        k: TransformWrap(transform=transform, input_key='image') for k in loaders 
+        }
+
+inference_names = {
+        'CIFAR100-train': [args.model],     
+        'CIFAR100-val': [args.model, 'BIM-'+args.model, 'CW-'+args.model],
+        'CIFAR100-test': [args.model, 'BIM-'+args.model, 'CW-'+args.model],
+        'CIFAR100-C-val-c4': [args.model],
+        'CIFAR100-C-test-c4': [args.model],
+        'SVHN-val': [args.model],
+        'SVHN-test': [args.model],
+        'Places365-val': [args.model],
+        'Places365-test': [args.model],
+        }

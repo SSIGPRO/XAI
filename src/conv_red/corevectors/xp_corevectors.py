@@ -47,6 +47,11 @@ if __name__ == "__main__":
             verbose = True 
             )
 
+    model.prepend_normalizer(
+            mean = normalization_mean,
+            std = normalization_std
+            )
+
     #--------------------------------
     # Dataset 
     #--------------------------------
@@ -60,9 +65,11 @@ if __name__ == "__main__":
     with datasets as ds:
         ds.load_only(
                 loaders = ['CIFAR100-train'],
+                transforms = transforms,
+                inference_names = inference_names,
                 verbose = verbose
                 )
-        sample_in = ds._dss['CIFAR100-train']['image'][0]
+        sample_in = ds._dss['CIFAR100-train-'+args.model][0]['image']
 
     reducers_kwargs = get_reducer_kwargs(model._target_modules) 
     reducers = {} 
@@ -88,6 +95,8 @@ if __name__ == "__main__":
     with datasets as ds, corevecs as cv: 
         ds.load_only(
                 loaders = loaders,
+                transforms = transforms,
+                inference_names = inference_names,
                 verbose = verbose
                 )
 
@@ -105,7 +114,7 @@ if __name__ == "__main__":
 
         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
             cv.normalize_corevectors(
-                    wrt = 'CIFAR100-train',
+                    wrt = 'CIFAR100-train-'+args.model,
                     to_file = cvs_path/(cvs_name+'.normalization.pt'),
                     #from_file = cvs_path/(cvs_name+'.normalization.pt'),
                     #loaders = ['CIFAR100-val', 'CIFAR100-test'],

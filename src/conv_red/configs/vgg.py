@@ -1,11 +1,8 @@
-# Python stuff
-from pathlib import Path as Path
-
 # Torch stuff
 from torchvision.models import vgg16 as Model
 
 # Peepholelib stuff
-from peepholelib.datasets.functional.transforms import vgg16_cifar100 as transform
+from peepholelib.datasets.functional.transforms import vgg16_transform as transform
 
 #------------------
 # Paths 
@@ -21,4 +18,3 @@ output_layer = 'classifier.6'
 bs_model_scale = 2**-2 
 
 target_layers = [f'features.{i}' for i in [7, 14, 21, 28]]#[2, 7, 14, 21, 28]]
-

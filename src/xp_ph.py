@@ -18,7 +18,9 @@ from peepholelib.models.model_wrap import ModelWrap
 
 # datasets
 from peepholelib.datasets.cifar100 import Cifar100
-from peepholelib.datasets.parsedDataset import ParsedDataset 
+from peepholelib.datasets.parsedDataset import ParsedDataset
+from peepholelib.datasets.functional.transforms import TransformWrap 
+from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform 
 
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
@@ -85,11 +87,19 @@ if __name__ == "__main__":
             'CIFAR100-C-test-c0' 
             ]
 
+    _transforms = {
+            k: TransformWrap(transform=ds_transform, input_key='image') for k in loaders 
+            }
+
+    _inference_names = {
+            k: ['vgg'] for k in loaders
+            }
+
+    n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
+
     #--------------------------------
     # Model 
     #--------------------------------
-    
-    n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
 
     model = ModelWrap(
             model = vgg16(),
@@ -125,9 +135,11 @@ if __name__ == "__main__":
     with datasets as ds:
         ds.load_only(
                 loaders = ['CIFAR100-train'],
+                transforms = _transforms,
+                inference_names = _inference_names,
                 verbose = verbose
                 )
-        sample_in = ds._dss['CIFAR100-train']['image'][0]
+        sample_in = ds._dss['CIFAR100-train-vgg'][0]['image']
 
         svds = {
                 'features.26': Conv2dToeplitzSVD(
@@ -169,6 +181,8 @@ if __name__ == "__main__":
     with datasets as ds, corevecs as cv: 
         ds.load_only(
                 loaders = loaders,
+                transforms = _transforms,
+                inference_names = _inference_names,
                 verbose = verbose
                 )
 
@@ -185,7 +199,7 @@ if __name__ == "__main__":
 
         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
             cv.normalize_corevectors(
-                    wrt = 'CIFAR100-train',
+                    wrt = 'CIFAR100-train-vgg',
                     to_file = cvs_path/(cvs_name+'.normalization.pt'),
                     #from_file = cvs_path/(cvs_name+'.normalization.pt'),
                     #loaders = ['CIFAR100-val', 'CIFAR100-test'],
@@ -224,11 +238,13 @@ if __name__ == "__main__":
     with datasets as ds, corevecs as cv:
         ds.load_only(
                 loaders = loaders,
+                transforms = _transforms,
+                inference_names = _inference_names,
                 verbose = verbose
                 )
 
         cv.load_only(
-                loaders = loaders,
+                loaders = list(ds._dss.keys()),
                 verbose = verbose 
                 ) 
 
@@ -239,7 +255,7 @@ if __name__ == "__main__":
                 driller.fit(
                         datasets = ds,
                         corevectors = cv,
-                        loader = 'CIFAR100-train',
+                        loader = 'CIFAR100-train-vgg',
                         verbose=verbose
                         )
                 print(f'Fitting time for {drill_key}  = ', time()-t0)
@@ -251,11 +267,13 @@ if __name__ == "__main__":
     with datasets as ds, corevecs as cv, peepholes as ph:
         ds.load_only(
                 loaders = loaders,
+                transforms = _transforms,
+                inference_names = _inference_names,
                 verbose = verbose
                 )
 
         cv.load_only(
-                loaders = loaders,
+                loaders = list(ds._dss.keys()),
                 verbose = verbose 
                 ) 
 

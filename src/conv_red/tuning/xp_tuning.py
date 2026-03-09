@@ -46,6 +46,7 @@ def peephole_wrap(config, **kwargs):
     verbose = kwargs['verbose']
 
     _device = ray_get_device() 
+
     # concatenate config for creating unique ph name
     _ph_name = ph_name
     for _l, _c in config.items():
@@ -62,7 +63,7 @@ def peephole_wrap(config, **kwargs):
             target_modules = target_layers,
             device = _device
             )
-                                            
+
     model.update_output(
             output_layer = output_layer,
             to_n_classes = n_classes,
@@ -75,6 +76,11 @@ def peephole_wrap(config, **kwargs):
             verbose = verbose
             )
     
+    model.prepend_normalizer(
+            mean = normalization_mean,
+            std = normalization_std
+            )
+
     drillers_kwargs = get_drillers_kwargs(
             path = drill_path,
             name = drill_name,
@@ -106,7 +112,7 @@ def peephole_wrap(config, **kwargs):
             drillers[_l].fit(
                     datasets = ds,
                     corevectors = cv,
-                    loader = 'CIFAR100-train',
+                    loader = 'CIFAR100-train-'+args.model,
                     verbose=verbose
                     )
             drillers[_l].save()
@@ -129,6 +135,7 @@ def peephole_wrap(config, **kwargs):
             )
 
         # Evaluation
+        score_fns = get_score_fns(args.model)
         scores = {}
         for score_name, score_fn in score_fns.items():
             scores = score_fn(
@@ -142,6 +149,7 @@ def peephole_wrap(config, **kwargs):
                     )
             if type(scores) == tuple: scores = scores[0]
 
+        auc_kwargs_ood = get_auc_kwargs_ood(args.model)
         aucs_ood = auc_atks(
                 datasets = ds,
                 scores = scores,
@@ -149,24 +157,30 @@ def peephole_wrap(config, **kwargs):
                 verbose = verbose
                 )
 
+        auc_kwargs_aa = get_auc_kwargs_aa(args.model)
         aucs_aa = auc_atks(
                 datasets = ds,
                 scores = scores,
                 **auc_kwargs_aa,
                 verbose = verbose
                 )
+        
+        report = {}
+        _aucs = []
+        for k in auc_kwargs_ood['atk_loaders']:
+            report['AUC '+k] = list(aucs_ood[k].values())[0]
+            _aucs.append(report['AUC '+k]) 
+        report['AUC OoD'] = geomean(_aucs)
 
-        _aucs = [list(aucs_ood[d].values())[0] for d in auc_kwargs_ood['atk_loaders']] 
-        avg_auc_ood = geomean(_aucs)
+        _aucs = []
+        for k in auc_kwargs_aa['atk_loaders']:
+            report['AUC '+k] = list(aucs_aa[k].values())[0]
+            _aucs.append(report['AUC '+k]) 
+        report['AUC AA'] = geomean(_aucs)
+        
+        print('Report: ', report)
 
-        _aucs = [list(aucs_aa[d].values())[0] for d in auc_kwargs_aa['atk_loaders']] 
-        avg_auc_aa = geomean(_aucs) 
-        print('geom auc OOD: ', avg_auc_ood, 'geom auch AA', avg_auc_aa)
-
-        train.report({
-            'ood_auc': avg_auc_ood,
-            'aa_auc': avg_auc_aa,
-            })
+        train.report(report)
     return 
 
 if __name__ == "__main__":
@@ -180,7 +194,7 @@ if __name__ == "__main__":
             model = Model(),
             target_modules = target_layers,
             )
-
+    
     datasets = ParsedDataset(
             path = ds_path,
             )
@@ -190,14 +204,21 @@ if __name__ == "__main__":
             name = cvs_name,
             )
 
+    dummy_model.prepend_normalizer(
+            mean = normalization_mean,
+            std = normalization_std
+            )
+
     with datasets as ds, corevecs as cv: 
         ds.load_only(
                 loaders = loaders,
+                transforms = transforms,
+                inference_names = inference_names,
                 verbose = verbose
                 )
 
         cv.load_only(
-                loaders = loaders,
+                loaders = list(ds._dss.keys()),
                 verbose = verbose 
                 ) 
 
@@ -227,9 +248,9 @@ if __name__ == "__main__":
         else:
             _prev_results_df = None
 
-        searcher = OptunaSearch(metric=['ood_auc', 'aa_auc'], mode=['max', 'max'])
+        searcher = OptunaSearch(metric=['AUC OoD', 'AUC AA'], mode=['max', 'max'])
         algo = ConcurrencyLimiter(searcher, max_concurrent=4)
-        scheduler = AsyncHyperBandScheduler(grace_period=5, max_t=100, metric='ood_auc', mode='max') 
+        scheduler = AsyncHyperBandScheduler(grace_period=5, max_t=100, metric='AUC OoD', mode='max') 
 
         trainable = tune.with_resources(
                 partial(

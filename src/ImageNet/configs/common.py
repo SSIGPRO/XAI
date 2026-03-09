@@ -10,6 +10,7 @@ ds_path = Path('../../data')/'datasets'
 # Running
 #--------------------------------
 n_threads = 4
-bs_base = 2**7
+bs_base = 2**10
 bs_atk_scale = 2**-4
 tune_num_samples = 50
+seed = 29

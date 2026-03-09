@@ -6,14 +6,14 @@ DATA_DIR := $(or $(DATA_DIR), ../../data)
 # ----------------
 # Definitions
 # ----------------
-models := vgg mobilenet
+models := VGG MobileNet ResNet
 reductions := kernel toeplitz avgpooling
-analyses := macs dmd
+analyses := MACS DMD 
 
 # ----------------
 # Parsing names 
 # ----------------
-datasets := $(foreach ds, $(models), $(DATA_DIR)/$(ds)/datasets)
+datasets := $(foreach m, $(models), $(DATA_DIR)/datasets/dss.CIFAR100-train.$(m))
 corevectors := $(foreach p, $(foreach m, $(models), $(DATA_DIR)/$(m)/corevectors), $(foreach r, $(reductions), $(p)/$(r)))
 peepholes := $(foreach pp, $(foreach p, $(foreach m, $(models), $(DATA_DIR)/$(m)/peepholes), $(foreach r, $(reductions), $(p)/$(r))), $(foreach a, $(analyses), $(pp)/$(a)))
 tunings := $(foreach pp, $(foreach p, $(foreach m, $(models), $(DATA_DIR)/$(m)/peepholes), $(foreach r, $(reductions), $(p)/$(r))), $(foreach a, $(analyses), $(pp)/$(a)/hyperparams.pickle))
@@ -42,7 +42,7 @@ xp_tuning: $(tunings)
 # ----------------
 
 #  Datasets
-$(DATA_DIR)/%/datasets:
+$(DATA_DIR)/datasets/dss.CIFAR100-train.%:
 	python datasets/xp_datasets.py -m $* -d $(DATA_DIR)
 
 # Corevectors

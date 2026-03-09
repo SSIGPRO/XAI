@@ -50,41 +50,42 @@ def analysis_param_space(configs, args):
     configs['analysis'] = args.analysis
     return configs 
 
-score_fns = {
-        'DMD-ood': partial(
-            dmd_score,
-            pos_loader_train = 'CIFAR100-val',
-            pos_loader_test = 'CIFAR100-test',
-            neg_loaders = {
-                'CIFAR100-C-test-c4': ['CIFAR100-C-val-c4'],
-                'Places365-test': ['Places365-val'],
-                'SVHN-test': ['SVHN-val']
+def get_score_fns(model):
+    return {
+            'DMD-ood': partial(
+                dmd_score,
+                pos_loader_train = 'CIFAR100-val-'+model,
+                pos_loader_test = 'CIFAR100-test-'+model,
+                neg_loaders = {
+                    'CIFAR100-C-test-c4-'+model: ['CIFAR100-C-val-c4-'+model],
+                    'Places365-test-'+model: ['Places365-val-'+model],
+                    'SVHN-test-'+model: ['SVHN-val-'+model]
+                    },
+                ),
+            'DMD-aa': partial(
+                dmd_score,
+                pos_loader_train = 'CIFAR100-val-'+model,
+                pos_loader_test = 'CIFAR100-test-'+model,
+                neg_loaders = {
+                    'CIFAR100-test-BIM-'+model: ['CIFAR100-val-BIM-'+model],
+                    'CIFAR100-test-CW-'+model: ['CIFAR100-val-CW-'+model],
+                    },
+                    ),
+        }
+
+def get_auc_kwargs_ood(model):
+    return {
+            'ori_loaders': {
+                'DMD-ood': ['CIFAR100-C-val-c4-'+model, 'Places365-val-'+model, 'SVHN-val-'+model],
                 },
+            'atk_loaders': ['CIFAR100-C-test-c4-'+model, 'Places365-test-'+model, 'SVHN-test-'+model],
+            'filter_key': None
+            }
 
-
-            ),
-        'DMD-aa': partial(
-            dmd_score,
-            pos_loader_train = 'CIFAR100-val',
-            pos_loader_test = 'CIFAR100-test',
-            neg_loaders = {
-                'BIM-CIFAR100-test': ['BIM-CIFAR100-val'],
-                'CW-CIFAR100-test': ['CW-CIFAR100-val'],
+def get_auc_kwargs_aa(model):
+    return {
+            'ori_loaders': {
+                'DMD-aa': ['CIFAR100-val-BIM-'+model, 'CIFAR100-val-CW-'+model],
                 },
-            ),
-        }
-
-auc_kwargs_ood = {
-        'ori_loaders': {
-            'DMD-ood': ['CIFAR100-C-val-c4', 'Places365-val', 'SVHN-val'],
-            },
-        'atk_loaders': ['CIFAR100-C-test-c4', 'Places365-test', 'SVHN-test'],
-        'filter_key': None
-        }
-
-auc_kwargs_aa = {
-        'ori_loaders': {
-            'DMD-aa': ['BIM-CIFAR100-val', 'CW-CIFAR100-val'],
-            },
-        'atk_loaders': ['BIM-CIFAR100-test', 'CW-CIFAR100-test']
-        }
+            'atk_loaders': ['CIFAR100-test-BIM-'+model, 'CIFAR100-test-CW-'+model]
+            }

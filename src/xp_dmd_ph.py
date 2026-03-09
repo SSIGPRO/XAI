@@ -12,9 +12,11 @@ from peepholelib.models.model_wrap import ModelWrap
 # dataset
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset
-from peepholelib.coreVectors.coreVectors import CoreVectors
+from peepholelib.datasets.functional.transforms import TransformWrap 
+from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform 
 
 # corevecs
+from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.avgPooling import AvgPooling 
 from peepholelib.models.model_wrap import get_out_activations
 
@@ -78,6 +80,14 @@ if __name__ == "__main__":
             'features.28': 512,
             }
 
+    _transforms = {
+            k: TransformWrap(transform=ds_transform, input_key='image') for k in loaders 
+            }
+
+    _inference_names = {
+            k: ['vgg'] for k in loaders
+            }
+
     #--------------------------------
     # Model 
     #--------------------------------
@@ -138,6 +148,8 @@ if __name__ == "__main__":
     with datasets as ds, corevecs as cv: 
         ds.load_only(
                 loaders = loaders,
+                transforms = _transforms,
+                inference_names = _inference_names,
                 verbose = verbose
                 )
 
@@ -180,11 +192,13 @@ if __name__ == "__main__":
     with datasets as ds, corevecs as cv:
         ds.load_only(
                 loaders = loaders,
+                transforms = _transforms,
+                inference_names = _inference_names,
                 verbose = verbose
                 )
 
         cv.load_only(
-                loaders = loaders,
+                loaders = list(ds._dss.keys()),
                 verbose = True
                 ) 
         
@@ -195,7 +209,7 @@ if __name__ == "__main__":
                 driller.fit(
                         datasets = ds, 
                         corevectors = cv, 
-                        loader = 'CIFAR100-train',
+                        loader = 'CIFAR100-train-vgg',
                         verbose=verbose
                         )
             
@@ -206,11 +220,13 @@ if __name__ == "__main__":
     with datasets as ds, corevecs as cv, peepholes as ph:
         ds.load_only(
                 loaders = loaders,
+                transforms = _transforms,
+                inference_names = _inference_names,
                 verbose = verbose
                 )
 
         cv.load_only(
-                loaders = loaders,
+                loaders = list(ds._dss.keys()),
                 verbose = True
                 ) 
 

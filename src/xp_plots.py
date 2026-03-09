@@ -18,7 +18,10 @@ from peepholelib.models.model_wrap import ModelWrap
 
 # datasets
 from peepholelib.datasets.cifar100 import Cifar100
-from peepholelib.datasets.parsedDataset import ParsedDataset 
+from peepholelib.datasets.parsedDataset import ParsedDataset
+from peepholelib.datasets.functional.transforms import TransformWrap 
+from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform 
+
 # peepholes
 from peepholelib.peepholes.peepholes import Peepholes
 
@@ -61,9 +64,20 @@ if __name__ == "__main__":
     n_conceptograms = 2 
 
     loaders = [
-            'CIFAR100-train', 'CIFAR100-val', 'CIFAR100-test', 
-            'CIFAR100-C-val-c0', 'CIFAR100-C-test-c0', 
+            'CIFAR100-train',
+            'CIFAR100-val',
+            'CIFAR100-test', 
+            'CIFAR100-C-val-c0',
+            'CIFAR100-C-test-c0', 
             ]
+
+    _transforms = { 
+            k: TransformWrap(transform=ds_transform, input_key='image') for k in loaders 
+            }
+
+    _inference_names = {
+            k: ['vgg'] for k in loaders
+            }
 
     #--------------------------------
     # Datasets 
@@ -93,16 +107,18 @@ if __name__ == "__main__":
     with ds, ph, dmd_ph:
         ds.load_only(
                 loaders = loaders,
+                transforms = _transforms,
+                inference_names = _inference_names,
                 verbose = verbose
                 )
 
         ph.load_only(
-                loaders = loaders,
+                loaders = list(ds._dss.keys()),
                 verbose = verbose
                 )
 
         dmd_ph.load_only(
-                loaders = loaders,
+                loaders = list(ds._dss.keys()),
                 verbose = verbose
                 )
 
@@ -110,7 +126,7 @@ if __name__ == "__main__":
         scores, protoclasses = proto_score(
                 datasets = ds,
                 peepholes = ph,
-                proto_key = 'CIFAR100-train',
+                proto_key = 'CIFAR100-train-vgg',
                 verbose = verbose
                 )
                                         
@@ -122,10 +138,10 @@ if __name__ == "__main__":
 
         scores = dmd_score(
                 peepholes = dmd_ph,
-                pos_loader_train = 'CIFAR100-val',
-                pos_loader_test = 'CIFAR100-test',
+                pos_loader_train = 'CIFAR100-val-vgg',
+                pos_loader_test = 'CIFAR100-test-vgg',
                 neg_loaders = {
-                    'CIFAR100-C-test-c0': ['CIFAR100-C-val-c0'],
+                    'CIFAR100-C-test-c0-vgg': ['CIFAR100-C-val-c0-vgg'],
                     },
                 append_scores = scores,
                 )
@@ -150,11 +166,11 @@ if __name__ == "__main__":
         plot_ood(
                 scores = scores,
                 id_loaders = {
-                    'Proto-Class': 'CIFAR100-test',
-                    'MSP': 'CIFAR100-test',
-                    'DMD': 'CIFAR100-C-val-c0',
+                    'Proto-Class': 'CIFAR100-test-vgg',
+                    'MSP': 'CIFAR100-test-vgg',
+                    'DMD': 'CIFAR100-C-val-c0-vgg',
                     },
-                ood_loaders = ['CIFAR100-C-test-c0'],
+                ood_loaders = ['CIFAR100-C-test-c0-vgg'],
                 path = plots_path,
                 verbose = verbose
                 )
@@ -166,7 +182,7 @@ if __name__ == "__main__":
                 name = 'conceptogram',
                 datasets = ds,
                 peepholes = ph,
-                loaders = ['CIFAR100-test'],
+                loaders = ['CIFAR100-test-vgg'],
                 samples = idx,
                 target_modules = target_layers,
                 classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),

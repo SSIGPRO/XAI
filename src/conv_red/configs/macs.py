@@ -45,24 +45,27 @@ def analysis_param_space(configs, args):
     configs['analysis'] = args.analysis
     return configs 
 
-score_fns = {
-        'MACS': partial(
-            proto_score,
-            proto_key = 'CIFAR100-train'
-            )
+def get_score_fns(model):
+    return {
+            'MACS': partial(
+                proto_score,
+                proto_key = 'CIFAR100-train-'+model
+                )
         }
 
-auc_kwargs_ood = {
-        'ori_loaders': {
-            'MACS': 'CIFAR100-test',
-            },
-        'atk_loaders': ['CIFAR100-C-test-c4', 'Places365-test', 'SVHN-test'],
-        'filter_key': None
-        }
+def get_auc_kwargs_ood(model):
+    return {
+            'ori_loaders': {
+                'MACS': 'CIFAR100-test-'+model,
+                },
+            'atk_loaders': ['CIFAR100-C-test-c4-'+model, 'Places365-test-'+model, 'SVHN-test-'+model],
+            'filter_key': None
+            }
 
-auc_kwargs_aa = {
-        'ori_loaders': {
-            'MACS': 'CIFAR100-test',
-            },
-        'atk_loaders': ['BIM-CIFAR100-test', 'CW-CIFAR100-test']
-        }
+def get_auc_kwargs_aa(model):
+    return {
+            'ori_loaders': {
+                'MACS': 'CIFAR100-test-'+model,
+                },
+            'atk_loaders': ['CIFAR100-test-BIM-'+model, 'CIFAR100-test-CW-'+model]
+            }
