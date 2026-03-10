@@ -25,7 +25,7 @@ from peepholelib.datasets.functional.transforms import convnext_base_cifar100 as
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # ATK dataset
-from peepholelib.adv_atk.BIM import myBIM
+from peepholelib.adv_atk.BIM import myBIMs
 from peepholelib.adv_atk.CW import myCW
 from peepholelib.adv_atk.DeepFool import myDeepFool
 from peepholelib.adv_atk.PGD import myPGD
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     # Model 
     #--------------------------------
     
-    nn = vgg16()
+    nn = convnext_base()
     n_classes = 100#len(ds.get_classes()) 
     model = ModelWrap(
             model = nn,
