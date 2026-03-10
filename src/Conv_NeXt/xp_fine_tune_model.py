@@ -38,7 +38,7 @@ if __name__ == "__main__":
     #--------------------------------
     ds_path = '/srv/newpenny/dataset/CIFAR100'
 
-    basic_dir = Path(f'/srv/newpenny/XAI/conceptograms/LC/{name_model}_{name_dataset}/')
+    basic_dir = Path("/home/arshakumari/repos/XAI/src/Conv_NeXt")
 
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     tune_dir = basic_dir / "checkpoints" / run_id
@@ -63,6 +63,12 @@ if __name__ == "__main__":
     #--------------------------------
 
     nn = convnext_base(weights=pre_train_weights.DEFAULT)
+    for name, module in nn.named_modules():
+        print(f"{name}: {type(module).__name__}")
+    for k in nn.state_dict().keys():
+        print(k)
+    quit()
+ 
 
     n_classes = len(Cifar100.get_classes(meta_path = Path(ds_path)/'cifar-100-python/meta'))
 

@@ -60,7 +60,7 @@ if __name__ == "__main__":
     # Model 
     #--------------------------------
     
-    nn = convnext_base()
+    nn =convnext_base()
     n_classes = 100#len(ds.get_classes()) 
     model = ModelWrap(
             model = nn,
