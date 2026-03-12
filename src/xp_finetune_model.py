@@ -14,7 +14,7 @@ from cuda_selector import auto_cuda
 
 # Our stuff
 from peepholelib.datasets.cifar100 import Cifar100
-from peepholelib.datasets.functional.transforms import means, stds, resnet50_cifar100 as transform, resnet50_cifar100_augmentations as augmentation
+from peepholelib.datasets.functional.transforms import means, stds, resnet50_transform as transform, resnet50_cifar100_augmentations as augmentation
 from peepholelib.models.model_wrap import ModelWrap 
 from peepholelib.training.trainingBase import Trainer
 
@@ -52,8 +52,8 @@ if __name__ == "__main__":
 
     dataset = Cifar100(
                     path = ds_path,
-                    transform = transform,
-                    augmentation = augmentation
+                    std_transform = transform,
+                    aug_transform = augmentation
                     )
 
     dataset.__load_data__()
