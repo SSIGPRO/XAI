@@ -9,7 +9,6 @@ from cuda_selector import auto_cuda
 
 # Our stuff
 from peepholelib.models.model_wrap import ModelWrap
-from peepholelib.datasets.functional.transforms import vgg16_imagenet as transform
 
 verbose = True
 output_layer = 'classifier.6'

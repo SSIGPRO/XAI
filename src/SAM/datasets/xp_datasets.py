@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
-sys.path.insert(0, (Path.home()/'repos/XAI/src/ImageNet').as_posix())
+sys.path.insert(0, (Path.home()/'repos/XAI/src/SAM').as_posix())
 
 # python stuff
 from functools import partial
@@ -28,23 +28,25 @@ if __name__ == "__main__":
     dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 0.3
+                perc = 0.0003
                 ) for k in dss.keys()
             }
 
     model = ModelWrap(
-                model = Model(weights=weights),
-                device = device
-            )
+                    model = Model(weights=weights),
+                    device = device
+                    )
 
-    ParsedDataset.parse_ds(
-        path = ds_path,
-        dataset_wraps = dss,
-        ds_samplers = dss_samplers, 
-        keys_to_copy = ['image', 'label'],
-        inference_fn = partial(inference_fn, model=model),
-        batch_size = bs_base,
-        n_threads = 1,
-        verbose = verbose,
-        )
+    model.normalize_model(mean=means['ImageNet'], std= stds['ImageNet'])
+
+    dataset = ParsedDataset.parse_ds(
+            path = ds_path,
+            dataset_wraps = dss,
+            ds_samplers = dss_samplers, 
+            keys_to_copy = ['image', 'label'],
+            inference_fn = partial(inference_fn, model=model), # comment for fine tuning the model
+            batch_size = bs_base,
+            n_threads = 1,
+            verbose = verbose
+            ) 
     
