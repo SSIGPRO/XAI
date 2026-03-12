@@ -101,6 +101,15 @@ if __name__ == "__main__":
                 ) for k in _dss.keys()
             }
 
+    ds = _dss['CIFAR100']
+    ds.__load_data__()
+    d = ds.__dataset__['CIFAR100-test']
+
+    print(d.data, d.targets)
+
+
+    quit()
+
     #######################
     # parsing datasets
     #######################
