@@ -1,6 +1,6 @@
 import sys
-from pathlib import Path as Path # why path as path? shouldn't make a difference anyways
-sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix()) # check these folders
+from pathlib import Path as Path
+sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 sys.path.insert(0, (Path.home()/'repos/XAI/src/conv_red').as_posix())
 
 # python stuff
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     _dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 1 # 0.005 for 50 samples
+                perc = 0.005 # 0.005 for 50 samples
                 ) for k in _dss.keys()
             }
 
@@ -86,28 +86,16 @@ if __name__ == "__main__":
     
     # parse the original datasets into ds_path
     # Create dataset files
-    ds = ParsedDataset.create_ds(
-        path=ds_path,
-        dataset_wraps=_dss,
-        batch_size=bs_base,
-        n_threads=n_threads,
-        ds_samplers=_dss_samplers,
-        verbose=verbose
-    )
-
-    # Parse
-    with ds:
-        ds.load_only(
-            loaders=loaders,
-            mode='r+',
-            verbose=verbose
-        )
-        ds.parse_ds(
-            model=model,
-            loaders=loaders,
-            batch_size=bs_base,
-            verbose=verbose
-        )
+    ds = ParsedDataset.parse_ds(
+            save_path = ds_path,
+            model = model,
+            datasets = _dss,
+            ds_parsers = _dss_parsers, 
+            ds_samplers = _dss_samplers, 
+            batch_size = bs_base,
+            n_threads = n_threads,
+            verbose = verbose
+            )
 
     #######################
     # creating attk dataset 

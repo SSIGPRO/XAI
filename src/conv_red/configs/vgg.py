@@ -3,7 +3,7 @@ from pathlib import Path as Path
 
 # Our stuff
 from torchvision.models import vgg16 as Model
-from peepholelib.datasets.functional.transforms import vgg16_cifar100 as transform
+from peepholelib.datasets.functional.transforms import vgg16_transform as transform
 
 #------------------
 # Paths 
