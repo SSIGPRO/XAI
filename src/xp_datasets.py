@@ -87,11 +87,11 @@ if __name__ == "__main__":
                 std_transform = ds_transform,
                 seed = seed
                 )#,
-            #'CIFARC': CifarC(
-            #    path = cifarc_path,
-            #    std_transform = ds_transform,
-            #    seed = seed
-            #    )
+            'CIFARC': CifarC(
+                path = cifarc_path,
+                std_transform = ds_transform,
+                seed = seed
+                )
             }
 
     _dss_samplers = {
@@ -100,15 +100,6 @@ if __name__ == "__main__":
                 perc = 0.1
                 ) for k in _dss.keys()
             }
-
-    ds = _dss['CIFAR100']
-    ds.__load_data__()
-    d = ds.__dataset__['CIFAR100-test']
-
-    print(d.data, d.targets)
-
-
-    quit()
 
     #######################
     # parsing datasets
@@ -131,12 +122,12 @@ if __name__ == "__main__":
 
         ds.parse_inference(
                 name = 'vgg',
-                inference_fn = partial(inference_fn, model=model), # comment for fine tuning the model
+                inference_fn = partial(inference_fn, model=model),
                 batch_size = bs,
                 n_threads = 1,
                 verbose = verbose
                 )
-    quit()
+
     #######################
     # creating attk dataset 
     #######################
