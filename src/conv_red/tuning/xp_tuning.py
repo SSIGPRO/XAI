@@ -279,6 +279,7 @@ if __name__ == "__main__":
                     ),
                 param_space = param_space,
                 )
+
         result = tuner.fit()
 
         results_df = result.get_dataframe()

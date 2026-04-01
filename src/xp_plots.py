@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     phs_path = Path.cwd()/'../data/peepholes'
     phs_name = 'peepholes'
-    avg_name = 'peepholes_avg'
+    avg_name = 'phs_avg'
 
     plots_path = Path.cwd()/'temp_plots/xp_plots/'
     verbose = True 
@@ -79,6 +79,18 @@ if __name__ == "__main__":
             k: ['vgg'] for k in loaders
             }
 
+
+    ph_names = {
+            'features.26': phs_name,
+            'features.28': phs_name,
+            'classifier.0': phs_name,
+            }
+
+    avg_names = {
+            'features.7': avg_name,
+            'features.14': avg_name,
+            'features.28': avg_name,
+            }
     #--------------------------------
     # Datasets 
     #--------------------------------
@@ -94,13 +106,11 @@ if __name__ == "__main__":
 
     ph = Peepholes(
             path = phs_path,
-            name = phs_name,
             device = device
             )
 
     dmd_ph = Peepholes(
             path = phs_path,
-            name = avg_name,
             device = device
             )
 
@@ -114,11 +124,13 @@ if __name__ == "__main__":
 
         ph.load_only(
                 loaders = list(ds._dss.keys()),
+                names = ph_names,
                 verbose = verbose
                 )
 
         dmd_ph.load_only(
                 loaders = list(ds._dss.keys()),
+                names = avg_names,
                 verbose = verbose
                 )
 

@@ -19,6 +19,7 @@ from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.plots.atks import auc_atks 
 
 from configs.common import *
+from configs.full_test import *
     
 if __name__ == "__main__":
     print(f'{args}') 
@@ -78,7 +79,7 @@ if __name__ == "__main__":
     # Peepholes
     #--------------------------------
     # testing values
-    hyperps = test_configs(model._target_modules)
+    hyperps = test_configs(model._target_modules, hyper_params_file)
 
     # Function analysis specific kwargs for drillers
     drillers_kwargs = get_drillers_kwargs(
@@ -110,10 +111,19 @@ if __name__ == "__main__":
                 **drillers_kwargs[_l],
                 reducer = reducer
                 )
+    
+    # concatenate config for creating unique ph name
+    # same as tuning
+    _phs_name = phs_name
+    for _l, _c in hyperps.items():
+        if type(_c) == dict:
+            _phs_name += f'.{_l}'
+            for _cn, _cv in _c.items():
+                _phs_name += f'.{_cn}.{_cv}'
 
     peepholes = Peepholes(
             path = phs_path,
-            name = phs_name+'.test',
+            name = _phs_name,
             device = device
             )
 
@@ -148,9 +158,9 @@ if __name__ == "__main__":
                     batch_size = bs,
                     drillers = drillers,
                     n_threads = n_threads,
-                    verbose = verbose
+                    verbose = verbose 
                     )
-            
+
             score_fns = get_score_fns(args.model)
             scores = {}
             for score_name, score_fn in score_fns.items():

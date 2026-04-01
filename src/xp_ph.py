@@ -75,10 +75,22 @@ if __name__ == "__main__":
             'features.28': 50,
             'classifier.0': 30,
             }
+    
+    cv_names = {
+            'features.26': cvs_name,
+            'features.28': cvs_name,
+            'classifier.0': cvs_name,
+            }
 
     svd_rank = 300
-    n_cluster = 4 
-    
+    n_cluster = 50 
+
+    ph_names = {
+            'features.26': phs_name,
+            'features.28': phs_name,
+            'classifier.0': phs_name,
+            }
+
     loaders = [
             'CIFAR100-train',
             'CIFAR100-val',
@@ -174,7 +186,6 @@ if __name__ == "__main__":
     
     corevecs = CoreVectors(
             path = cvs_path,
-            name = cvs_name,
             model = model,
             )
     
@@ -192,21 +203,18 @@ if __name__ == "__main__":
                 reducers = svds,
                 save_input = True,
                 save_output = False,
+                names = cv_names,
                 batch_size = bs,
                 n_threads = n_threads,
                 verbose = verbose
                 )
 
-        if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
-            cv.normalize_corevectors(
-                    wrt = 'CIFAR100-train-vgg',
-                    to_file = cvs_path/(cvs_name+'.normalization.pt'),
-                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
-                    #loaders = ['CIFAR100-val', 'CIFAR100-test'],
-                    batch_size = bs,
-                    n_threads = n_threads,
-                    verbose=verbose
-                    )
+        cv.normalize_corevectors(
+                wrt = 'CIFAR100-train-vgg',
+                batch_size = bs,
+                n_threads = n_threads,
+                verbose=verbose
+                )
 
     #--------------------------------
     # Peepholes
@@ -221,8 +229,8 @@ if __name__ == "__main__":
                 nl_model = n_classes,
                 n_features = cv_dims[peep_layer],
                 cls_kwargs = {
-                    'covariance_regularization': 1e-4,
-                    'convergence_tolerance': 1e-2
+                    'covariance_regularization': 1e-5,
+                    'convergence_tolerance': 1e-3
                     },
                 reducer = svds[peep_layer],
                 device = device
@@ -230,7 +238,6 @@ if __name__ == "__main__":
 
     peepholes = Peepholes(
             path = phs_path,
-            name = phs_name,
             device = device
             )
 
@@ -245,9 +252,10 @@ if __name__ == "__main__":
 
         cv.load_only(
                 loaders = list(ds._dss.keys()),
+                names = cv_names,
                 verbose = verbose 
                 ) 
-
+        
         for drill_key, driller in drillers.items():
             if not driller.load():
                 t0 = time()
@@ -274,6 +282,7 @@ if __name__ == "__main__":
 
         cv.load_only(
                 loaders = list(ds._dss.keys()),
+                names = cv_names,
                 verbose = verbose 
                 ) 
 
@@ -283,6 +292,7 @@ if __name__ == "__main__":
                 target_modules = target_layers,
                 batch_size = bs,
                 drillers = drillers,
+                names = ph_names,
                 n_threads = n_threads,
                 verbose = verbose
                 )

@@ -2,7 +2,8 @@
 from functools import partial
 
 # Ray Stuff
-from ray.tune import qrandint 
+from torch import linspace, int32
+from ray.tune import choice 
 
 # Peepholelib stuff
 from peepholelib.peepholes.classifiers.tgmm import GMM as Driller 
@@ -39,7 +40,7 @@ def get_drillers_kwargs(**kwargs):
 
 def analysis_param_space(configs, args):
     for _n, _l in configs.items():
-        _l['n_clusters'] = qrandint(50, 500, 50)
+        _l['n_clusters'] = choice(linspace(50, 500, 10, dtype=int32).numpy().tolist())
     configs['model'] = args.model 
     configs['reduction'] = args.reduction 
     configs['analysis'] = args.analysis
@@ -58,7 +59,11 @@ def get_auc_kwargs_ood(model):
             'ori_loaders': {
                 'MACS': 'CIFAR100-test-'+model,
                 },
-            'atk_loaders': ['CIFAR100-C-test-c4-'+model, 'Places365-test-'+model, 'SVHN-test-'+model],
+            'atk_loaders': [
+                'Places365-test-'+model,
+                'SVHN-test-'+model,
+                'Textures-test-'+model,
+                ],
             'filter_key': None
             }
 
@@ -67,5 +72,10 @@ def get_auc_kwargs_aa(model):
             'ori_loaders': {
                 'MACS': 'CIFAR100-test-'+model,
                 },
-            'atk_loaders': ['CIFAR100-test-BIM-'+model, 'CIFAR100-test-CW-'+model]
+            'atk_loaders': [
+                'CIFAR100-test-BIM-'+model,
+                'CIFAR100-test-CW-'+model,
+                'CIFAR100-test-DF-'+model,
+                'CIFAR100-test-PGD-'+model,
+                ]
             }

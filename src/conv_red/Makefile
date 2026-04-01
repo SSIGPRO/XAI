@@ -6,7 +6,7 @@ DATA_DIR := $(or $(DATA_DIR), ../../data)
 # ----------------
 # Definitions
 # ----------------
-models := VGG MobileNet ResNet
+models := VGG MobileNet ResNet ConvNeXt
 reductions := kernel toeplitz avgpooling
 analyses := MACS DMD 
 

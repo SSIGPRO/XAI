@@ -48,13 +48,13 @@ if __name__ == "__main__":
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
     
     cvs_path = Path.cwd()/'../data/corevectors'
-    cvs_name = 'corevectors_avg'
+    cvs_name = 'cvs_avg'
 
     drill_path = Path.cwd()/'../data/drillers'
     drill_name = 'DMD'
 
     phs_path = Path.cwd()/'../data/peepholes'
-    phs_name = 'peepholes_avg'
+    phs_name = 'phs_avg'
 
     verbose = True 
 
@@ -64,6 +64,7 @@ if __name__ == "__main__":
             'features.14',
             'features.28',
             ]
+
 
     loaders = [
             'CIFAR100-train',
@@ -88,6 +89,17 @@ if __name__ == "__main__":
             k: ['vgg'] for k in loaders
             }
 
+    cv_names = {
+            'features.7': cvs_name,
+            'features.14': cvs_name,
+            'features.28': cvs_name,
+            }
+
+    ph_names = {
+            'features.7': phs_name,
+            'features.14': phs_name,
+            'features.28': phs_name,
+            }
     #--------------------------------
     # Model 
     #--------------------------------
@@ -125,7 +137,6 @@ if __name__ == "__main__":
     #--------------------------------
     corevecs = CoreVectors(
             path = cvs_path,
-            name = cvs_name,
             model = model,
             )
     
@@ -159,6 +170,7 @@ if __name__ == "__main__":
                 activations_parser = get_out_activations,
                 save_input = False,
                 save_output = True,
+                names = cv_names,
                 batch_size = bs,
                 n_threads = n_threads,
                 verbose = verbose
@@ -184,7 +196,6 @@ if __name__ == "__main__":
         
     peepholes = Peepholes(
             path = phs_path,
-            name = phs_name,
             device = device
             )
         
@@ -199,6 +210,7 @@ if __name__ == "__main__":
 
         cv.load_only(
                 loaders = list(ds._dss.keys()),
+                names = cv_names,
                 verbose = True
                 ) 
         
@@ -227,6 +239,7 @@ if __name__ == "__main__":
 
         cv.load_only(
                 loaders = list(ds._dss.keys()),
+                names = cv_names,
                 verbose = True
                 ) 
 
@@ -236,6 +249,7 @@ if __name__ == "__main__":
                 target_modules = target_layers,
                 batch_size = bs,
                 drillers = drillers,
+                names = ph_names,
                 n_threads = n_threads,
                 verbose = verbose,
                 )

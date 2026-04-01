@@ -2,7 +2,7 @@ from pathlib import Path as Path
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-m', '--model',  choices=['VGG','MobileNet', 'ResNet'], default='VGG')
+parser.add_argument('-m', '--model',  choices=['VGG','MobileNet', 'ResNet', 'ConvNeXt'], default='VGG')
 parser.add_argument('-r', '--reduction', choices=['avgpooling', 'toeplitz', 'kernel'], default='kernel')
 parser.add_argument('-a', '--analysis', choices=['MACS', 'DMD'], default='MACS')
 parser.add_argument('-d', '--data_path', default=Path.cwd()/'../../data')
@@ -15,6 +15,8 @@ elif args.model == 'MobileNet':
     from configs.mobilenet import *
 elif args.model == 'ResNet':
     from configs.resnet import *
+elif args.model == 'ConvNeXt':
+    from configs.convnext import *
 
 if args.reduction == 'avgpooling':
     from configs.avgpooling import *
@@ -40,8 +42,8 @@ cifar_path = '/srv/newpenny/dataset/CIFAR100'
 cifarc_path = '/srv/newpenny/dataset/CIFAR-100-C'
 svhn_path = '/srv/newpenny/dataset/SVHN' 
 places_path = '/srv/newpenny/dataset/Places365'
+textures_path = '/srv/newpenny/dataset/DTD'
 
-# TODO: restruct this to have svds, corevector, .. etc at leaf folders
 ds_path = Path(args.data_path)/'datasets'
 
 svds_path = Path(args.data_path)/args.model/'svds'/args.reduction
@@ -70,7 +72,7 @@ verbose = True
 n_classes = 100
 bs_base = 2**10
 bs_atk_scale = 2**-4
-tune_num_samples = 50 
+tune_num_samples = 15 
 
 #--------------------------------
 # Defs 
@@ -79,12 +81,12 @@ loaders = [
         'CIFAR100-train',
         'CIFAR100-val',
         'CIFAR100-test',
-        'CIFAR100-C-val-c4',
-        'CIFAR100-C-test-c4',
         'SVHN-val',
         'SVHN-test',
         'Places365-val',
         'Places365-test',
+        'Textures-val',
+        'Textures-test',
         ]
 
 transforms = {
@@ -93,12 +95,12 @@ transforms = {
 
 inference_names = {
         'CIFAR100-train': [args.model],     
-        'CIFAR100-val': [args.model, 'BIM-'+args.model, 'CW-'+args.model],
-        'CIFAR100-test': [args.model, 'BIM-'+args.model, 'CW-'+args.model],
-        'CIFAR100-C-val-c4': [args.model],
-        'CIFAR100-C-test-c4': [args.model],
+        'CIFAR100-val': [args.model, 'BIM-'+args.model, 'CW-'+args.model, 'DF-'+args.model, 'PGD-'+args.model],
+        'CIFAR100-test': [args.model, 'BIM-'+args.model, 'CW-'+args.model, 'DF-'+args.model, 'PGD-'+args.model],
         'SVHN-val': [args.model],
         'SVHN-test': [args.model],
         'Places365-val': [args.model],
         'Places365-test': [args.model],
+        'Textures-val': [args.model],
+        'Textures-test': [args.model],
         }

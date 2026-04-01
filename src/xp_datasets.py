@@ -19,6 +19,8 @@ from peepholelib.models.model_wrap import ModelWrap
 # datasets
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.cifarC import CifarC
+from peepholelib.datasets.MNIST import MNIST 
+from peepholelib.datasets.textures import Textures 
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 
 from peepholelib.datasets.functional.inference_fns import img_classification_full as img_cls_inf, img_classification_atks as img_cls_atk_inf 
@@ -42,6 +44,8 @@ if __name__ == "__main__":
     #--------------------------------
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
     cifarc_path = '/srv/newpenny/dataset/CIFAR-100-C'
+    mnist_path = '/srv/newpenny/dataset/MNIST'
+    textures_path = '/srv/newpenny/dataset/DTD'
     ds_path = Path.cwd()/'../data/datasets'
     atk_path = '../data/attacks/'
 
@@ -90,13 +94,22 @@ if __name__ == "__main__":
             'CIFARC': CifarC(
                 path = cifarc_path,
                 seed = seed
+                ),
+            #'MNIST': MNIST(
+            #    path = mnist_path,
+            #    seed = seed
+            #    ),
+            'Textures': Textures(
+                path = textures_path,
+                seed = seed
                 )
+
             }
 
     _dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 0.5
+                perc = 0.1
                 ) for k in _dss.keys()
             }
 
@@ -149,7 +162,6 @@ if __name__ == "__main__":
                 label_key = 'label'
                 ) for atk_name, atk in atks.items()
             }
-
 
     #######################
     # parsing datasets

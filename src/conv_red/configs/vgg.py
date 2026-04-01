@@ -17,4 +17,4 @@ model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=L
 output_layer = 'classifier.6'
 bs_model_scale = 2**-2 
 
-target_layers = [f'features.{i}' for i in [7, 14, 21, 28]]#[2, 7, 14, 21, 28]]
+target_layers = [f'features.{i}' for i in [7, 14, 21, 28]]

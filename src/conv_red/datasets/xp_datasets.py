@@ -14,9 +14,9 @@ from cuda_selector import auto_cuda
 # Peephoelib stuff
 from peepholelib.models.model_wrap import ModelWrap 
 from peepholelib.datasets.cifar100 import Cifar100
-from peepholelib.datasets.cifarC import CifarC
 from peepholelib.datasets.SVHN import SVHN 
 from peepholelib.datasets.Places import Places 
+from peepholelib.datasets.textures import Textures 
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 from peepholelib.datasets.functional.inference_fns import img_classification_full as img_cls_inf, img_classification_atks as img_cls_atk_inf 
@@ -24,7 +24,7 @@ from peepholelib.datasets.functional.inference_fns import img_classification_ful
 # ATK dataset
 from peepholelib.adv_atk.BIM import myBIM
 from peepholelib.adv_atk.CW import myCW
-from peepholelib.adv_atk.DeepFool import myDeepFool
+from peepholelib.adv_atk.DeepFool import myDeepFool as myDF
 from peepholelib.adv_atk.PGD import myPGD
 
 from configs.common import *
@@ -73,10 +73,6 @@ if __name__ == "__main__":
                 path = cifar_path,
                 seed = seed
                 ),
-            'CIFARC': CifarC(
-                path = cifarc_path,
-                seed = seed
-                ),
             'SVHN': SVHN(
                 path = svhn_path,
                 seed = seed
@@ -84,13 +80,17 @@ if __name__ == "__main__":
             'Places': Places(
                 path = places_path,
                 seed = seed
+                ),
+            'Textures': Textures(
+                path = textures_path,
+                seed = seed
                 )
             }
 
     _dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 0.5
+                perc = 0.001
                 ) for k in _dss.keys()
             }
 
@@ -112,6 +112,13 @@ if __name__ == "__main__":
                 model = model,
                 max_steps = 100,
                 ),
+            'DF-'+args.model: myDF(
+                model = model,
+                steps = 100,
+                ),
+            'PGD-'+args.model: myPGD(
+                model = model,
+                )
             }
 
     # create inference functions for each atk

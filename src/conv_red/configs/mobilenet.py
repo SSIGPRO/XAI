@@ -13,6 +13,6 @@ model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr
 #------------------
 
 output_layer = 'classifier.1'
-bs_model_scale = 2**2 
+bs_model_scale = 2**0
 
-target_layers = [f'features.{i}.conv.2' for i in [8, 11, 14, 17]]#[2, 5, 8, 11, 14, 17]]
+target_layers = [f'features.{i}.conv.2' for i in [8, 11, 14, 17]]

@@ -109,7 +109,7 @@ if __name__ == "__main__":
                 save_output = save_output,
                 batch_size = int(bs_base*bs_model_scale*bs_red_scale),
                 n_threads = n_threads,
-                verbose = verbose
+                verbose = verbose 
                 )
 
         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
