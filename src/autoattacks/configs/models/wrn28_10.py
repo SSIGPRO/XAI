@@ -62,7 +62,7 @@ cfg['standard'] ={
     }
 
 ### Robust Model
-model_name = 'Wang2023Better_WRN-28-10.pt'
+model_name = 'Wang2023Better_WRN-28-10'
 
 Model = load_model(model_name = model_name, threat_model='Linf', dataset='cifar100', model_dir = model_path)
 

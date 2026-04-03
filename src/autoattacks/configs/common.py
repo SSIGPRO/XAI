@@ -5,7 +5,7 @@ print('Loading common configuration...')
 parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--model',  choices=['WRN28','WRN70'], default='WRN28')
 parser.add_argument('-v', '--version', choices=['standard', 'robust'], default='standard')
-parser.add_argument('-p', '--path', default=Path('/srv/newpenny/XAI/generated_data/TPAMI/review').as_posix()) # Path.cwd()/'../../../data/tests
+parser.add_argument('-p', '--path', default=Path('/srv/newpenny/XAI/generated_data/attacks').as_posix()) # Path.cwd()/'../../../data/tests
 args, remaining_argv = parser.parse_known_args()
 
 if args.model == 'WRN28':
