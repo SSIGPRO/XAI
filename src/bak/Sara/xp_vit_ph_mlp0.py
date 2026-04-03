@@ -1,0 +1,264 @@
+import sys
+sys.path.insert(0, '/home/saravorabbi/repos/peepholelib')
+
+# torch
+import torch
+import torchvision
+
+# python
+from pathlib import Path as Path
+from time import time
+
+# peepholelib
+from peepholelib.datasets.cifar import Cifar
+from peepholelib.models.model_wrap import ModelWrap
+from peepholelib.coreVectors.coreVectors import CoreVectors
+from peepholelib.coreVectors.svd_coreVectors import reduct_matrices_from_svds as parser_fn
+from peepholelib.utils.testing import trim_dataloaders
+from peepholelib.classifier.classifier_base import trim_corevectors
+from peepholelib.classifier.tgmm import GMM as tGMM
+from peepholelib.peepholes.peepholes import Peepholes
+
+###################################################################################
+#### In this .py file we compute corevectors and peepholes for all mlp0 layers ####
+###################################################################################
+
+def get_st_list_mlp0(state_dict):
+    '''
+    Return a clean list of the layers of the model
+
+    Args:
+    - state_dict: state dict of the model
+
+    Return:
+    - st_sorted: list of the name of the layers 
+    '''
+    print('getting all the layers we want')
+    state_dict_list = list(state_dict)
+
+    # remove .weight and .bias from the strings in the state_dict list
+    st_clean = [s.replace(".bias", "").replace(".weight", "") for s in state_dict_list]
+    st_sorted = sorted(list(set(st_clean)))
+    filtered_layers = [layer for layer in st_sorted if 'mlp.0' in layer]
+
+    return filtered_layers
+
+if __name__ == "__main__":
+
+    # gpu selection
+    use_cuda = torch.cuda.is_available()
+    cuda_index = 0  # torch.cuda.device_count() -1
+    device = torch.device(f"cuda:{cuda_index}" if use_cuda else "cpu")
+    print(device)
+
+    seed = 42
+    verbose = True
+    bs = 64
+
+    # ----------------
+    # path
+    # ----------------
+    dataset = 'CIFAR100'
+    ds_path = '/srv/newpenny/dataset/CIFAR100'
+
+    model_dir = '/srv/newpenny/XAI/models/'
+    model_name = 'SV_model=vit_b_16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau_withInfo.pth'
+
+    # svd_path = '/home/saravorabbi/Documents/test'
+    # svd_name = 'svd'
+
+    # cvs_path = Path('/home/saravorabbi/Documents/test/corevectors')
+    # cvs_name = 'corevectors'
+
+    # phs_path = Path('/home/saravorabbi/Documents/test/peepholes')
+    # phs_name = 'peepholes'
+
+    svd_path = '/home/saravorabbi/Desktop/'
+    svd_name = 'svd'
+
+    cvs_path = Path('/home/saravorabbi/Desktop/xp_full_ds/corevectors')
+    cvs_name = 'corevectors'
+
+    phs_path = Path('/home/saravorabbi/Desktop/xp_full_ds/peepholes')
+    phs_name = 'peepholes'
+
+    # ------------
+    # dataset
+    # ------------
+    ds = Cifar(
+        dataset=dataset,
+        data_path=ds_path
+    )
+
+    ds.load_data(
+        dataset=dataset,
+        batch_size=64,
+        data_kwargs = {'num_workers': 8, 'pin_memory': True},
+        seed=seed
+    )
+
+    # -----------------------------
+    # import the model + model wrap
+    # -----------------------------
+    nn = torchvision.models.vit_b_16()
+    in_features = nn.heads.head.in_features
+    nn.heads.head = torch.nn.Linear(in_features, 100)
+
+    wrap = ModelWrap(device=device)
+    wrap.set_model(
+        model = nn,
+        path = model_dir,
+        name = model_name
+    )
+
+    # target_layers = ['heads.head', 'encoder.layers.encoder_layer_11.mlp.0', 'encoder.layers.encoder_layer_11.mlp.3']
+    # target_layers = ['heads.head']
+    # target_layers = get_st_list_mlp0(nn.state_dict().keys())
+    target_layers = ['encoder.layers.encoder_layer_11.mlp.0']
+
+    wrap.set_target_layers(target_layers=target_layers)
+    
+
+    # --------
+    # Dry run 
+    # --------
+    direction = {'save_input':True, 'save_output':True}
+    wrap.add_hooks(verbose=verbose)
+    
+    dry_img, _ = ds._train_ds.dataset[0]
+    dry_img = dry_img.reshape((1,)+dry_img.shape)
+    wrap.dry_run(x=dry_img)
+
+
+    # ----
+    # SVD
+    # ----
+    wrap.get_svds(path=svd_path, name=svd_name)
+
+    # ------------
+    # corevectors
+    # ------------
+
+    ds_loaders = ds.get_dataset_loaders()
+    #ds_loaders = ds_loaders = trim_dataloaders(ds.get_dataset_loaders(), 0.03)
+
+    corevecs = CoreVectors(
+        path = cvs_path,
+        name = cvs_name,
+        model = wrap,
+        device = device
+        )
+
+    with corevecs as cv:
+        cv.get_coreVec_dataset(
+            loaders = ds_loaders,
+            verbose = verbose
+        )
+        cv.get_activations(
+            batch_size = 64,
+            loaders = ds_loaders,
+            verbose = verbose
+        )
+        cv.get_coreVectors(
+            batch_size = 64,
+            reduct_matrices = wrap._svds,
+            parser = parser_fn,
+            verbose = verbose
+        )
+        cv_dl = cv.get_dataloaders(verbose=verbose)
+
+        i = 0
+        print('\nPrinting some corevecs')
+        for data in cv_dl['train']:
+            print(data['coreVectors']['encoder.layers.encoder_layer_11.mlp.3'][34:56,:])
+            i += 1
+            if i == 3: break
+
+        cv.normalize_corevectors(
+            wrt='train',
+            #from_file=cvs_path/(cvs_name+'.normalization.pt'),
+            to_file=cvs_path/(cvs_name+'.normalization2.pt'),
+            verbose=verbose
+        )
+        
+        i = 0
+        print('after norm')
+        for data in cv_dl['train']:
+            print(data['coreVectors']['encoder.layers.encoder_layer_11.mlp.3'][34:56,:])
+            i += 1
+            if i == 3: break
+
+
+    # ------------
+    # peepholes
+    # ------------
+
+    n_classes = 100
+    parser_cv = trim_corevectors
+    peep_layer = 'encoder.layers.encoder_layer_11.mlp.3'            # posso passare una lista di tutti i mlp0?
+    parser_kwargs = {'layer': peep_layer, 'peep_size':100}          # scegli peep_size
+    cls_kwargs = {}#{'batch_size':256} 
+    cls = tGMM(
+            nl_classifier = 100,                                    # scegli cluster
+            nl_model = n_classes,
+            parser = parser_cv,
+            parser_kwargs = parser_kwargs,
+            cls_kwargs = cls_kwargs,
+            device = device
+            )
+
+    corevecs = CoreVectors(
+            path = cvs_path,
+            name = cvs_name,
+            )
+    
+    peepholes = Peepholes(
+            path = phs_path,
+            name = phs_name+'.'+peep_layer,
+            classifier = cls,
+            layer = peep_layer,
+            device = device
+            )
+
+    with corevecs as cv, peepholes as ph:
+        cv.load_only(
+                loaders = ['train', 'test', 'val'],
+                verbose = True
+                ) 
+
+        cv_dl = cv.get_dataloaders(
+                batch_size = bs,
+                verbose = True,
+                )
+    
+        t0 = time()
+        cls.fit(dataloader = cv_dl['train'], verbose=verbose)
+        print('Fitting time = ', time()-t0)
+        
+        cls.compute_empirical_posteriors(verbose=verbose)
+
+        ph.get_peepholes(
+                loaders = cv_dl,
+                verbose = verbose
+                )
+
+        ph.get_scores(
+            batch_size = bs,
+            verbose=verbose
+            )
+
+        i = 0
+        print('\nPrinting some peeps')
+        ph_dl = ph.get_dataloaders(verbose=verbose)
+        for data in ph_dl['test']:
+            print('phs\n', data[peep_layer]['peepholes'])
+            print('max\n', data[peep_layer]['score_max'])
+            print('ent\n', data[peep_layer]['score_entropy'])
+            i += 1
+            if i == 3: break
+
+        ph.evaluate_dists(
+                score_type = 'max',
+                coreVectors = cv_dl,
+                bins = 20
+                )
