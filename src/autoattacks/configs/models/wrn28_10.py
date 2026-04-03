@@ -4,6 +4,7 @@ from pathlib import Path as Path
 # Torch stuff
 import torch
 from cuda_selector import auto_cuda
+from collections import defaultdict
 
 # Robustbench stuff
 from robustbench.model_zoo.architectures.wide_resnet import WideResNet
@@ -15,6 +16,13 @@ from peepholelib.datasets.functional.transforms import means, stds
 from peepholelib.datasets.functional.transforms import TransformWrap 
 
 from configs.datasets.cifar import *
+
+def _normalize_layers(m):
+    return {
+        'linear':    m.get('Conv2d', []) + m.get('Linear', []),
+        'nonlinear': m.get('ReLU', []),
+        'batchnorm': m.get('BatchNorm2d', []),
+    }
 
 #------------------
 # Device
@@ -54,11 +62,21 @@ model.load_checkpoint(
         verbose = True 
         )
 
-target_layers = ['conv1', 'block1', 'block2', 'block3']
+modules_by_type = defaultdict(list)
+
+for name, module in model._model.named_modules():
+    if name == "":
+        continue
+    modules_by_type[type(module).__name__].append(name)
+
+modules_by_type = dict(modules_by_type)
+
+modules_by_type.pop('Sequential'); modules_by_type.pop('NetworkBlock'); modules_by_type.pop('BasicBlock')
+modules_by_type = _normalize_layers(modules_by_type)
 
 cfg['standard'] ={
     'model': model, 
-    'target_layers': target_layers
+    'layers': modules_by_type
     }
 
 ### Robust Model
@@ -71,9 +89,19 @@ model = ModelWrap(
             device = device
             )
 
-target_layers = ['init_conv', 'layer.0', 'layer.1', 'layer.2']
+modules_by_type = defaultdict(list)
+
+for name, module in model._model.named_modules():
+    if name == "":
+        continue
+    modules_by_type[type(module).__name__].append(name)
+
+modules_by_type = dict(modules_by_type)
+
+modules_by_type.pop('Sequential'); modules_by_type.pop('_BlockGroup'); modules_by_type.pop('_Block')
+modules_by_type = _normalize_layers(modules_by_type)
 
 cfg['robust'] ={
     'model': model, 
-    'target_layers': target_layers
+    'layers': modules_by_type
     }

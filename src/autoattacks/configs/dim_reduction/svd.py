@@ -1,36 +1,28 @@
 from configs.common import *
 
-# Peephoelib stuff
-from peepholelib.datasets.parsedDataset import ParsedDataset  
+# Peepholelib stuff
+from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds.vit_linear_svd import ViTLinearSVD 
 from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
 
+target_layers = cfg[args.version]['layers']['linear']
+
+cvs_name = 'corevectors.svd'
+svd_rank = 500
+
 inference_names = {
-        f'{args.dataset}-train': [args.model],     
-        f'{args.dataset}-val': [args.model],#, 'BIM-'+args.model],#, 'CW-'+args.model],
-        f'{args.dataset}-test': [args.model]#, 'BIM-'+args.model],#, 'CW-'+args.model],
+        f'{dataset_name}-train': [args.model],
+        f'{dataset_name}-val': [args.model],
+        f'{dataset_name}-test': [args.model]
         }
 
-transforms = {
-            k: TransformWrap(transform=transform, input_key='image') for k in loaders 
-            }
-
-cvs_name = 'corevectors'
-
-target_layers = cfg[args.version]['target_layers']
-
 n_classifiers = {
-        
     layer: 50 for layer in target_layers
-
     }
 
 cv_dims = {
-    
     layer: 100 for layer in target_layers
-
     }
 
 model.set_target_modules(
@@ -38,58 +30,33 @@ model.set_target_modules(
             verbose = verbose
             )
 
-#--------------------------------
-# SVDs 
-#--------------------------------
-
-svd_rank = 500 
-
 dataset = ParsedDataset(
             path = ds_path,
             )
 
-#--------------------------------
-# Corevectors 
-#--------------------------------
 corevecs = CoreVectors(
         path = cvs_path,
         name = cvs_name,
         model = model,
         )
 
-with dataset as ds: 
+svds = {}
+
+with dataset as ds:
         ds.load_only(
                 loaders = loaders,
                 verbose = verbose
                 )
 
-        sample_in = ds._dss[f'{args.dataset}-train']['image'][0]
+        sample_in = ds._dss[f'{dataset_name}-train']['image'][0]
 
-        svds = {}
         for _l in target_layers:
-                if 'head'  in _l or 'classifier' in _l or 'fc' in _l:
+                if 'fc' in _l:
                         svds[_l] = LinearSVD(
-                                        path = svds_path,
+                                        path = proj_path,
                                         layer = _l,
                                         model = model,
                                         cv_dim = cv_dims[_l],
-                                        rank = svd_rank,
-                                        verbose = verbose
-                                        )
-                        
-                elif 'mlp' in _l:
-
-                        if 'encoder' in _l:
-                                token_reduction = 'first'
-                        elif 'features' in _l:
-                                token_reduction = 'mean'
-                        
-                        svds[_l] = ViTLinearSVD(
-                                        path = svds_path,
-                                        layer = _l,
-                                        model = model,
-                                        cv_dim = cv_dims[_l],
-                                        token_reduction= token_reduction,
                                         rank = svd_rank,
                                         verbose = verbose
                                         )
@@ -102,7 +69,7 @@ with dataset as ds:
                                 model._model = model._model.to(temp_device)
 
                                 svds[_l] = Conv2dToeplitzSVD(
-                                                path = svds_path,
+                                                path = proj_path,
                                                 layer = _l,
                                                 model = model,
                                                 cv_dim = cv_dims[_l],
@@ -113,16 +80,15 @@ with dataset as ds:
                                                 )
                         finally:
                                 model.device = original_device
-                                model._model = model._model.to(original_device) 
+                                model._model = model._model.to(original_device)
                                 sample_in = sample_in.to(original_device)
                                 svds[_l] = Conv2dToeplitzSVD(
-                                                path = svds_path,
+                                                path = proj_path,
                                                 layer = _l,
                                                 model = model,
                                                 cv_dim = cv_dims[_l],
                                                 rank = svd_rank,
-                                                sample_in = sample_in.to(temp_device),
+                                                sample_in = sample_in,
                                                 device = original_device,
                                                 verbose = verbose
                                                 )
-              

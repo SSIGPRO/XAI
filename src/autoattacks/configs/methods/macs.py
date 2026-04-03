@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
-sys.path.insert(0, (Path.home()/'repos/Peepholes-Analysis/src').as_posix())
+sys.path.insert(0, (Path.home()/'repos/XAI/src/autoattacks').as_posix())
 
 # Peephoelib stuff
 from peepholelib.peepholes.peepholes import Peepholes
