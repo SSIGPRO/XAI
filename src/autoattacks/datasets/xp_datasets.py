@@ -48,7 +48,7 @@ if __name__ == "__main__":
                 
 
         ds.parse_inference(
-                inference_fns = {args.model: partial(img_cls_inf, model=model)},
+                inference_fns = {f"{args.model}-{args.version}": partial(img_cls_inf, model=model)},
                 transforms = transforms,
                 batch_size = bs_base,
                 n_threads = n_threads,

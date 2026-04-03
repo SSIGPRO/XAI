@@ -5,7 +5,7 @@ print('Loading common configuration...')
 parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--model',  choices=['WRN28','WRN70'], default='WRN28')
 parser.add_argument('-v', '--version', choices=['standard', 'robust'], default='standard')
-parser.add_argument('-p', '--path', default=Path.cwd()/'../../../data/tests') # Path('/srv/newpenny/XAI/generated_data/TPAMI/review').as_posix
+parser.add_argument('-p', '--path', default=Path('/srv/newpenny/XAI/generated_data/TPAMI/review').as_posix()) # Path.cwd()/'../../../data/tests
 args, remaining_argv = parser.parse_known_args()
 
 if args.model == 'WRN28':
@@ -29,23 +29,23 @@ transforms = {
             }
 
 # TODO: restruct this to have svds, corevector, .. etc at leaf folders
-ds_path = Path(args.path)/'datasets'/f'{dataset}'
+ds_path = Path(args.path)/'datasets'/f'{dataset_name}'
 
-svds_path = Path(args.path)/f'{dataset}_{args.model}'/'svds'
+svds_path = Path(args.path)/f'{dataset_name}_{args.model}'/'svds'
 
-cvs_path = Path(args.path)/f'{dataset}_{args.model}'/'corevectors'
+cvs_path = Path(args.path)/f'{dataset_name}_{args.model}'/'corevectors'
 
-drill_path = Path(args.path)/f'{dataset}_{args.model}'/'drillers'
+drill_path = Path(args.path)/f'{dataset_name}_{args.model}'/'drillers'
 
-phs_path = Path(args.path)/f'{dataset}_{args.model}'/'peepholes'
+phs_path = Path(args.path)/f'{dataset_name}_{args.model}'/'peepholes'
 
-tune_storage_path = Path(args.path)/'tuning'/f'{dataset}_{args.model}'
+tune_storage_path = Path(args.path)/'tuning'/f'{dataset_name}_{args.model}'
 
-scores_file = Path(args.path)/f'{dataset}_{args.model}'/'temp_scores'
+scores_file = Path(args.path)/f'{dataset_name}_{args.model}'/'temp_scores'
 
 hyper_params_file = phs_path/f'hyperparams.pickle'
 
-plots_path = Path(args.path)/f'{dataset}_{args.model}'/'temp_plots'
+plots_path = Path(args.path)/f'{dataset_name}_{args.model}'/'temp_plots'
 
 #--------------------------------
 # Running

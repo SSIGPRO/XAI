@@ -11,7 +11,7 @@ from robustbench.utils import load_model
 
 # Our stuff
 from peepholelib.models.model_wrap import ModelWrap
-from peepholelib.datasets.functional.transforms import means, stds, wrn_cifar100_transform as transform
+from peepholelib.datasets.functional.transforms import means, stds#, wrn_cifar100_transform as transform
 from peepholelib.datasets.functional.transforms import TransformWrap 
 
 from configs.datasets.cifar import *
@@ -31,7 +31,8 @@ print(f"Using {device} device")
 
 cfg = {}
 n_classes = 100
-dataset = 'CIFAR100'
+dataset_name = 'CIFAR100'
+transform = lambda x:x
 
 ### Standard Model
 
