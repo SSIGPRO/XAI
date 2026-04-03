@@ -11,7 +11,7 @@ from robustbench.utils import load_model
 
 # Our stuff
 from peepholelib.models.model_wrap import ModelWrap
-from peepholelib.datasets.functional.transforms import means, stds#, wrn_cifar100_transform as transform
+from peepholelib.datasets.functional.transforms import means, stds
 from peepholelib.datasets.functional.transforms import TransformWrap 
 
 from configs.datasets.cifar import *
@@ -33,11 +33,11 @@ cfg = {}
 n_classes = 100
 dataset_name = 'CIFAR100'
 transform = lambda x:x
+model_path = '/srv/newpenny/XAI/models'
 
 ### Standard Model
 
-model_path = Path('/srv/newpenny/XAI/conceptograms/LC/WRN28_10_CIFAR100/checkpoints/20260319_134646/best_model')
-model_name = 'best_model_config.pt'
+model_name = 'wrn28_10_cifar100.pt'
 
 Model = WideResNet(depth=28, widen_factor=10, num_classes=n_classes, dropRate=0.0,)
 
@@ -62,9 +62,7 @@ cfg['standard'] ={
     }
 
 ### Robust Model
-
-model_path = Path('/srv/newpenny/XAI/conceptograms/LC/WRNRobust28_10')
-model_name = 'Wang2023Better_WRN-28-10'
+model_name = 'Wang2023Better_WRN-28-10.pt'
 
 Model = load_model(model_name = model_name, threat_model='Linf', dataset='cifar100', model_dir = model_path)
 
