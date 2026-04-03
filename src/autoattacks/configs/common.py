@@ -3,55 +3,49 @@ import argparse
 print('Loading common configuration...')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-m', '--model',  choices=['VGG16','ViTB16', 'ResNet50', 'SwinB'], default='VGG16')
-parser.add_argument('-d', '--dataset', choices=['CIFAR100', 'ImageNet'], default='CIFAR100')
-parser.add_argument('-p', '--path', default=Path('/srv/newpenny/XAI/generated_data/TPAMI/review').as_posix()) # Path.cwd()/'../../data/tests'
+parser.add_argument('-m', '--model',  choices=['WRN28','WRN70'], default='WRN28')
+parser.add_argument('-v', '--version', choices=['standard', 'robust'], default='standard')
+parser.add_argument('-p', '--path', default=Path.cwd()/'../../../data/tests') # Path('/srv/newpenny/XAI/generated_data/TPAMI/review').as_posix
 args, remaining_argv = parser.parse_known_args()
 
-# import configs
-if args.dataset == 'CIFAR100':
-    from configs.datasets.cifar import *
-elif args.dataset == 'ImageNet':
-    from configs.datasets.imagenet import *
+if args.model == 'WRN28':
+    from configs.models.wrn28_10 import *
+elif args.model == 'WRN70':
+    from configs.models.wrn70_16 import *
 else:
-    raise RuntimeError('Select a dataset <CIFAR100|ImageNet>\'')
+    raise RuntimeError('Select a model <WRN28|WRN70>\'')
 
-if args.model == 'VGG16':
-    from configs.models.vgg import *
-elif args.model == 'ViTB16':
-    from configs.models.vit import *
-elif args.model == 'ResNet50':
-    from configs.models.resnet import *
-elif args.model == 'SwinB':
-    from configs.models.swin import *
+if args.version == 'standard':
+    model = cfg['standard']['model']
+    target_layers = cfg['standard']['target_layers']
+elif args.version == 'robust':
+    model = cfg['robust']['model']
+    target_layers = cfg['robust']['target_layers']
 else:
-    raise RuntimeError('Select a model <VGG16|ViTB16|ResNet50|SwinB>\'')
+    raise RuntimeError('Select a version <standard|robust>\'')
 
 transforms = {
             k: TransformWrap(transform=transform, input_key='image') for k in loaders 
             }
 
-model = cfg[args.dataset]["model"]
-n_classes = cfg[args.dataset]["n_classes"]
-
 # TODO: restruct this to have svds, corevector, .. etc at leaf folders
-ds_path = Path(args.path)/'datasets'/f'{args.dataset}'
+ds_path = Path(args.path)/'datasets'/f'{dataset}'
 
-svds_path = Path(args.path)/f'{args.dataset}_{args.model}'/'svds'
+svds_path = Path(args.path)/f'{dataset}_{args.model}'/'svds'
 
-cvs_path = Path(args.path)/f'{args.dataset}_{args.model}'/'corevectors'
+cvs_path = Path(args.path)/f'{dataset}_{args.model}'/'corevectors'
 
-drill_path = Path(args.path)/f'{args.dataset}_{args.model}'/'drillers'
+drill_path = Path(args.path)/f'{dataset}_{args.model}'/'drillers'
 
-phs_path = Path(args.path)/f'{args.dataset}_{args.model}'/'peepholes'
+phs_path = Path(args.path)/f'{dataset}_{args.model}'/'peepholes'
 
-tune_storage_path = Path(args.path)/'tuning'/f'{args.dataset}_{args.model}'
+tune_storage_path = Path(args.path)/'tuning'/f'{dataset}_{args.model}'
 
-scores_file = Path(args.path)/f'{args.dataset}_{args.model}'/'temp_scores'
+scores_file = Path(args.path)/f'{dataset}_{args.model}'/'temp_scores'
 
 hyper_params_file = phs_path/f'hyperparams.pickle'
 
-plots_path = Path(args.path)/f'{args.dataset}_{args.model}'/'temp_plots'
+plots_path = Path(args.path)/f'{dataset}_{args.model}'/'temp_plots'
 
 #--------------------------------
 # Running
@@ -60,3 +54,4 @@ n_threads = 1
 bs_base = 2**9
 bs_atk_scale = 2**-4
 tune_num_samples = 50
+verbose = True

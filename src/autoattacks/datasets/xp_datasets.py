@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
-sys.path.insert(0, (Path.home()/'repos/Peepholes-Analysis/src').as_posix())
+sys.path.insert(0, (Path.home()/'repos/XAI/src/autoattacks').as_posix())
 
 # python stuff
 from functools import partial
@@ -18,14 +18,14 @@ if __name__ == "__main__":
     
     '''
     just for testing
-    
+    '''
     dss_samplers = {
             k: partial(
                 random_subsampling, 
                 perc = 0.003
                 ) for k in dss.keys()
             }
-    '''   
+       
     #######################
     # parsing datasets
     #######################
@@ -36,27 +36,16 @@ if __name__ == "__main__":
 
     with dataset as ds:
 
-        if args.dataset == 'CIFAR100':
             
-                ds.parse_dataset(
-                        dataset_wraps = dss,
-                        #ds_samplers = dss_samplers, 
-                        keys_to_copy = ['image', 'label'],
-                        batch_size = bs_base,
-                        n_threads = n_threads,
-                        verbose = verbose
-                        )
+        ds.parse_dataset(
+                dataset_wraps = dss,
+                #ds_samplers = dss_samplers, 
+                keys_to_copy = ['image', 'label'],
+                batch_size = bs_base,
+                n_threads = n_threads,
+                verbose = verbose
+                )
                 
-        elif args.dataset == 'ImageNet':     
-
-                ds.parse_dataset(
-                        dataset_wraps = dss,
-                        ds_samplers = dss_samplers, 
-                        keys_to_copy = ['image', 'label'],
-                        batch_size = bs_base,
-                        n_threads = n_threads,
-                        verbose = verbose
-                        )   
 
         ds.parse_inference(
                 inference_fns = {args.model: partial(img_cls_inf, model=model)},
