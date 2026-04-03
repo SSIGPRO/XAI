@@ -3,18 +3,20 @@ from configs.common import *
 # Peepholelib stuff
 from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
-from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
+from peepholelib.coreVectors.dimReduction.reducers.linear_svd import LinearSVD
+from peepholelib.coreVectors.dimReduction.reducers.conv2d_toeplitz_svd import Conv2dToeplitzSVD
 
 target_layers = cfg[args.version]['layers']['linear']
 
 cvs_name = 'corevectors.svd'
+drill_path /= 'svd'
+proj_path /= 'svd'
 svd_rank = 500
 
 inference_names = {
-        f'{dataset_name}-train': [args.model],
-        f'{dataset_name}-val': [args.model],
-        f'{dataset_name}-test': [args.model]
+        f'{dataset_name}-train': [f'{args.model}-{args.version}'],
+        f'{dataset_name}-val': [f'{args.model}-{args.version}'],
+        f'{dataset_name}-test': [f'{args.model}-{args.version}']
         }
 
 n_classifiers = {
@@ -40,7 +42,7 @@ corevecs = CoreVectors(
         model = model,
         )
 
-svds = {}
+reducers = {}
 
 with dataset as ds:
         ds.load_only(
@@ -52,7 +54,7 @@ with dataset as ds:
 
         for _l in target_layers:
                 if 'fc' in _l:
-                        svds[_l] = LinearSVD(
+                        reducers[_l] = LinearSVD(
                                         path = proj_path,
                                         layer = _l,
                                         model = model,
@@ -68,7 +70,7 @@ with dataset as ds:
                                 model.device = temp_device
                                 model._model = model._model.to(temp_device)
 
-                                svds[_l] = Conv2dToeplitzSVD(
+                                reducers[_l] = Conv2dToeplitzSVD(
                                                 path = proj_path,
                                                 layer = _l,
                                                 model = model,
@@ -82,7 +84,7 @@ with dataset as ds:
                                 model.device = original_device
                                 model._model = model._model.to(original_device)
                                 sample_in = sample_in.to(original_device)
-                                svds[_l] = Conv2dToeplitzSVD(
+                                reducers[_l] = Conv2dToeplitzSVD(
                                                 path = proj_path,
                                                 layer = _l,
                                                 model = model,

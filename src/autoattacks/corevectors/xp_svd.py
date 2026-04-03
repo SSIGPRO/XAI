@@ -18,7 +18,7 @@ if __name__ == "__main__":
         # computing the corevectors
         cv.get_coreVectors(
                 datasets = ds,
-                reducers = svds,
+                reducers = reducers,
                 save_input = True,
                 save_output = False,
                 batch_size = bs_base,

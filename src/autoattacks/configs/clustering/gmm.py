@@ -11,7 +11,19 @@ from configs.common import *
 phs_name = 'peepholes'
 drill_name = 'classifier'
 
-from configs.methods.macs_common import *
+import argparse
+print('Loading dim_reduction common configuration...')
+
+_parser = argparse.ArgumentParser()
+_parser.add_argument('-r', '--reduction', choices=['random', 'svd'], default='svd')
+_args, _ = _parser.parse_known_args()
+
+if _args.reduction == 'random':
+        from configs.dim_reduction.random import *
+elif _args.reduction == 'svd':
+        from configs.dim_reduction.svd import * 
+else:
+        raise ValueError('Select a reduction method <random|svd>\'')
 
 #--------------------------------
 # Peepholes 
@@ -33,6 +45,6 @@ for _l in target_layers:
                 nl_classifier = n_classifiers[_l],
                 nl_model = n_classes,
                 n_features = cv_dims[_l],
-                reducer = svds[_l],
+                reducer = reducers[_l],
                 device = device
                 )

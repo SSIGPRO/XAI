@@ -17,6 +17,7 @@ _dim_args, _ = _parser.parse_known_args()
 
 cvs_name = 'corevectors.random'
 drill_path /= 'random'
+proj_path /= 'random'
 rank = 500
 save_input = _dim_args.input
 save_output = not _dim_args.input
@@ -33,7 +34,7 @@ inference_names = {
         }
 
 n_classifiers = {
-    layer: 50 for layer in target_layers
+    layer: 100 for layer in target_layers
     }
 
 cv_dims = {
