@@ -25,12 +25,17 @@ save_output = not _dim_args.input
 if save_input: activation_parser = get_in_activations
 else: activation_parser = get_out_activations
 
-target_layers = [cfg[args.version]['layers'][_dim_args.layer][-1]]
+target_layers = cfg[args.version]['layers'][_dim_args.layer]
 
 inference_names = {
-        f'{dataset_name}-train': [f'{args.model}-{args.version}'],
-        f'{dataset_name}-val': [f'{args.model}-{args.version}'],
-        f'{dataset_name}-test': [f'{args.model}-{args.version}']
+        f'{dataset_name}-train': [f'{model_name}'],
+        f'{dataset_name}-val': [f'{model_name}'],
+        f'{dataset_name}-test': 
+            [
+                f'{model_name}', 
+                f'APGD-ce-{model_name}', 
+                f'APGD-t-{model_name}'
+            ]
         }
 
 n_classifiers = {
@@ -64,7 +69,7 @@ with dataset as ds:
                 verbose = verbose
                 )
 
-        sample_in = ds._dss[f'{dataset_name}-train']['image'][0]
+        sample_in = ds._dss[f'{dataset_name}-train']['image'][0:1]
 
         for _l in target_layers:
                 reducers[_l] = Reducer(
@@ -72,6 +77,7 @@ with dataset as ds:
                         layer = _l,
                         model = model,
                         sample_in = sample_in,
+                        activations_parser = activation_parser,
                         seed = _dim_args.seed,
                         save_input = save_input,
                         save_output = save_output,

@@ -26,24 +26,25 @@ transforms = {
             k: TransformWrap(transform=transform, input_key='image') for k in loaders 
             }
 
+model_name = f'{args.model}-{args.version}'
 # TODO: restruct this to have svds, corevector, .. etc at leaf folders
 ds_path = Path(args.path)/'datasets'/f'{dataset_name}'
 
-proj_path = Path(args.path)/f'{dataset_name}_{args.model}'/'dim_reduction'
+proj_path = Path(args.path)/f'{dataset_name}_{model_name}'/'dim_reduction'
 
-cvs_path = Path(args.path)/f'{dataset_name}_{args.model}'/'corevectors'
+cvs_path = Path(args.path)/f'{dataset_name}_{model_name}'/'corevectors'
 
-drill_path = Path(args.path)/f'{dataset_name}_{args.model}'/'drillers'
+drill_path = Path(args.path)/f'{dataset_name}_{model_name}'/'drillers'
 
-phs_path = Path(args.path)/f'{dataset_name}_{args.model}'/'peepholes'
+phs_path = Path(args.path)/f'{dataset_name}_{model_name}'/'peepholes'
 
-tune_storage_path = Path(args.path)/'tuning'/f'{dataset_name}_{args.model}'
+tune_storage_path = Path(args.path)/'tuning'/f'{dataset_name}_{model_name}'
 
-scores_file = Path(args.path)/f'{dataset_name}_{args.model}'/'temp_scores'
+scores_file = Path(args.path)/f'{dataset_name}_{model_name}'/'temp_scores'
 
 hyper_params_file = phs_path/f'hyperparams.pickle'
 
-plots_path = Path(args.path)/f'{dataset_name}_{args.model}'/'temp_plots'
+plots_path = Path(args.path)/f'{dataset_name}_{model_name}'/'temp_plots'
 
 #--------------------------------
 # Running

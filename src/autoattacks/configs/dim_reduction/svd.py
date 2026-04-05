@@ -3,8 +3,8 @@ from configs.common import *
 # Peepholelib stuff
 from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.reducers.linear_svd import LinearSVD
-from peepholelib.coreVectors.dimReduction.reducers.conv2d_toeplitz_svd import Conv2dToeplitzSVD
+from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
+from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
 
 target_layers = cfg[args.version]['layers']['linear']
 
@@ -14,17 +14,22 @@ proj_path /= 'svd'
 svd_rank = 500
 
 inference_names = {
-        f'{dataset_name}-train': [f'{args.model}-{args.version}'],
-        f'{dataset_name}-val': [f'{args.model}-{args.version}'],
-        f'{dataset_name}-test': [f'{args.model}-{args.version}']
+        f'{dataset_name}-train': [f'{model_name}'],
+        f'{dataset_name}-val': [f'{model_name}'],
+        f'{dataset_name}-test': 
+            [
+                f'{model_name}', 
+                f'APGD-ce-{model_name}', 
+                f'APGD-t-{model_name}'
+            ]
         }
 
 n_classifiers = {
-    layer: 50 for layer in target_layers
+    layer: 100 for layer in target_layers
     }
 
 cv_dims = {
-    layer: 100 for layer in target_layers
+    layer: 200 for layer in target_layers
     }
 
 model.set_target_modules(
@@ -50,10 +55,10 @@ with dataset as ds:
                 verbose = verbose
                 )
 
-        sample_in = ds._dss[f'{dataset_name}-train']['image'][0]
+        sample_in = ds._dss[f'{dataset_name}-train']['image'][0:1]
 
         for _l in target_layers:
-                if 'fc' in _l:
+                if 'fc' in _l or 'logits' in _l:
                         reducers[_l] = LinearSVD(
                                         path = proj_path,
                                         layer = _l,
@@ -65,10 +70,14 @@ with dataset as ds:
                 else:
                         temp_device = torch.device("cpu")
                         original_device = model.device
+                        _norm = model._normalizer
 
                         try:
                                 model.device = temp_device
                                 model._model = model._model.to(temp_device)
+                                if hasattr(_norm, 'mean'):
+                                        _norm.mean = _norm.mean.to(temp_device)
+                                        _norm.std  = _norm.std.to(temp_device)
 
                                 reducers[_l] = Conv2dToeplitzSVD(
                                                 path = proj_path,
@@ -83,6 +92,9 @@ with dataset as ds:
                         finally:
                                 model.device = original_device
                                 model._model = model._model.to(original_device)
+                                if hasattr(_norm, 'mean'):
+                                        _norm.mean = _norm.mean.to(original_device)
+                                        _norm.std  = _norm.std.to(original_device)
                                 sample_in = sample_in.to(original_device)
                                 reducers[_l] = Conv2dToeplitzSVD(
                                                 path = proj_path,

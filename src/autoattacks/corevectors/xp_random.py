@@ -29,8 +29,8 @@ if __name__ == "__main__":
 
         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
                 cv.normalize_corevectors(
-                        wrt = f'{dataset_name}-train-{args.model}-{args.version}',
-                        to_file = cvs_path/(cvs_name+'.normalization.pt'),
+                        wrt = f'{dataset_name}-train-{model_name}',
+                        to_file = cvs_path/(cvs_name+f'.normalization.pt'),
                         #from_file = cvs_path/(cvs_name+'.normalization.pt'),
                         batch_size = bs_base,
                         n_threads = n_threads,

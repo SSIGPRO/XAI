@@ -20,7 +20,7 @@ from configs.datasets.cifar import *
 def _normalize_layers(m):
     return {
         'linear':    m.get('Conv2d', []) + m.get('Linear', []),
-        'nonlinear': m.get('ReLU', []),
+        'nonlinear': m.get('ReLU', []) + m.get('SiLU', []),
         'batchnorm': m.get('BatchNorm2d', []),
     }
 
@@ -28,14 +28,14 @@ def _normalize_layers(m):
 # Device
 #------------------
 
-# use_cuda = torch.cuda.is_available()
-# device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
-# print(f"Using {device} device")
-
-gpu_id = 5  # physical GPU index
-use_cuda = torch.cuda.is_available() and torch.cuda.device_count() > gpu_id
-device = torch.device(f"cuda:{gpu_id}" if use_cuda else "cpu")
+use_cuda = torch.cuda.is_available()
+device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
 print(f"Using {device} device")
+
+# gpu_id = 5  # physical GPU index
+# use_cuda = torch.cuda.is_available() and torch.cuda.device_count() > gpu_id
+# device = torch.device(f"cuda:{gpu_id}" if use_cuda else "cpu")
+# print(f"Using {device} device")
 
 cfg = {}
 n_classes = 100
@@ -95,8 +95,6 @@ for name, module in model._model.named_modules():
     if name == "":
         continue
     modules_by_type[type(module).__name__].append(name)
-
-modules_by_type = dict(modules_by_type)
 
 modules_by_type.pop('Sequential'); modules_by_type.pop('_BlockGroup'); modules_by_type.pop('_Block')
 modules_by_type = _normalize_layers(modules_by_type)
