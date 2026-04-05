@@ -32,6 +32,13 @@ cv_dims = {
     layer: 200 for layer in target_layers
     }
 
+if args.version == 'standard':
+        cv_dims['fc'] = 50
+elif args.version == 'robust':
+        cv_dims['logits'] = 50  
+else:        
+        raise ValueError('Select a version <standard|robust>\'')
+
 model.set_target_modules(
             target_modules = target_layers,
             verbose = verbose
