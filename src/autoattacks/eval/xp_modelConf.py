@@ -3,7 +3,7 @@ from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 sys.path.insert(0, (Path.home()/'repos/XAI/src/autoattacks').as_posix())
 
-from src.autoattacks.configs.eval.model_eval import *
+from configs.eval.model_eval import *
 
 import matplotlib.pyplot as plt
 import seaborn as sb
@@ -157,4 +157,42 @@ if __name__ == "__main__":
         aurc_ax.set_title('AURC - Model Confidence')
         margin_aurc_ax.set_title('AURC - Top-1 minus Top-2 Score')
 
-    plt.savefig('AURC.png', dpi=300, bbox_inches='tight')
+        plt.savefig('AURC.png', dpi=300, bbox_inches='tight')
+        plt.close()
+
+        # ----------------------------------------------------------------
+        # KDE: confidence distribution — correct vs. incorrect
+        # ----------------------------------------------------------------
+        conf_st = ost.max(dim=1).values
+        conf_rb = orb.max(dim=1).values
+        correct_st = (ost.argmax(dim=1) == lst)
+        correct_rb = (orb.argmax(dim=1) == lrb)
+
+        c_correct   = 'xkcd:cobalt'
+        c_incorrect = 'xkcd:dark hot pink'
+
+        fig2, (kde_ax_st, kde_ax_rb) = plt.subplots(1, 2, figsize=(10, 5))
+
+        for ax, conf, correct, title in [
+            (kde_ax_st, conf_st, correct_st, 'Standard'),
+            (kde_ax_rb, conf_rb, correct_rb, 'Robust'),
+        ]:
+            df_kde = pd.DataFrame({
+                'confidence': conf.numpy(),
+                'classification': ['correct' if c else 'incorrect' for c in correct.tolist()],
+            })
+            sb.kdeplot(data=df_kde[df_kde['classification'] == 'correct'],   ax=ax,
+                       x='confidence', color=c_correct,   common_norm=False,
+                       clip=[0., 1.], label='correct')
+            sb.kdeplot(data=df_kde[df_kde['classification'] == 'incorrect'], ax=ax,
+                       x='confidence', color=c_incorrect, common_norm=False,
+                       clip=[0., 1.], label='incorrect')
+            ax.set_xlabel('Max softmax confidence')
+            ax.set_ylabel('Density')
+            ax.set_title(f'{title} — correct vs. incorrect')
+            ax.legend(title='Classification', loc='upper left', frameon=True)
+            ax.grid(True)
+
+        fig2.suptitle(f'Confidence distribution — {args.model}', fontsize=13)
+        plt.savefig('confidence_dist_correct_incorrect.png', dpi=300, bbox_inches='tight')
+        plt.close()
