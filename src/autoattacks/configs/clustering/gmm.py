@@ -8,15 +8,15 @@ from peepholelib.peepholes.peepholes import Peepholes
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 from configs.common import *
 
-phs_name = 'peepholes'
-drill_name = 'classifier'
-
 import argparse
 print('Loading dim_reduction common configuration...')
 
 _parser = argparse.ArgumentParser()
 _parser.add_argument('-r', '--reduction', choices=['random', 'svd'], default='svd')
 _args, _ = _parser.parse_known_args()
+
+phs_name = f'peepholes.{_args.reduction}'
+drill_name = 'classifier'
 
 if _args.reduction == 'random':
         from configs.dim_reduction.random import *
@@ -34,6 +34,10 @@ peepholes = Peepholes(
                 name = phs_name,
                 device = device
                 )
+
+n_classifiers = {
+    layer: 100 for layer in target_layers
+    }
 
 drillers = {}
 for _l in target_layers:

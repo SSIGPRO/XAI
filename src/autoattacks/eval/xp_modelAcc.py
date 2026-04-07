@@ -3,7 +3,7 @@ from pathlib import Path as Path
 sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 sys.path.insert(0, (Path.home()/'repos/XAI/src/autoattacks').as_posix())
 
-from configs.eval.eval import *
+from src.autoattacks.configs.eval.model_eval import *
 
 if __name__ == "__main__":
 

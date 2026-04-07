@@ -38,12 +38,8 @@ inference_names = {
             ]
         }
 
-n_classifiers = {
-    layer: 100 for layer in target_layers
-    }
-
 cv_dims = {
-    layer: 100 for layer in target_layers
+    layer: 20 for layer in target_layers
     }
 
 model.set_target_modules(
