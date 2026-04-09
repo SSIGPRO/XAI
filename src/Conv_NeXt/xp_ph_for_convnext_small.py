@@ -25,12 +25,12 @@ from peepholelib.datasets.functional.transforms import convnext_small_transform 
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
-from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
-from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
+# from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
+# from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
 
-# peepholes
-from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
-from peepholelib.peepholes.peepholes import Peepholes
+# # peepholes
+# from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
+# from peepholelib.peepholes.peepholes import Peepholes
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -65,18 +65,18 @@ if __name__ == "__main__":
     
     # Peepholelib
     target_layers = [
-            'features.26',
-            'features.28',
-            'classifier.0',
+            'stages.1',
+            'stages.2',
+            'norm',
             ]
     
     cv_dims = {
-            'features.26': 30,
-            'features.28': 50,
-            'classifier.0': 30,
+            'stages.1': 30,
+            'stages.2': 50,
+            'norm': 30,
             }
 
-    svd_rank = 300
+    svd_rank = 400
     n_cluster = 4 
     
     loaders = [
@@ -92,7 +92,7 @@ if __name__ == "__main__":
             }
 
     _inference_names = {
-            k: ['vgg'] for k in loaders
+            k: ['convnext_small'] for k in loaders
             }
 
     n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
@@ -102,13 +102,13 @@ if __name__ == "__main__":
     #--------------------------------
 
     model = ModelWrap(
-            model = vgg16(),
+            model = convnext_small(),
             target_modules = target_layers,
             device = device
             )
                                             
     model.update_output(
-            output_layer = 'classifier.6', 
+            output_layer = 'classifier.2', 
             to_n_classes = n_classes,
             overwrite = True 
             )
@@ -139,7 +139,7 @@ if __name__ == "__main__":
                 inference_names = _inference_names,
                 verbose = verbose
                 )
-        sample_in = ds._dss['CIFAR100-train-vgg'][0]['image']
+        sample_in = ds._dss['CIFAR100-train-convnext_small'][0]['image']
 
         svds = {
                 'features.26': Conv2dToeplitzSVD(
@@ -199,7 +199,7 @@ if __name__ == "__main__":
 
         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
             cv.normalize_corevectors(
-                    wrt = 'CIFAR100-train-vgg',
+                    wrt = 'CIFAR100-train-convnext_small',
                     to_file = cvs_path/(cvs_name+'.normalization.pt'),
                     #from_file = cvs_path/(cvs_name+'.normalization.pt'),
                     #loaders = ['CIFAR100-val', 'CIFAR100-test'],
@@ -211,78 +211,78 @@ if __name__ == "__main__":
     #--------------------------------
     # Peepholes
     #--------------------------------
-    drillers = {}
-    for peep_layer in target_layers:
-        drillers[peep_layer] = tGMM(
-                path = drill_path,
-                name = f'{drill_name}.GMM.{peep_layer}.{n_classes}.{cv_dims[peep_layer]}.{n_cluster}',
-                target_module = peep_layer,
-                nl_classifier = n_cluster,
-                nl_model = n_classes,
-                n_features = cv_dims[peep_layer],
-                cls_kwargs = {
-                    'covariance_regularization': 1e-4,
-                    'convergence_tolerance': 1e-2
-                    },
-                reducer = svds[peep_layer],
-                device = device
-                )
+#     drillers = {}
+#     for peep_layer in target_layers:
+#         drillers[peep_layer] = tGMM(
+#                 path = drill_path,
+#                 name = f'{drill_name}.GMM.{peep_layer}.{n_classes}.{cv_dims[peep_layer]}.{n_cluster}',
+#                 target_module = peep_layer,
+#                 nl_classifier = n_cluster,
+#                 nl_model = n_classes,
+#                 n_features = cv_dims[peep_layer],
+#                 cls_kwargs = {
+#                     'covariance_regularization': 1e-4,
+#                     'convergence_tolerance': 1e-2
+#                     },
+#                 reducer = svds[peep_layer],
+#                 device = device
+#                 )
 
-    peepholes = Peepholes(
-            path = phs_path,
-            name = phs_name,
-            device = device
-            )
+#     peepholes = Peepholes(
+#             path = phs_path,
+#             name = phs_name,
+#             device = device
+#             )
 
-    # fitting classifiers
-    with datasets as ds, corevecs as cv:
-        ds.load_only(
-                loaders = loaders,
-                transforms = _transforms,
-                inference_names = _inference_names,
-                verbose = verbose
-                )
+#     # fitting classifiers
+#     with datasets as ds, corevecs as cv:
+#         ds.load_only(
+#                 loaders = loaders,
+#                 transforms = _transforms,
+#                 inference_names = _inference_names,
+#                 verbose = verbose
+#                 )
 
-        cv.load_only(
-                loaders = list(ds._dss.keys()),
-                verbose = verbose 
-                ) 
+#         cv.load_only(
+#                 loaders = list(ds._dss.keys()),
+#                 verbose = verbose 
+#                 ) 
 
-        for drill_key, driller in drillers.items():
-            if not driller.load():
-                t0 = time()
-                print(f'Fitting classifier for {drill_key}')
-                driller.fit(
-                        datasets = ds,
-                        corevectors = cv,
-                        loader = 'CIFAR100-train-vgg',
-                        verbose=verbose
-                        )
-                print(f'Fitting time for {drill_key}  = ', time()-t0)
+#         for drill_key, driller in drillers.items():
+#             if not driller.load():
+#                 t0 = time()
+#                 print(f'Fitting classifier for {drill_key}')
+#                 driller.fit(
+#                         datasets = ds,
+#                         corevectors = cv,
+#                         loader = 'CIFAR100-train-vgg',
+#                         verbose=verbose
+#                         )
+#                 print(f'Fitting time for {drill_key}  = ', time()-t0)
 
-                # save classifiers
-                print(f'Saving classifier for {drill_key}')
-                driller.save()
+#                 # save classifiers
+#                 print(f'Saving classifier for {drill_key}')
+#                 driller.save()
 
-    with datasets as ds, corevecs as cv, peepholes as ph:
-        ds.load_only(
-                loaders = loaders,
-                transforms = _transforms,
-                inference_names = _inference_names,
-                verbose = verbose
-                )
+#     with datasets as ds, corevecs as cv, peepholes as ph:
+#         ds.load_only(
+#                 loaders = loaders,
+#                 transforms = _transforms,
+#                 inference_names = _inference_names,
+#                 verbose = verbose
+#                 )
 
-        cv.load_only(
-                loaders = list(ds._dss.keys()),
-                verbose = verbose 
-                ) 
+#         cv.load_only(
+#                 loaders = list(ds._dss.keys()),
+#                 verbose = verbose 
+#                 ) 
 
-        ph.get_peepholes(
-                datasets = ds,
-                corevectors = cv,
-                target_modules = target_layers,
-                batch_size = bs,
-                drillers = drillers,
-                n_threads = n_threads,
-                verbose = verbose
-                )
+#         ph.get_peepholes(
+#                 datasets = ds,
+#                 corevectors = cv,
+#                 target_modules = target_layers,
+#                 batch_size = bs,
+#                 drillers = drillers,
+#                 n_threads = n_threads,
+#                 verbose = verbose
+#                 )

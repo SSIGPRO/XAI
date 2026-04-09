@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 
 # torch stuff
 import torch
-from torchvision.models import vgg16
+from torchvision.models import convnext_small
 from cuda_selector import auto_cuda
 
 ###### Our stuff
@@ -23,7 +23,7 @@ from peepholelib.datasets.parsedDataset import ParsedDataset
 
 from peepholelib.datasets.functional.inference_fns import img_classification_full as img_cls_inf, img_classification_atks as img_cls_atk_inf 
 from peepholelib.datasets.functional.transforms import TransformWrap 
-from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform 
+from peepholelib.datasets.functional.transforms import convnext_small_transform as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
 # ATK dataset
@@ -52,14 +52,14 @@ if __name__ == "__main__":
     n_threads = 1
 
     model_dir = '/srv/newpenny/XAI/models'
-    model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
+    model_name = 'convnext_cifar100_clean_sd.pt'
      
     verbose = True 
     
     #--------------------------------
     # Model 
     #--------------------------------
-    nn = vgg16()
+    nn = convnext_small()
     n_classes = 100#len(ds.get_classes()) 
     model = ModelWrap(
             model = nn,
@@ -67,7 +67,7 @@ if __name__ == "__main__":
             )
                                             
     model.update_output(
-            output_layer = 'classifier.6', 
+            output_layer = 'classifier.2', 
             to_n_classes = n_classes,
             overwrite = True 
             )
@@ -169,18 +169,18 @@ if __name__ == "__main__":
                 ) 
 
         ds.parse_inference(
-                inference_fns = {'vgg': partial(img_cls_inf, model=model)},
+                inference_fns = {'convnext_small': partial(img_cls_inf, model=model)},
                 transforms = _transforms,
                 batch_size = bs,
                 n_threads = 1,
                 verbose = verbose
                 )
 
-        ds.parse_inference(
-                loaders = ['CIFAR100-test-vgg'],
-                inference_fns = atks_inf_fns, 
-                transforms = _transforms,
-                batch_size = bs,
-                verbose = verbose 
-                )
+        # ds.parse_inference(
+        #         loaders = ['CIFAR100-test-vgg'],
+        #         inference_fns = atks_inf_fns, 
+        #         transforms = _transforms,
+        #         batch_size = bs,
+        #         verbose = verbose 
+        #         )
 
