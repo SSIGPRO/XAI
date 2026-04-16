@@ -26,11 +26,6 @@ from peepholelib.datasets.functional.transforms import TransformWrap
 from peepholelib.datasets.functional.transforms import convnext_small_transform as ds_transform 
 from peepholelib.datasets.functional.samplers import random_subsampling 
 
-# ATK dataset
-from peepholelib.adv_atk.BIM import myBIM
-from peepholelib.adv_atk.CW import myCW
-from peepholelib.adv_atk.DeepFool import myDeepFool
-from peepholelib.adv_atk.PGD import myPGD
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -125,30 +120,6 @@ if __name__ == "__main__":
             k: TransformWrap(transform=ds_transform, input_key='image') for k in loaders 
             }
 
-    atks = {
-            'CW': myCW(
-                model = model,
-                max_steps = 10,
-                ),
-            'BIM': myBIM(
-                model = model,
-                ),
-            'DF': myDeepFool(
-                model = model,
-                ),
-            'PGD': myPGD(
-                model = model,
-                ),
-            }
-
-    # create inference functions for each atk
-    atks_inf_fns = {
-            atk_name: partial(
-                img_cls_atk_inf,
-                attack = atk,
-                label_key = 'label'
-                ) for atk_name, atk in atks.items()
-            }
 
 
     #######################
@@ -175,12 +146,4 @@ if __name__ == "__main__":
                 n_threads = 1,
                 verbose = verbose
                 )
-
-        # ds.parse_inference(
-        #         loaders = ['CIFAR100-test-vgg'],
-        #         inference_fns = atks_inf_fns, 
-        #         transforms = _transforms,
-        #         batch_size = bs,
-        #         verbose = verbose 
-        #         )
 
