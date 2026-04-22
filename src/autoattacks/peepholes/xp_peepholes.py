@@ -22,22 +22,13 @@ if __name__ == "__main__":
 
         for _layer in target_layers:
             print(f'Preparing driller for layer {_layer}')
-            if (drillers[_layer]._clas_path).exists():
-                if (drillers[_layer]._empp_file).exists():
-                    drillers[_layer].load()
-                else:
-                    drillers[_layer].load()
-                    drillers[_layer]._compute_empirical_posteriors(
-                                                    datasets = ds,
-                                                    corevectors = cv,
-                                                    verbose = verbose
-                                                    )
-                    drillers[_layer].save()
+            if (drillers[_layer]._empp_file).exists():
+                drillers[_layer].load()
             else:
                 drillers[_layer].fit(
                         datasets = ds, 
                         corevectors = cv, 
-                        loader = f'{dataset_name}-train-{args.model}-{args.version}',
+                        loader = f'{dataset_name}-train-{model_name}',
                         verbose=verbose
                     )
                 drillers[_layer].save()
@@ -49,6 +40,7 @@ if __name__ == "__main__":
                 )
 
         with peepholes as ph:
+
             ph.get_peepholes(
                 datasets = ds,
                 corevectors = cv,

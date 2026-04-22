@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import seaborn as sb
 from matplotlib.lines import Line2D
 import pandas as pd
+from sklearn.metrics import roc_auc_score, roc_curve
 
 from peepholelib.plots.confidence import risk_coverage_curve
 
@@ -177,8 +178,17 @@ if __name__ == "__main__":
             (kde_ax_st, conf_st, correct_st, 'Standard'),
             (kde_ax_rb, conf_rb, correct_rb, 'Robust'),
         ]:
+            y_true = correct.numpy().astype(int)
+            y_score = conf.numpy()
+
+            auc = roc_auc_score(y_true, y_score)
+            fprs, tprs, _ = roc_curve(y_true, y_score)
+            # FPR at the first threshold where TPR >= 95%
+            idx = next((i for i, t in enumerate(tprs) if t >= 0.95), -1)
+            fpr95 = fprs[idx]
+
             df_kde = pd.DataFrame({
-                'confidence': conf.numpy(),
+                'confidence': y_score,
                 'classification': ['correct' if c else 'incorrect' for c in correct.tolist()],
             })
             sb.kdeplot(data=df_kde[df_kde['classification'] == 'correct'],   ax=ax,
@@ -189,8 +199,8 @@ if __name__ == "__main__":
                        clip=[0., 1.], label='incorrect')
             ax.set_xlabel('Max softmax confidence')
             ax.set_ylabel('Density')
-            ax.set_title(f'{title} — correct vs. incorrect')
-            ax.legend(title='Classification', loc='upper left', frameon=True)
+            ax.set_title(f'{title} — AUC = {auc:.2f} FPR@95TPR = {fpr95:.2f}')
+            ax.legend(title='Classification', frameon=True)
             ax.grid(True)
 
         fig2.suptitle(f'Confidence distribution — {args.model}', fontsize=13)

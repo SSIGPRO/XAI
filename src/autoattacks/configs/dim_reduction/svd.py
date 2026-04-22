@@ -24,10 +24,6 @@ inference_names = {
             ]
         }
 
-n_classifiers = {
-    layer: 100 for layer in target_layers
-    }
-
 cv_dims = {
     layer: 200 for layer in target_layers
     }

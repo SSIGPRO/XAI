@@ -46,7 +46,7 @@ if __name__ == "__main__":
                 target_modules = target_layers,
                 batch_size = bs_base,
                 drillers = drillers,
-                n_threads = 1,
+                n_threads = 8,
                 verbose = verbose 
                 )
             

@@ -1,0 +1,41 @@
+MODEL    := WRN28
+VERSIONS := standard robust
+
+# ----------------
+# Top-level targets
+# ----------------
+
+all: corevectors peepholes
+
+corevectors: $(foreach v, $(VERSIONS), corevectors_$(v))
+
+peepholes: $(foreach v, $(VERSIONS), peepholes_$(v))
+
+# ----------------
+# Corevectors  (xp_random.py -l linear)
+# ----------------
+
+define corevectors_template
+corevectors_$(1):
+	python corevectors/xp_random.py -m $(MODEL) -v $(1) -l linear
+endef
+
+$(foreach v, $(VERSIONS), $(eval $(call corevectors_template,$(v))))
+
+# ----------------
+# Peepholes  (xp_peepholes.py -r random)
+# ----------------
+
+define peepholes_template
+peepholes_$(1):
+	python peepholes/xp_peepholes.py -m $(MODEL) -v $(1) -r random
+endef
+
+$(foreach v, $(VERSIONS), $(eval $(call peepholes_template,$(v))))
+
+# ----------------
+# Phony
+# ----------------
+
+.PHONY: all corevectors peepholes \
+        $(foreach v, $(VERSIONS), corevectors_$(v) peepholes_$(v))

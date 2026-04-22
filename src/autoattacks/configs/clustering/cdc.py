@@ -16,7 +16,7 @@ _parser.add_argument('-r', '--reduction', choices=['random', 'svd'], default='sv
 _args, _ = _parser.parse_known_args()
 
 drill_name = 'CDclassifier'
-phs_name = f'peepholes_cdc.{args.reduction}'
+phs_name = f'peepholes_cdc.{_args.reduction}'
 
 if _args.reduction == 'random':
         from configs.dim_reduction.random import *
