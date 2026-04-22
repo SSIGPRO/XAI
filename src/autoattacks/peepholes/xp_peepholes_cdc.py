@@ -38,8 +38,9 @@ if __name__ == "__main__":
                 name = phs_name,
                 device = device
                 )
+        
 
-        with peepholes as ph:
+        with dataset as ds,peepholes as ph:
             ph.get_peepholes(
                 datasets = ds,
                 corevectors = cv,
@@ -49,4 +50,15 @@ if __name__ == "__main__":
                 n_threads = 1,
                 verbose = verbose 
                 )
+            # ds.load_only(
+            #     loaders = loaders,
+            #     transforms = transforms,
+            #     inference_names = inference_names,
+            #     verbose = verbose
+            #     ) 
             
+            # ph.load_only(
+            #     loaders = list(ds._dss.keys()),
+            #     verbose = verbose 
+            #     )
+            # print(ph._phs)

@@ -50,7 +50,7 @@ plots_path = Path(args.path)/f'{dataset_name}_{model_name}'/'temp_plots'
 # Running
 #--------------------------------
 n_threads = 1
-bs_base = 2**9
+bs_base = 2**11
 bs_atk_scale = 2**-4
 tune_num_samples = 50
 verbose = True

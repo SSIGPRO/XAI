@@ -8,6 +8,8 @@ from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2d
 
 target_layers = cfg[args.version]['layers']['linear']
 
+# target_layers = [target_layers[-1]]
+
 cvs_name = 'corevectors.svd'
 drill_path /= 'svd'
 proj_path /= 'svd'
