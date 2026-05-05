@@ -24,9 +24,8 @@ from peepholelib.datasets.functional.transforms import convnext_small_transform 
 
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
-
+from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 # # peepholes
 # from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 # from peepholelib.peepholes.peepholes import Peepholes
@@ -38,7 +37,7 @@ if __name__ == "__main__":
     gpu_id = 0 # physical GPU index
     use_cuda = torch.cuda.is_available() and torch.cuda.device_count() > gpu_id
     device = torch.device(f"cuda:{gpu_id}" if use_cuda else "cpu")
-    device = torch.device('cpu')  # Force CPU usage
+#     device = torch.device('cpu')  # Force GPU usage
     print(f"Using {device} device")
 
     #--------------------------------
@@ -66,63 +65,39 @@ if __name__ == "__main__":
     phs_name = 'peepholes'
     
     verbose = True 
-    
-    # Peepholelib
+    #----Target_layers_start-----
     target_layers = []
-
-# Add Stem
     target_layers.append('features.0.0')
 
-# Stage configuration: (feature_index, number_of_blocks)
+        # Stage configuration
     stages = [
         (1, 3),   # Stage 1
-        (3, 3),   # Stage 2
-        (5, 27),  # Stage 3
-        (7, 3),   # Stage 4
+        (3, 3),
+        (5, 27),
+        (7, 3),
 ]
 
-# Layers inside each CNBlock
-    inner_layers = [0, 3, 5]
-
-# Generate all layers
+        # Feature layers (inner layer = 0)
     for stage, num_blocks in stages:
         for block in range(num_blocks):
-            for inner in inner_layers:
-                target_layers.append(f'features.{stage}.{block}.block.{inner}')
+                target_layers.append(f'features.{stage}.{block}.block.0')
+#     target_layers.append('classifier.2')   # Linear layer
+#     print('Target layers:', target_layers)
+#     quit()
+    
+    #----Target_layers_code_part_end-------------
 
-# Add classifier
-    target_layers.append('classifier.2')
-#----Trget_layers_code_part_end-------------
-#----CV_dims_code_part_start----------------
+    #----CV_dims_code_part_start----------------
     cv_dims = {}
 
-# Stem
-    cv_dims['features.0.0'] = 32
+    # Only inner layer 0
+    inner_dim = 96  # dimension for layer 0
 
-# Stage configuration
-    stages = [
-        (1, 3),   # Stage 1
-        (3, 3),   # Stage 2
-        (5, 27),  # Stage 3
-        (7, 3),   # Stage 4
-]
-
-# Inner layer → dimension mapping
-    inner_dim_map = {
-        0: 96,   # Conv
-        3: 192,  # Linear
-        5: 192   # Linear
-}
-# Generate automatically
-    for stage, num_blocks in stages:
-        for block in range(num_blocks):
-            for inner, dim in inner_dim_map.items():
-                layer_name = f'features.{stage}.{block}.block.{inner}'
-                cv_dims[layer_name] = dim
-# Classifier
-    cv_dims['classifier.2'] = 96
-
-#------cv_dims_code_part_end-------------
+    for _l in target_layers:
+        cv_dims[_l] = inner_dim
+        
+    
+    #------cv_dims_code_part_end-------------
 
     svd_rank = 300
     n_cluster = 4 
@@ -189,66 +164,73 @@ if __name__ == "__main__":
                 )
         sample_in = ds._dss['CIFAR100-train-convnext_small'][0]['image']
 
-#--------svds_code_part_start----------------
-    svds = {}
+        #--------svds_code_part_start----------------
+        
+        svds = {}
 
-    # Stem (Conv layer)
-    svds['features.0.0'] = Conv2dToeplitzSVD(
-        path=svds_path,
-        layer='features.0.0',
-        model=model,
-        rank=svd_rank,
-        cv_dim=cv_dims['features.0.0'],
-        sample_in=sample_in,
-    )
+        # -----------------------------
+        # ✅ Stem (Conv layer)
+        # -----------------------------
+        svds['features.0.0'] = Conv2dToeplitzSVD(
+            path=svds_path,
+            layer='features.0.0',
+            model=model,
+            rank=svd_rank,
+            cv_dim=cv_dims['features.0.0'],
+            sample_in=sample_in,
+        )
 
-    # Stage configuration
-    stages = [
-        (1, 3),
-        (3, 3),
-        (5, 27),
-        (7, 3),
-    ]
+        # -----------------------------
+        # Define stages
+        # -----------------------------
+        stages = [
+            (1, 3),   # Stage 1
+            (3, 3),   # Stage 2
+            (5, 27),  # Stage 3
+            (7, 3)    # Stage 4
+        ]
 
-    # Generate layers
-    for stage, num_blocks in stages:
-        for block in range(num_blocks):
-            for inner in [0, 3, 5]:
-                layer_name = f'features.{stage}.{block}.block.{inner}'
-                if inner == 0:
-                    svds[layer_name] = Conv2dToeplitzSVD(
-                        path=svds_path,
-                        layer=layer_name,
-                        model=model,
-                        rank=svd_rank,
-                        cv_dim=cv_dims[layer_name],
-                        sample_in=sample_in,
-                    )
-                else:
-                    svds[layer_name] = LinearSVD(
-                        path=svds_path,
-                        layer=layer_name,
-                        model=model,
-                        rank=svd_rank,
-                        cv_dim=cv_dims[layer_name],
-                        sample_in=sample_in,
-                    )
+        # -----------------------------
+        # ✅ Conv layers (block.0)
+        # -----------------------------
+        for stage, num_blocks in stages:
+            for block in range(num_blocks):
+                layer_name = f'features.{stage}.{block}.block.0'
 
-    # Classifier (Linear)
-    svds['classifier.2'] = LinearSVD(
-        path=svds_path,
-        layer='classifier.2',
-        model=model,
-        rank=svd_rank,
-        cv_dim=cv_dims['classifier.2'],
-        verbose=verbose
-    )
-#--------svds_code_part_end------------------
+                svds[layer_name] = Conv2dToeplitzSVD(
+                    path=svds_path,
+                    layer=layer_name,
+                    model=model,
+                    rank=svd_rank,
+                    cv_dim=cv_dims[layer_name],
+                    sample_in=sample_in,
+                    
+                )
+
+        # -----------------------------
+        # ✅ Classifier Linear layers
+        # -----------------------------
+        # linear_layers = ['classifier.2']
+
+        # for layer_name in linear_layers:
+        #     svds[layer_name] = LinearSVD(
+        #         path=svds_path,
+        #         layer=layer_name,
+        #         model=model,
+        #         rank=svd_rank,
+        #         cv_dim=cv_dims[layer_name],   # keeping consistent with your setup
+        #         verbose=verbose
+        # )
+
+       
+    #---------End of this part---------------
     print('time: ', time()-t0)
-    quit()
-    # #--------------------------------
-    # # CoreVectors 
-    # #--------------------------------
+    
+    
+# #--------svds_code_part_end------------------
+#     # #--------------------------------
+#     # # CoreVectors 
+#     # #--------------------------------
     
     corevecs = CoreVectors(
             path = cvs_path,
@@ -275,16 +257,16 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
 
-    if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
-        cv.normalize_corevectors(
-                wrt = 'CIFAR100-train-convnext_small',
-                to_file = cvs_path/(cvs_name+'.normalization.pt'),
-                #from_file = cvs_path/(cvs_name+'.normalization.pt'),
-                #loaders = ['CIFAR100-val', 'CIFAR100-test'],
-                batch_size = bs,
-                n_threads = n_threads,
-                verbose=verbose
-                )
+        if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
+            cv.normalize_corevectors(
+                    wrt = 'CIFAR100-train-convnext_small',
+                    to_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
+                    #loaders = ['CIFAR100-val', 'CIFAR100-test'],
+                    batch_size = bs,
+                    n_threads = n_threads,
+                    verbose=verbose
+                    )
 
     #--------------------------------
     # Peepholes
