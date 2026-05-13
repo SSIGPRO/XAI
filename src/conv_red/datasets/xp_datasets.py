@@ -16,6 +16,7 @@ from peepholelib.models.model_wrap import ModelWrap
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.SVHN import SVHN 
 from peepholelib.datasets.Places import Places 
+from peepholelib.datasets.MNIST import MNIST
 from peepholelib.datasets.textures import Textures 
 from peepholelib.datasets.parsedDataset import ParsedDataset 
 from peepholelib.datasets.functional.samplers import random_subsampling 
@@ -81,6 +82,10 @@ if __name__ == "__main__":
                 path = places_path,
                 seed = seed
                 ),
+            'MNIST': MNIST(
+                path = mnist_path,
+                seed = seed
+                ),
             'Textures': Textures(
                 path = textures_path,
                 seed = seed
@@ -90,8 +95,8 @@ if __name__ == "__main__":
     _dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 0.001
-                ) for k in _dss.keys()
+                perc = 0.5
+                ) for k in _dss.keys() if 'Textures' not in k 
             }
 
     #######################

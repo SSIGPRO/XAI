@@ -9,6 +9,7 @@ from statistics import geometric_mean as geomean
 import pandas as pd
 import seaborn as sb
 from matplotlib import pyplot as plt
+from matplotlib.lines import Line2D
 
 # torch
 import torch
@@ -30,19 +31,20 @@ def plot_isometrics(**kwargs):
     lb_y = kwargs.get('lb_y', 0)
     ub_y = kwargs.get('ub_y', 1)
 
-    auc_ood = r'$\overline{\Lambda}_{\rm{OoD}}$'
-    auc_aa = r'$\overline{\Lambda}_{\rm{AA}}$'
-
     isos = torch.linspace(step, 1, int(1/step))
     for iso in isos:
         x = torch.linspace(1/n_points, 1, n_points)
-        y = iso/x
-        idx = torch.logical_and(x <= 1, y <= 1)
+        y = (iso**2)/x
+
+        # filtering in range
+        idx_x = torch.logical_and(x >= lb_x , x <= ub_x)
+        idx_y = torch.logical_and(y >= lb_y , y <= ub_y)
+        idx = torch.logical_and(idx_x, idx_y)
         x = x[idx]
         y = y[idx]
-        plt.plot(x, y, c='xkcd:light grey', alpha=0.5, lw=0.2)
-        plt.text(x[-1], y[-1], f'{iso:.1f}', c='xkcd:light grey', alpha=0.5, size='small')
-    plt.legend(f'{auc_ood}.{auc_aa} isometrics')
+        if len(x) > 0 and len(y) > 0:
+            plt.plot(x, y, c='xkcd:light grey', alpha=0.5, lw=0.2)
+            plt.text(x[-1], y[-1], f'{iso:.2f}', c='xkcd:light grey', alpha=0.5, size='small')
     return
 
 
@@ -79,8 +81,12 @@ if __name__ == "__main__":
 
     df = pd.concat(dfs, ignore_index=True)
     df = pd.concat([df, best_configs], ignore_index=True)
+
+    # latex like names
     auc_ood = r'$\overline{\Lambda}_{\rm{OoD}}$'
     auc_aa = r'$\overline{\Lambda}_{\rm{AA}}$'
+    auc_all = r'$\overline{\Lambda}_{\rm{all}}$'
+
     df = df.rename(columns={'AUC OoD': auc_ood, 'AUC AA': auc_aa})
 
     # plotting
@@ -103,6 +109,7 @@ if __name__ == "__main__":
             ub_x = df[auc_ood].max(),
             lb_y = df[auc_aa].min(),
             ub_y = df[auc_aa].max(),
+            step = 0.05,
             )
 
     grid.map(
@@ -113,8 +120,17 @@ if __name__ == "__main__":
             s = 50,
             )
 
+    # add the isometrics to the legend
     grid.set_titles('{col_name} | {row_name}')
     grid.add_legend()
+    ax = plt.gca()
+    leg = ax.legend(
+            handles = [Line2D([0],[0], c='xkcd:light grey', lw=0.3, alpha=0.9, label=f'{auc_all}\nisometrics')],
+            loc = 'upper left',
+            bbox_to_anchor = (1.05, 0.6),
+            frameon = False
+            )
+    ax.add_artist(leg)  
 
     plots_path.mkdir(parents=True, exist_ok=True)
     plt.savefig((plots_path/f'aucs.png').as_posix(), dpi=300, bbox_inches='tight')

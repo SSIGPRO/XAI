@@ -42,9 +42,12 @@ cifar_path = '/srv/newpenny/dataset/CIFAR100'
 cifarc_path = '/srv/newpenny/dataset/CIFAR-100-C'
 svhn_path = '/srv/newpenny/dataset/SVHN' 
 places_path = '/srv/newpenny/dataset/Places365'
+mnist_path = '/srv/newpenny/dataset/MNIST'
 textures_path = '/srv/newpenny/dataset/DTD'
 
 ds_path = Path(args.data_path)/'datasets'
+
+model_path = Path(args.data_path)/'models'
 
 svds_path = Path(args.data_path)/args.model/'svds'/args.reduction
 
@@ -72,7 +75,7 @@ verbose = True
 n_classes = 100
 bs_base = 2**10
 bs_atk_scale = 2**-4
-tune_num_samples = 15 
+tune_num_samples = 50 
 
 #--------------------------------
 # Defs 
@@ -85,6 +88,8 @@ loaders = [
         'SVHN-test',
         'Places365-val',
         'Places365-test',
+        'MNIST-val',
+        'MNIST-test',
         'Textures-val',
         'Textures-test',
         ]
@@ -101,6 +106,10 @@ inference_names = {
         'SVHN-test': [args.model],
         'Places365-val': [args.model],
         'Places365-test': [args.model],
+        'MNIST-val': [args.model],
+        'MNIST-test': [args.model],
         'Textures-val': [args.model],
         'Textures-test': [args.model],
         }
+
+cvs_names = {l: cvs_name for l in target_layers}

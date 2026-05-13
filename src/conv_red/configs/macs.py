@@ -62,6 +62,7 @@ def get_auc_kwargs_ood(model):
             'atk_loaders': [
                 'Places365-test-'+model,
                 'SVHN-test-'+model,
+                'MNIST-test-'+model,
                 'Textures-test-'+model,
                 ],
             'filter_key': None

@@ -88,7 +88,6 @@ if __name__ == "__main__":
     #--------------------------------
     corevecs = CoreVectors(
             path = cvs_path,
-            name = cvs_name,
             model = model,
             )
     
@@ -107,6 +106,7 @@ if __name__ == "__main__":
                 activations_parser = act_parser,
                 save_input = save_input,
                 save_output = save_output,
+                names = cvs_names,
                 batch_size = int(bs_base*bs_model_scale*bs_red_scale),
                 n_threads = n_threads,
                 verbose = verbose 
@@ -115,9 +115,6 @@ if __name__ == "__main__":
         if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
             cv.normalize_corevectors(
                     wrt = 'CIFAR100-train-'+args.model,
-                    to_file = cvs_path/(cvs_name+'.normalization.pt'),
-                    #from_file = cvs_path/(cvs_name+'.normalization.pt'),
-                    #loaders = ['CIFAR100-val', 'CIFAR100-test'],
                     batch_size = int(bs_base*bs_red_scale),
                     n_threads = n_threads,
                     verbose=verbose

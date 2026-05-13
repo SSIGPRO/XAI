@@ -62,6 +62,7 @@ def get_score_fns(model):
                 neg_loaders = {
                     'Places365-test-'+model: ['Places365-val-'+model],
                     'SVHN-test-'+model: ['SVHN-val-'+model],
+                    'MNIST-test-'+model: ['MNIST-val-'+model],
                     'Textures-test-'+model: ['Textures-val-'+model],
                     },
                 ),
@@ -84,12 +85,14 @@ def get_auc_kwargs_ood(model):
                 'DMD-ood': [
                     'Places365-val-'+model,
                     'SVHN-val-'+model,
+                    'MNIST-val-'+model,
                     'Textures-val-'+model,
                     ],
                 },
             'atk_loaders': [
                 'Places365-test-'+model,
                 'SVHN-test-'+model,
+                'MNIST-test-'+model,
                 'Textures-test-'+model,
                 ],
             'filter_key': None

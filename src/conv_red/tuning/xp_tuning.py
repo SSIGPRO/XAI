@@ -48,12 +48,12 @@ def peephole_wrap(config, **kwargs):
     _device = ray_get_device() 
 
     # concatenate config for creating unique ph name
-    _ph_name = ph_name
+    phs_names = {} 
     for _l, _c in config.items():
         if type(_c) == dict:
-            _ph_name += f'.{_l}'
+            phs_names[_l] = ''
             for _cn, _cv in _c.items():
-                _ph_name += f'.{_cn}.{_cv}'
+                phs_names[_l] += f'{_cn}{_cv}'
 
     #--------------------------------
     # instances
@@ -119,7 +119,6 @@ def peephole_wrap(config, **kwargs):
 
     peepholes = Peepholes(
             path = ph_path,
-            name = _ph_name,
             device = _device
             )
 
@@ -130,6 +129,8 @@ def peephole_wrap(config, **kwargs):
             target_modules = target_layers,
             batch_size = bs,
             drillers = drillers,
+            names = phs_names,
+            retry_load_time = 60,
             n_threads = 1,
             verbose = verbose 
             )
@@ -166,17 +167,19 @@ def peephole_wrap(config, **kwargs):
                 )
         
         report = {}
-        _aucs = []
+        _aucs_ood = []
         for k in auc_kwargs_ood['atk_loaders']:
             report['AUC '+k] = list(aucs_ood[k].values())[0]
-            _aucs.append(report['AUC '+k]) 
-        report['AUC OoD'] = geomean(_aucs)
+            _aucs_ood.append(report['AUC '+k]) 
+        report['AUC OoD'] = geomean(_aucs_ood)
 
-        _aucs = []
+        _aucs_aa = []
         for k in auc_kwargs_aa['atk_loaders']:
             report['AUC '+k] = list(aucs_aa[k].values())[0]
-            _aucs.append(report['AUC '+k]) 
-        report['AUC AA'] = geomean(_aucs)
+            _aucs_aa.append(report['AUC '+k]) 
+        report['AUC AA'] = geomean(_aucs_aa)
+
+        report['AUC general'] = geomean(_aucs_ood+_aucs_aa)
         
         print('Report: ', report)
 
@@ -190,23 +193,24 @@ if __name__ == "__main__":
     #--------------------------------
     # Instances 
     #--------------------------------
+
+    # dummy model to get instances of target layers
     dummy_model = ModelWrap(
             model = Model(),
             target_modules = target_layers,
             )
     
+    dummy_model.prepend_normalizer(
+            mean = normalization_mean,
+            std = normalization_std
+            )
+
     datasets = ParsedDataset(
             path = ds_path,
             )
 
     corevecs = CoreVectors(
             path = cvs_path,
-            name = cvs_name,
-            )
-
-    dummy_model.prepend_normalizer(
-            mean = normalization_mean,
-            std = normalization_std
             )
 
     with datasets as ds, corevecs as cv: 
@@ -219,6 +223,7 @@ if __name__ == "__main__":
 
         cv.load_only(
                 loaders = list(ds._dss.keys()),
+                names = cvs_names,
                 verbose = verbose 
                 ) 
 
@@ -248,9 +253,9 @@ if __name__ == "__main__":
         else:
             _prev_results_df = None
 
-        searcher = OptunaSearch(metric=['AUC OoD', 'AUC AA'], mode=['max', 'max'])
+        searcher = OptunaSearch(metric=['AUC general'], mode=['max'])
         algo = ConcurrencyLimiter(searcher, max_concurrent=4)
-        scheduler = AsyncHyperBandScheduler(grace_period=5, max_t=100, metric='AUC OoD', mode='max') 
+        scheduler = AsyncHyperBandScheduler(grace_period=5, max_t=100, metric='AUC general', mode='max') 
 
         trainable = tune.with_resources(
                 partial(

@@ -71,7 +71,6 @@ if __name__ == "__main__":
     #--------------------------------
     corevecs = CoreVectors(
             path = cvs_path,
-            name = cvs_name,
             model = model,
             )
     
@@ -112,18 +111,17 @@ if __name__ == "__main__":
                 reducer = reducer
                 )
     
-    # concatenate config for creating unique ph name
+    # create phs names from configs
     # same as tuning
-    _phs_name = phs_name
+    phs_names = {} 
     for _l, _c in hyperps.items():
         if type(_c) == dict:
-            _phs_name += f'.{_l}'
+            phs_names[_l] = ''
             for _cn, _cv in _c.items():
-                _phs_name += f'.{_cn}.{_cv}'
+                phs_names[_l] += f'{_cn}{_cv}'
 
     peepholes = Peepholes(
             path = phs_path,
-            name = _phs_name,
             device = device
             )
 
@@ -137,6 +135,7 @@ if __name__ == "__main__":
 
         cv.load_only(
                 loaders = list(ds._dss.keys()),
+                names = cvs_names,
                 verbose = verbose
                 ) 
 
@@ -157,6 +156,7 @@ if __name__ == "__main__":
                     target_modules = target_layers,
                     batch_size = bs,
                     drillers = drillers,
+                    names = phs_names,
                     n_threads = n_threads,
                     verbose = verbose 
                     )

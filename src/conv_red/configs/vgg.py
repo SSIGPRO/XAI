@@ -1,14 +1,15 @@
 # Torch stuff
 from torchvision.models import vgg16 as Model
+from torchvision.models import VGG16_Weights as pre_train_weights
 
 # Peepholelib stuff
 from peepholelib.datasets.functional.transforms import vgg16_transform as transform
+from peepholelib.datasets.functional.transforms import vgg16_cifar_augmentations as augmentation 
 
 #------------------
 # Paths 
 #------------------
-model_path = '/srv/newpenny/XAI/models'
-model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
+model_name = 'vgg16_cifar100.pt'
 
 #------------------
 # Defs 

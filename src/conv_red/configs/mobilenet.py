@@ -1,12 +1,15 @@
-# Peepholelib stuff
+# Torch stuff
 from torchvision.models import mobilenet_v2 as Model
+from torchvision.models import MobileNet_V2_Weights as pre_train_weights
+
+# Peepholelib stuff
 from peepholelib.datasets.functional.transforms import mobilenet_v2_transform as transform
+from peepholelib.datasets.functional.transforms import mobilenet_v2_cifar10_augmentations as augmentation 
 
 #------------------
 # Paths 
 #------------------
-model_path = '/srv/newpenny/XAI/models'
-model_name = 'CN_model=mobilenet_v2_dataset=CIFAR100_optim=Adam_scheduler=RoP_lr=0.001_factor=0.1_patience=5.pth'
+model_name = 'mobilenet_cifar100.pt'
 
 #------------------
 # Defs 
