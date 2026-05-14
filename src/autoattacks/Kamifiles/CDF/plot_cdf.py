@@ -8,7 +8,7 @@ sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
 # ── Paths ──────────────────────────────────────────────────────────────
 ds_base = "/srv/newpenny/XAI/generated_data/Kami_attacks/datasets/CIFAR100"
-ph_base = "/srv/newpenny/XAI/generated_data/Kami_attacks/CIFAR100_WRN28-robust/peepholes/peepholes"
+ph_base = "/srv/newpenny/XAI/generated_data/Kami_attacks/CIFAR100_WRN28-standard/peepholes/peepholes"
 
 # ── 1. Load test labels ────────────────────────────────────────────────
 test_td     = PersistentTensorDict.from_h5(f"{ds_base}/dss.CIFAR100-test")
@@ -16,10 +16,10 @@ test_labels = test_td['label'].numpy()
 print("Test labels loaded:", test_labels.shape)
 
 # ── 2. Load CDF scores ─────────────────────────────────────────────────
-layer = 'logits' #logits for robust, fc for standard
-clean_ph   = PersistentTensorDict.from_h5(f"{ph_base}_cdf.svd.CIFAR100-test-WRN28-robust")
-apgd_ce_ph = PersistentTensorDict.from_h5(f"{ph_base}_cdf.svd.CIFAR100-test-APGD-ce-WRN28-robust")
-apgd_t_ph  = PersistentTensorDict.from_h5(f"{ph_base}_cdf.svd.CIFAR100-test-APGD-t-WRN28-robust")
+layer = 'block1.layer.2.conv1' #logits for robust, fc for standard
+clean_ph   = PersistentTensorDict.from_h5(f"{ph_base}_cdf.svd.CIFAR100-test-WRN28-standard")
+apgd_ce_ph = PersistentTensorDict.from_h5(f"{ph_base}_cdf.svd.CIFAR100-test-APGD-ce-WRN28-standard")
+apgd_t_ph  = PersistentTensorDict.from_h5(f"{ph_base}_cdf.svd.CIFAR100-test-APGD-t-WRN28-standard")
 
 clean_S   = clean_ph[layer].numpy()
 apgd_ce_S = apgd_ce_ph[layer].numpy()
