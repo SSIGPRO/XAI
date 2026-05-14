@@ -29,7 +29,8 @@ from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2d
 # peepholes
 from peepholelib.peepholes.classifiers.tgmm import GMM as tGMM 
 from peepholelib.peepholes.peepholes import Peepholes
-
+from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
+from peepholelib.plots.conceptograms import *
 if __name__ == "__main__":
 #     use_cuda = torch.cuda.is_available()
 #     device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
@@ -37,11 +38,8 @@ if __name__ == "__main__":
     gpu_id = 2 # physical GPU index
     use_cuda = torch.cuda.is_available() and torch.cuda.device_count() > gpu_id
     device = torch.device(f"cuda:{gpu_id}" if use_cuda else "cpu")
-#     device = torch.device('cpu')  # Force GPU usage
-    print(f"Using {device} device")
-
-    #--------------------------------
-    # Directories definitions
+    #device = torch.device('cpu')  # Force GPU usage
+    print(f"Using {device} device")    # Directories definitions
     #--------------------------------
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
     ds_path = '/home/arshakumari/repos/XAI/data/datasets'  #Path.cwd()/'../data/datasets'
@@ -332,3 +330,170 @@ if __name__ == "__main__":
                 n_threads = n_threads,
                 verbose = verbose
                 )
+#----------Protoclass-----------
+        scores, protoclasses = proto_score(
+                        datasets = ds,
+                        peepholes = ph,
+                        proto_key = 'CIFAR100-train-convnext_small',
+                        verbose = verbose
+                        )
+        print('Protoclass scores: ', scores)
+        print('Protoclasses: ', protoclasses)
+        print(protoclasses.shape)
+        
+#-----------------------------------
+#        Conceptogram plot
+#-----------------------------------
+# -----------------------------------
+# Plot Conceptograms
+# -----------------------------------
+
+        # Get CIFAR100 class names
+        class_names = Cifar100.get_classes(
+        meta_path=Path(cifar_path)/'cifar-100-python/meta'
+        )
+
+        # Convert list -> dictionary
+        classes_dict = {i: name for i, name in enumerate(class_names)}
+
+        # Path to save plots
+        plot_path = Path.cwd() / "../data/conceptogram_plots"
+
+        # Select sample indexes to visualize
+        samples_to_plot = [0, 1, 2, 3, 4]
+
+        # Call plotting function
+        plot_conceptogram(
+        path=plot_path,
+        name='conceptogram',
+        datasets=ds,
+        peepholes=ph,
+        loaders=['CIFAR100-test-convnext_small'],
+        samples=samples_to_plot,
+        target_modules=target_layers,
+        protoclasses=protoclasses,
+        scores=scores,
+        classes=classes_dict,
+        ticks=target_layers,
+        krows=5,
+        verbose=True
+        )
+        print("Conceptogram plots saved!")
+#-----------------------------------
+#-----------------------------------
+#       Plot of one class heatmap
+#-----------------------------------
+        # import matplotlib.pyplot as plt
+        # import numpy as np
+
+        # class_id = 30
+
+        # proto = protoclasses[class_id].cpu().numpy()
+
+        # # Normalize for better visibility
+        # proto = (proto - proto.min()) / (proto.max() - proto.min())
+
+        # plt.figure(figsize=(14,8))
+
+        # plt.imshow(proto, aspect='auto', cmap='viridis')
+
+        # plt.colorbar(label='Activation Score')
+
+        # plt.xlabel("Feature Dimension")
+        # plt.ylabel("Prototype / Layer")
+
+        # plt.title(f"Protoclass Heatmap - Class {class_id}")
+
+        # plt.show(block=True)
+        # plt.savefig("proto_heatmap.png")
+        # print("saved")
+        
+# --------------------------------
+# Conceptograms
+# --------------------------------
+
+# conceptogram_path = Path.cwd() / '../data/conceptograms'
+
+# # CIFAR100 class names
+# class_names = Cifar100.get_classes(
+#     meta_path=Path(cifar_path) / 'cifar-100-python/meta'
+# )
+
+# # convert list -> dictionary
+# classes_dict = {i: cls for i, cls in enumerate(class_names)}
+
+# with datasets as ds, corevecs as cv, peepholes as ph:
+
+#     # --------------------------------
+#     # Load datasets
+#     # --------------------------------
+#     ds.load_only(
+#             loaders = loaders,
+#             transforms = _transforms,
+#             inference_names = _inference_names,
+#             verbose = verbose
+#             )
+
+#     # --------------------------------
+#     # Load corevectors
+#     # --------------------------------
+#     cv.load_only(
+#             loaders = list(ds._dss.keys()),
+#             verbose = True
+#             )
+
+#     # --------------------------------
+#     # Generate/load peepholes
+#     # --------------------------------
+#     ph.get_peepholes(
+#             datasets = ds,
+#             corevectors = cv,
+#             target_modules = target_layers,
+#             batch_size = bs,
+#             drillers = drillers,
+#             n_threads = n_threads,
+#             verbose = True
+#             )
+    
+#     # --------------------------------
+#     # Print available dataset keys
+#     # --------------------------------
+#     print(ds._dss.keys())
+
+#     # --------------------------------
+#     # Example samples to visualize
+#     # --------------------------------
+#     samples_to_plot = [0, 1, 2, 3]
+
+#     # --------------------------------
+#     # Plot conceptograms
+#     # --------------------------------
+#     plot_conceptogram(
+#             path = conceptogram_path,
+
+#             name = 'convnext_conceptogram',
+
+#             datasets = ds,
+
+#             peepholes = ph,
+
+#             loaders = ['CIFAR100-test-convnext_small'],
+
+#             samples = samples_to_plot,
+
+#             target_modules = target_layers,
+
+#             classes = classes_dict,
+
+#             ticks = target_layers,
+
+#             krows = 5,
+
+#             verbose = True
+#     )
+
+# print(type(ph._phs))
+# print(len(ph._phs))
+# print(ph._phs.keys())
+# test_ph = ph._phs['CIFAR100-test-convnext_small']
+# print(test_ph.keys())
