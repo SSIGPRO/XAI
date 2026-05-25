@@ -32,13 +32,14 @@ def _normalize_layers(m):
 # device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
 # print(f"Using {device} device")
 
-gpu_id = 5  # physical GPU index
+gpu_id = 3  # physical GPU index
 use_cuda = torch.cuda.is_available() and torch.cuda.device_count() > gpu_id
 device = torch.device(f"cuda:{gpu_id}" if use_cuda else "cpu")
 print(f"Using {device} device")
 
 cfg = {}
 n_classes = 100
+dataset_name = 'CIFAR100'
 transform = lambda x:x
 model_path = '/srv/newpenny/XAI/models'
 
@@ -49,7 +50,7 @@ model_name = 'wrn70_16_cifar100.pt'
 Model = WideResNet(depth=70, widen_factor=16, num_classes=n_classes, dropRate=0.0,)
 
 model = ModelWrap(
-            model = Model(),
+            model = Model,
             device = device
             )
 
@@ -79,12 +80,12 @@ cfg['standard'] ={
     }
 
 ### Robust Model
-model_name = 'Wang2023Better_WRN-70-16.pt' 
+model_name = 'Wang2023Better_WRN-70-16'
 
 Model = load_model(model_name = model_name, threat_model='Linf', dataset='cifar100', model_dir = model_path)
 
 model = ModelWrap(
-            model = Model(),
+            model = Model,
             device = device
             )
 

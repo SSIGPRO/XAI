@@ -21,7 +21,7 @@ if __name__ == "__main__":
     # Directories definitions
     #--------------------------------
     # overwrite bs 
-    bs = 512 
+    bs = 2048
                                             
     #--------------------------------
     # Creating attk dataset 
@@ -46,6 +46,20 @@ if __name__ == "__main__":
                 version = 'standard',
                 eps = 8/255,
                 attack_to_run = 'apgd-t'
+                ),
+        'FAB-t-'+args.model+'-'+args.version: myAutoAttack(
+                model = model,
+                norm = 'Linf',
+                version = 'standard',
+                eps = 8/255,
+                attack_to_run = 'fab-t'
+                ),
+        'Square-'+args.model+'-'+args.version: myAutoAttack(
+                model = model,
+                norm = 'Linf',
+                version = 'standard',
+                eps = 8/255,
+                attack_to_run = 'square'
                 ),
             }
 

@@ -36,10 +36,10 @@ if __name__ == "__main__":
         raise RuntimeError("Select a model <WRN28|WRN70>")
 
     base_path = Path(args.path)
-    ds_path   = base_path / 'datasets' / dataset_name
+    ds_path   = base_path / 'datasets_' / dataset_name
     verbose   = True
 
-    versions = ['robust','standard', ]
+    versions = ['standard', ] #'robust'
 
     dataset = ParsedDataset(
         path=ds_path
@@ -48,11 +48,11 @@ if __name__ == "__main__":
     for version in versions:
 
         model_name = f'{args.model}-{version}'
-        cvs_path = base_path / f'{dataset_name}_{model_name}' / 'corevectors'
+        cvs_path = base_path / f'{dataset_name}_{model_name}_' / 'corevectors'
         target_layers = cfg[version]['layers']['linear']
         inference_names = {
             f'{dataset_name}-train': [model_name],
-            f'{dataset_name}-test':  [model_name, f'APGD-ce-{model_name}', f'APGD-t-{model_name}'],
+            f'{dataset_name}-test':  [model_name, f'APGD-ce-{model_name}', f'APGD-t-{model_name}', f'FAB-t-{model_name}', f'Square-{model_name}'],
             }
         
         corevecs = CoreVectors(
@@ -69,11 +69,12 @@ if __name__ == "__main__":
 
             cv.load_only(
                 loaders=list(ds._dss.keys()),
+                names={layer: None for layer in target_layers},
                 verbose=verbose
             )
 
             clean_key = f'{dataset_name}-test-{model_name}'
-            atk_types = ['APGD-ce', 'APGD-t']
+            atk_types = ['APGD-ce', 'APGD-t', 'FAB-t', 'Square']
             atk_keys  = [f'{dataset_name}-test-{a}-{model_name}' for a in atk_types]
 
             # correctly classified by the clean model
@@ -149,6 +150,7 @@ if __name__ == "__main__":
                         f'success={n_success}, fail={n_fail}, tail={tail_size} dims',
                         fontsize=8
                     )
+                    ax.set_xlim(left=0)
                     ax.set_xlabel(f'Energy in last {tail_size} SVD components', fontsize=8)
                     ax.set_ylabel('Density', fontsize=8)
                     ax.grid(True, alpha=0.3)
@@ -189,6 +191,7 @@ if __name__ == "__main__":
                     f'correct={clean_result.sum().item()}, incorrect={(~clean_result).sum().item()}, tail={tail_size} dims',
                     fontsize=8
                 )
+                ax.set_xlim(left=0)
                 ax.set_xlabel(f'Energy in last {tail_size} SVD components', fontsize=8)
                 ax.set_ylabel('Density', fontsize=8)
                 ax.grid(True, alpha=0.3)

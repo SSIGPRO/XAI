@@ -18,9 +18,11 @@ inference_names = {
         f'{dataset_name}-val': [f'{model_name}'],
         f'{dataset_name}-test': 
             [
-                f'{model_name}', 
-                f'APGD-ce-{model_name}', 
-                f'APGD-t-{model_name}'
+                f'{model_name}',
+                f'APGD-ce-{model_name}',
+                f'APGD-t-{model_name}',
+                f'FAB-t-{model_name}',
+                f'Square-{model_name}'
             ]
         }
 
@@ -58,7 +60,7 @@ with dataset as ds:
                 verbose = verbose
                 )
 
-        sample_in = ds._dss[f'{dataset_name}-train']['image'][0:1]
+        sample_in = ds._dss[f'{dataset_name}-train'][0:1]['image'].squeeze(0)
 
         for _l in target_layers:
                 if 'fc' in _l or 'logits' in _l:
