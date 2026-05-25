@@ -4,6 +4,7 @@ from configs.common import *
 from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
+from peepholelib.coreVectors.dimReduction.svds.vit_linear_svd import ViTLinearSVD 
 from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
 
 target_layers = cfg[args.version]['layers']['linear']
@@ -63,12 +64,29 @@ with dataset as ds:
         sample_in = ds._dss[f'{dataset_name}-train'][0:1]['image'].squeeze(0)
 
         for _l in target_layers:
-                if 'fc' in _l or 'logits' in _l:
+                if 'head'  in _l or 'fc' in _l or 'logits' in _l:
                         reducers[_l] = LinearSVD(
                                         path = proj_path,
                                         layer = _l,
                                         model = model,
                                         cv_dim = cv_dims[_l],
+                                        rank = svd_rank,
+                                        verbose = verbose
+                                        )
+                        
+                elif 'mlp' in _l:
+
+                        if 'encoder' in _l:
+                                token_reduction = 'first'
+                        elif 'features' in _l:
+                                token_reduction = 'mean'
+                        
+                        reducers[_l] = ViTLinearSVD(
+                                        path = proj_path,
+                                        layer = _l,
+                                        model = model,
+                                        cv_dim = cv_dims[_l],
+                                        token_reduction= token_reduction,
                                         rank = svd_rank,
                                         verbose = verbose
                                         )

@@ -12,8 +12,10 @@ if args.model == 'WRN28':
     from configs.models.wrn28_10 import *
 elif args.model == 'WRN70':
     from configs.models.wrn70_16 import *
+elif args.model == 'ViT':
+    from configs.models.vit import *
 else:
-    raise RuntimeError('Select a model <WRN28|WRN70>\'')
+    raise RuntimeError('Select a model <WRN28|WRN70|ViT>\'')
 
 if args.version == 'standard':
     model = cfg['standard']['model']
@@ -30,21 +32,21 @@ model_name = f'{args.model}-{args.version}'
 # TODO: restruct this to have svds, corevector, .. etc at leaf folders
 ds_path = Path(args.path)/'datasets_'/f'{dataset_name}'
 
-proj_path = Path(args.path)/f'{dataset_name}_{model_name}_'/'dim_reduction'
+proj_path = Path(args.path)/f'{dataset_name}_{model_name}'/'dim_reduction'
 
-cvs_path = Path(args.path)/f'{dataset_name}_{model_name}_'/'corevectors'
+cvs_path = Path(args.path)/f'{dataset_name}_{model_name}'/'corevectors'
 
-drill_path = Path(args.path)/f'{dataset_name}_{model_name}_'/'drillers'
+drill_path = Path(args.path)/f'{dataset_name}_{model_name}'/'drillers'
 
-phs_path = Path(args.path)/f'{dataset_name}_{model_name}_'/'peepholes'
+phs_path = Path(args.path)/f'{dataset_name}_{model_name}'/'peepholes'
 
-tune_storage_path = Path(args.path)/'tuning'/f'{dataset_name}_{model_name}_'
+tune_storage_path = Path(args.path)/'tuning'/f'{dataset_name}_{model_name}'
 
-scores_file = Path(args.path)/f'{dataset_name}_{model_name}_'/'temp_scores'
+scores_file = Path(args.path)/f'{dataset_name}_{model_name}'/'temp_scores'
 
 hyper_params_file = phs_path/f'hyperparams.pickle'
 
-plots_path = Path(args.path)/f'{dataset_name}_{model_name}_'/'temp_plots'
+plots_path = Path(args.path)/f'{dataset_name}_{model_name}'/'temp_plots'
 
 #--------------------------------
 # Running
