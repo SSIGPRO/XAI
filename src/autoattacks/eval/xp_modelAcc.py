@@ -7,11 +7,16 @@ from configs.eval.model_eval import *
 
 if __name__ == "__main__":
 
-    loader = f'{dataset_name}-test.{args.model}-{args.version}'
-
+    base_loader = f'{dataset_name}-test'
+    inf_name = f'{args.model}-{args.version}'
+    inf_loader = f'{base_loader}-{inf_name}'
+    print(model._model)
+    quit()
     with dataset as ds:
         ds.load_only(
-            loaders = [loader],
+            loaders = [base_loader],
+            inference_names = {base_loader: [inf_name]},
             verbose = verbose
         )
-        print((ds._dss[loader]['result'].sum()/len(ds._dss[loader]['result']))*100) 
+        
+        print((ds._dss[inf_loader]['result'].sum()/len(ds._dss[inf_loader]['result']))*100)

@@ -9,7 +9,6 @@ sys.path.insert(0, (Path.home()/'repos/XAI/src/autoattacks').as_posix())
 # datasets
 from peepholelib.datasets.functional.inference_fns import img_classification_atks as img_cls_atk_inf 
 from peepholelib.datasets.parsedDataset import ParsedDataset 
-from peepholelib.datasets.functional.transforms import TransformWrap 
 
 # ATK dataset
 from peepholelib.adv_atk.AutoAttack import myAutoAttack
@@ -21,7 +20,7 @@ if __name__ == "__main__":
     # Directories definitions
     #--------------------------------
     # overwrite bs 
-    bs = 2048
+    bs = 128
                                             
     #--------------------------------
     # Creating attk dataset 

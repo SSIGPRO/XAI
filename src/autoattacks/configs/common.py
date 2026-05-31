@@ -3,7 +3,7 @@ import argparse
 print('Loading common configuration...')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-m', '--model',  choices=['WRN28','WRN70'], default='WRN28')
+parser.add_argument('-m', '--model',  choices=['WRN28','WRN70','XCiT', 'ConvNext'], default='WRN28')
 parser.add_argument('-v', '--version', choices=['standard', 'robust'], default='standard')
 parser.add_argument('-p', '--path', default=Path('/srv/newpenny/XAI/generated_data/attacks').as_posix())
 args, remaining_argv = parser.parse_known_args()
@@ -12,10 +12,12 @@ if args.model == 'WRN28':
     from configs.models.wrn28_10 import *
 elif args.model == 'WRN70':
     from configs.models.wrn70_16 import *
-elif args.model == 'ViT':
-    from configs.models.vit import *
+elif args.model == 'XCiT':
+    from configs.models.xcit_l12 import *
+elif args.model == 'ConvNext':
+    from configs.models.convnext_l import *
 else:
-    raise RuntimeError('Select a model <WRN28|WRN70|ViT>\'')
+    raise RuntimeError('Select a model <WRN28|WRN70|XCiT|ConvNext>\'')
 
 if args.version == 'standard':
     model = cfg['standard']['model']
@@ -30,7 +32,7 @@ transforms = {
 
 model_name = f'{args.model}-{args.version}'
 # TODO: restruct this to have svds, corevector, .. etc at leaf folders
-ds_path = Path(args.path)/'datasets_'/f'{dataset_name}'
+ds_path = Path(args.path)/'datasets'/f'{dataset_name}'
 
 proj_path = Path(args.path)/f'{dataset_name}_{model_name}'/'dim_reduction'
 

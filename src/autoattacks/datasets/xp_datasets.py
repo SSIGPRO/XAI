@@ -36,10 +36,9 @@ if __name__ == "__main__":
 
     with dataset as ds:
 
-            
         ds.parse_dataset(
                 dataset_wraps = dss,
-                #ds_samplers = dss_samplers, 
+                ds_samplers = dss_samplers,
                 keys_to_copy = ['image', 'label'],
                 batch_size = bs_base,
                 n_threads = n_threads,

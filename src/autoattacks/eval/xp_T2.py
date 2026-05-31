@@ -18,11 +18,12 @@ from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.coreVectors.coreVectors import CoreVectors
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-m', '--model', choices=['WRN28', 'WRN70', 'XCiT'], default='WRN28')
+parser.add_argument('-m', '--model', choices=['WRN28', 'WRN70'], default='WRN28')
 parser.add_argument('-s', '--size', type=int, default=10)
 parser.add_argument('-p', '--path', default=Path('/srv/newpenny/XAI/generated_data/attacks').as_posix())
 args, _ = parser.parse_known_args()
 tail_size = args.size
+eps = 1e-12
 
 from configs.common import *
 
@@ -32,10 +33,8 @@ if __name__ == "__main__":
         from configs.models.wrn28_10 import *
     elif args.model == 'WRN70':
         from configs.models.wrn70_16 import *
-    elif args.model == 'XCiT':
-        from configs.models.xcit_l12 import *
     else:
-        raise RuntimeError("Select a model <WRN28|WRN70|XCiT>")
+        raise RuntimeError("Select a model <WRN28|WRN70>")
 
     base_path = Path(args.path)
     ds_path   = base_path / 'datasets' / dataset_name
@@ -51,10 +50,7 @@ if __name__ == "__main__":
 
         model_name = f'{args.model}-{version}'
         cvs_path = base_path / f'{dataset_name}_{model_name}' / 'corevectors'
-        if args.model == 'XCiT':
-                target_layers = cfg[version]['layers']
-        else:
-            target_layers = cfg[version]['layers']['linear']
+        target_layers = cfg[version]['layers']['linear']
         inference_names = {
             f'{dataset_name}-train': [model_name],
             f'{dataset_name}-test':  [model_name, f'APGD-ce-{model_name}', f'APGD-t-{model_name}', f'FAB-t-{model_name}', f'Square-{model_name}'],
@@ -78,6 +74,7 @@ if __name__ == "__main__":
                 verbose=verbose
             )
 
+            train_key = f'{dataset_name}-train-{model_name}'
             clean_key = f'{dataset_name}-test-{model_name}'
             atk_types = ['APGD-ce', 'APGD-t', 'FAB-t', 'Square']
             atk_keys  = [f'{dataset_name}-test-{a}-{model_name}' for a in atk_types]
@@ -85,9 +82,15 @@ if __name__ == "__main__":
             # correctly classified by the clean model
             clean_result = ds._dss[clean_key]['result'].bool()  # [N]
 
-            # tail energy: squared projection onto the last `tail_size` SVD directions (lowest SVs)
-            def tail_energy(cv_tensor):
-                return cv_tensor[:, -tail_size:].pow(2).sum(dim=-1).cpu()  # [N]
+            # Train-normalized tail energy:
+            # sum_j z_j^2 / E_train[z_j^2] over the last `tail_size` SVD directions.
+            def tail_direction_energy(cv_tensor):
+                return cv_tensor[:, -tail_size:].pow(2).mean(dim=0).clamp_min(eps)
+
+            def normalized_tail_energy(cv_tensor, direction_energy):
+                direction_energy = direction_energy.to(device=cv_tensor.device, dtype=cv_tensor.dtype)
+                tail = cv_tensor[:, -tail_size:]
+                return (tail.pow(2) / direction_energy).sum(dim=-1).cpu()  # [N]
 
             cs = {'clean (correct)': 'xkcd:cobalt',
                   'attack success':  'xkcd:dark hot pink',
@@ -108,7 +111,8 @@ if __name__ == "__main__":
             clean_aucs = []
 
             for row, layer in enumerate(target_layers):
-                clean_energy = tail_energy(cv._corevds[clean_key][layer])  # [N]
+                direction_energy = tail_direction_energy(cv._corevds[train_key][layer])
+                clean_energy = normalized_tail_energy(cv._corevds[clean_key][layer], direction_energy)  # [N]
 
                 for col, (atk_name, atk_key) in enumerate(zip(atk_types, atk_keys)):
                     ax = axes[row, col]
@@ -117,7 +121,7 @@ if __name__ == "__main__":
                     success_mask = clean_result & ~atk_result   # was right → now wrong
                     fail_mask    = clean_result &  atk_result   # was right → still right
 
-                    atk_energy = tail_energy(cv._corevds[atk_key][layer])
+                    atk_energy = normalized_tail_energy(cv._corevds[atk_key][layer], direction_energy)
 
                     groups = {
                         'clean (correct)': clean_energy[success_mask],
@@ -140,7 +144,7 @@ if __name__ == "__main__":
                         fill=True, alpha=0.25, linewidth=1.2,
                     )
 
-                    # AUC: can tail energy separate clean-correct from attack-success?
+                    # AUC: can train-normalized tail energy separate clean-correct from attack-success?
                     e_clean = clean_energy[success_mask].numpy()
                     e_atk   = atk_energy[success_mask].numpy()
                     y_true  = np.concatenate([np.zeros(len(e_clean)), np.ones(len(e_atk))])
@@ -156,7 +160,7 @@ if __name__ == "__main__":
                         fontsize=8
                     )
                     ax.set_xlim(left=0)
-                    ax.set_xlabel(f'Energy in last {tail_size} SVD components', fontsize=8)
+                    ax.set_xlabel(f'Train-normalized energy in last {tail_size} SVD components', fontsize=8)
                     ax.set_ylabel('Density', fontsize=8)
                     ax.grid(True, alpha=0.3)
 
@@ -197,7 +201,7 @@ if __name__ == "__main__":
                     fontsize=8
                 )
                 ax.set_xlim(left=0)
-                ax.set_xlabel(f'Energy in last {tail_size} SVD components', fontsize=8)
+                ax.set_xlabel(f'Train-normalized energy in last {tail_size} SVD components', fontsize=8)
                 ax.set_ylabel('Density', fontsize=8)
                 ax.grid(True, alpha=0.3)
 
@@ -206,11 +210,11 @@ if __name__ == "__main__":
             )
             mean_auc_str += f'  |  clean (correct vs incorrect): mean AUC={np.mean(clean_aucs):.3f}'
             fig.suptitle(
-                f'{args.model} {version} — tail energy distribution (lower SVs, tail={tail_size})\n{mean_auc_str}',
+                f'{args.model} {version} — train-normalized tail energy distribution (lower SVs, tail={tail_size})\n{mean_auc_str}',
                 fontsize=10,
             )
             plt.tight_layout()
-            out_file = f'energy_kde_{args.model}_{version}.png'
+            out_file = f'normalized_tail_energy_kde_{args.model}_{version}.png'
             plt.savefig(out_file, dpi=150, bbox_inches='tight')
             plt.close(fig)
             print(f'Saved {out_file}')

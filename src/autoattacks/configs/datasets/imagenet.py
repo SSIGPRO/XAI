@@ -1,6 +1,5 @@
 from peepholelib.datasets.imagenet import ImageNet
 from peepholelib.datasets.functional.samplers import random_subsampling 
-from functools import partial
 
 seed = 29
 
@@ -27,9 +26,10 @@ loaders = [
         'ImageNet-test',
         ]
 
+def _imagenet_sampler(ds):
+    ds.__dataset__.pop('ImageNet-train', None)
+    random_subsampling(ds, perc={'ImageNet-val': 0.04, 'ImageNet-test': 0.2})
+
 dss_samplers = {
-    'ImageNet': partial(
-        random_subsampling, 
-        perc = [1, 0.04, 0.2] # train, val, test
-        ),
+    'ImageNet': _imagenet_sampler,
     }

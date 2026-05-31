@@ -9,9 +9,9 @@ if __name__ == "__main__":
 
     with corevecs as cv, dataset as ds:
         ds.load_only(
-                loaders = loaders,
+                loaders = analysis_loaders,
                 transforms = transforms,
-                inference_names = inference_names,
+                inference_names = analysis_inference_names,
                 verbose = verbose
                 )
 
@@ -19,6 +19,7 @@ if __name__ == "__main__":
         cv.get_coreVectors(
                 datasets = ds,
                 reducers = reducers,
+                names = corevector_names,
                 save_input = True,
                 save_output = False,
                 batch_size = bs_base,
@@ -26,12 +27,12 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
 
-        if not (cvs_path/(cvs_name+'.normalization.pt')).exists():
-                cv.normalize_corevectors(
-                        wrt = f'{dataset_name}-train-{model_name}',
-                        to_file = cvs_path/(cvs_name+'.normalization.pt'),
-                        #from_file = cvs_path/(cvs_name+'.normalization.pt'),
-                        batch_size = bs_base,
-                        n_threads = n_threads,
-                        verbose=verbose
-                        )
+        # if not (corevector_path/(cvs_name+'.normalization.pt')).exists():
+        #         cv.normalize_corevectors(
+        #                 wrt = f'{dataset_name}-train-{model_name}',
+        #                 to_file = corevector_path/(cvs_name+'.normalization.pt'),
+        #                 #from_file = corevector_path/(cvs_name+'.normalization.pt'),
+        #                 batch_size = bs_base,
+        #                 n_threads = n_threads,
+        #                 verbose=verbose
+        #                 )

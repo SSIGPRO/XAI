@@ -1,5 +1,4 @@
 # Python stuff
-from collections import defaultdict
 from pathlib import Path as Path
 
 # Torch stuff
@@ -16,13 +15,7 @@ from peepholelib.datasets.functional.transforms import means, stds
 from peepholelib.datasets.functional.transforms import TransformWrap 
 
 from configs.datasets.cifar import *
-
-def _normalize_layers(m):
-    return {
-        'linear':    m.get('Conv2d', []) + m.get('Linear', []),
-        'nonlinear': m.get('ReLU', []),
-        'batchnorm': m.get('BatchNorm2d', []),
-    }
+from configs.models.model_utils import get_linear_conv2d_layers
 
 #------------------
 # Device
@@ -62,21 +55,11 @@ model.load_checkpoint(
         verbose = True 
         )
 
-modules_by_type = defaultdict(list)
-
-for name, module in model._model.named_modules():
-    if name == "":
-        continue
-    modules_by_type[type(module).__name__].append(name)
-
-modules_by_type = dict(modules_by_type)
-
-modules_by_type.pop('Sequential'); modules_by_type.pop('NetworkBlock'); modules_by_type.pop('BasicBlock')
-modules_by_type = _normalize_layers(modules_by_type)
+target_layers = get_linear_conv2d_layers(model._model)
 
 cfg['standard'] ={
     'model': model, 
-    'layers': modules_by_type
+    'layers': target_layers
     }
 
 ### Robust Model
@@ -89,19 +72,9 @@ model = ModelWrap(
             device = device
             )
 
-modules_by_type = defaultdict(list)
-
-for name, module in model._model.named_modules():
-    if name == "":
-        continue
-    modules_by_type[type(module).__name__].append(name)
-
-modules_by_type = dict(modules_by_type)
-
-modules_by_type.pop('Sequential'); modules_by_type.pop('_BlockGroup'); modules_by_type.pop('_Block')
-modules_by_type = _normalize_layers(modules_by_type)
+target_layers = get_linear_conv2d_layers(model._model)
 
 cfg['robust'] ={
     'model': model, 
-    'layers': modules_by_type
+    'layers': target_layers
     }
