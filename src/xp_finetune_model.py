@@ -50,10 +50,10 @@ if __name__ == "__main__":
     #--------------------------------
 
     dataset = Cifar100(
-                    path = ds_path,
-                    std_transform = transform,
-                    aug_transform = augmentation
-                    )
+            path = ds_path,
+            std_transform = transform,
+            aug_transform = augmentation
+            )
 
     dataset.__load_data__()
 
@@ -150,8 +150,8 @@ if __name__ == "__main__":
     # Phase 1: Head-only Warm-up
     #----------------------------
 
-    bs = 2**7
-    iterations = 16
+    bs = 2**4
+    iterations = 2**2 
     num_epochs = 20
 
     ## DataLoader
@@ -167,13 +167,13 @@ if __name__ == "__main__":
 
     ## Optimizer & Scheduler
     trainable_params = model.get_trainable_parameters(
-            layers_to_train=[output_layer],
-            verbose=verbose
+            layers_to_train = [output_layer],
+            verbose = verbose
             )
 
     optimizer = AdamW(
             trainable_params,
-            lr=1e-3,          
+            lr = 1e-3,
             )
 
     warmup = LinearLR(optimizer, start_factor=0.1, total_iters=5)
@@ -181,8 +181,8 @@ if __name__ == "__main__":
 
     scheduler = SequentialLR(
             optimizer,
-            schedulers=[warmup, cosine],
-            milestones=[5]
+            schedulers = [warmup, cosine],
+            milestones = [5]
             )
     
     ## Trainer
@@ -196,12 +196,12 @@ if __name__ == "__main__":
             test_key = f'{name_dataset}-test',
             batch_size = bs,
             dataloader_kwargs = dl_kwargs,
-            max_epochs = 200,
+            max_epochs = 10,
             iterations = iterations,
             optimizer = optimizer,
             scheduler = scheduler,
-            save_every = 100,
-            early_stopping_patience = 10,
+            save_every = 5,
+            verbose = verbose
             )
     
     finetuner.fit()
@@ -210,19 +210,18 @@ if __name__ == "__main__":
     #-----------------------------------------------
     # Phase 2: Feature-extractor and Head finetuning
     #-----------------------------------------------
-    '''
-    bs = 2**7
+    bs = 2**4
     backbone_lr = 5e-5    
     head_lr = 1e-3             
     weight_decay = 0.05
 
     head_params = model.get_trainable_parameters(
-            layers_to_train=[f'model.{output_layer}'],
-            verbose=verbose
+            layers_to_train = [f'model.{output_layer}'],
+            verbose = verbose
             )
     backbone_params = model.get_trainable_parameters(
-            layers_to_train=layers_to_train,
-            verbose=verbose
+            layers_to_train = layers_to_train,
+            verbose = verbose
             )
 
     optimizer = AdamW(
@@ -248,34 +247,34 @@ if __name__ == "__main__":
             test_key = f'{name_dataset}-test',
             batch_size = bs,
             dataloader_kwargs = dl_kwargs,
-            max_epochs = 40,
-            iterations = 'full',
+            max_epochs = 20,
+            iterations = iterations,
             optimizer = optimizer,
             scheduler = scheduler,
-            save_every = 1,
-            early_stopping_patience = 10,
+            save_every = 5,
+            early_stopping_patience = 2,
+            verbose = verbose
             )
     
     finetuner.fit()
     finetuner.test()
-    '''
+
     #-----------------------------------------------
     # Phase 3: Finetune the whole model
     #-----------------------------------------------
     
     # after model is created / normalized
     trainable_params = model.get_trainable_parameters(
-            layers_to_train=None,
-            verbose=verbose
+            layers_to_train = None,
+            verbose = verbose
             )
-
     
     optimizer = AdamW(
             trainable_params,
-            lr=1e-4,              
-            weight_decay=0.05,    
-            betas=(0.9, 0.999),
-            eps=1e-8,
+            lr = 1e-4,              
+            weight_decay = 0.05,    
+            betas = (0.9, 0.999),
+            eps = 1e-8,
             )
 
     scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs-5)
@@ -292,12 +291,13 @@ if __name__ == "__main__":
             test_key = f'{name_dataset}-test',
             batch_size = bs,
             dataloader_kwargs = dl_kwargs,
-            max_epochs = 2000,
+            max_epochs = 30,
             iterations = iterations,
             optimizer = optimizer,
             scheduler = scheduler,
-            early_stopping_patience = 2000,
-            save_every = 100
+            early_stopping_patience = 2,
+            save_every = 5,
+            verbose = verbose
             )
     
     finetuner.fit()
