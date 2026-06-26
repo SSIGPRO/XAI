@@ -14,10 +14,8 @@ from cuda_selector import auto_cuda
 
 # Model
 from peepholelib.models.model_wrap import ModelWrap
-from peepholelib.models.model_wrap import get_in_activations as act_parser
 
-# dataset
-from peepholelib.datasets.cifar100 import Cifar100
+# datasets
 from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.datasets.functional.transforms import TransformWrap
 from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform
@@ -28,12 +26,12 @@ from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv
 from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 
 # peepholes
-from peepholelib.peepholes.DeepMahalanobisDistance.DMD import DeepMahalanobisDistance as DMD
 from peepholelib.peepholes.peepholes import Peepholes
+from peepholelib.peepholes.CoverageAnalysisMethods.MRC import MRC
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -42,25 +40,25 @@ if __name__ == "__main__":
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
     ds_path = Path.cwd()/'../data/datasets'
 
-    model_dir = '/srv/newpenny/XAI/models'
+    model_path = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
 
-    svds_path = Path.cwd()/'../data/svds'
-    cvs_path = Path.cwd()/'../data/corevectors'
-    cvs_name = 'corevectors'
+    svds_path  = Path.cwd()/'../data/svds'
+    cvs_path   = Path.cwd()/'../data/corevectors'
+    cvs_name  = 'corevectors'
 
     drill_path = Path.cwd()/'../data/drillers'
-    drill_name = 'DMD'
+    drill_name = 'MRC'
 
-    phs_path = Path.cwd()/'../data/peepholes'
-    phs_name = 'phs_dmd'
+    phs_path   = Path.cwd()/'../data/peepholes'
+    phs_name  = 'phs_mrc'
 
     # model / driller parameters
     n_classes = 100
-    bs = 256 
     svd_rank = 300
+    bs = 512
+    Q = 256   # number of MRC sub-ranges
     verbose = True
-
 
     # Peepholelib
     target_layers = [
@@ -126,7 +124,7 @@ if __name__ == "__main__":
 
     model.load_checkpoint(
             name = model_name,
-            path = model_dir,
+            path = model_path,
             verbose = verbose
             )
 
@@ -136,8 +134,10 @@ if __name__ == "__main__":
     datasets = ParsedDataset(path=ds_path)
 
     #--------------------------------
-    # SVDs
+    # SVDs  (Conv2dAvgKernelSVD for all conv layers)
     #--------------------------------
+
+
     svds = {
             'features.26': Conv2dAvgKernelSVD(
                 path = svds_path,
@@ -163,31 +163,28 @@ if __name__ == "__main__":
                 ),
             }
 
+    #--------------------------------
+    # CoreVectors
+    #--------------------------------
     corevecs = CoreVectors(
             path = cvs_path,
             model = model,
             )
 
     #--------------------------------
-    # Peepholes
+    # MRC drillers
     #--------------------------------
-    # ATTENTION: for DMD to work with the SVD dim reds, you need to set it to get the input activations, instead of the output ones (default)
     drillers = {}
-    for peep_layer in target_layers:
-        drillers[peep_layer] = DMD(
+    for layer in target_layers:
+        drillers[layer] = MRC(
                 path = drill_path,
-                name = f'{drill_name}.{peep_layer}',
-                target_module = peep_layer,
+                name = f'{drill_name}.{layer}.{n_classes}.{cv_dims[layer]}.Q{Q}',
+                target_module = layer,
                 nl_model = n_classes,
-                n_features = cv_dims[peep_layer],
-                model = model,
-                magnitude = 0.004,
-                reducer = svds[peep_layer],
-                std_transform = [0.229, 0.224, 0.225],
-                act_parser = act_parser, 
-                save_input = True,
-                save_output = False,
-                device = device,
+                n_features = cv_dims[layer],
+                Q = Q,
+                reducer = svds[layer],
+                device = device
                 )
 
     peepholes = Peepholes(
@@ -207,13 +204,13 @@ if __name__ == "__main__":
         cv.load_only(
                 loaders = list(ds._dss.keys()),
                 names = cv_names,
-                verbose = True
+                verbose = verbose
                 )
 
-        for drill_key, driller in drillers.items():
+        for layer, driller in drillers.items():
             if not driller.load():
                 t0 = time()
-                print(f'Fitting DMD for {drill_key}')
+                print(f'Fitting MRC for {layer}')
                 driller.fit(
                         datasets = ds,
                         corevectors = cv,
@@ -223,6 +220,9 @@ if __name__ == "__main__":
                 print(f'  fit time: {time()-t0:.1f}s')
                 driller.save()
 
+    #--------------------------------
+    # Peepholes
+    #--------------------------------
     with datasets as ds, corevecs as cv, peepholes as ph:
         ds.load_only(
                 loaders = loaders,
@@ -234,7 +234,7 @@ if __name__ == "__main__":
         cv.load_only(
                 loaders = list(ds._dss.keys()),
                 names = cv_names,
-                verbose = True
+                verbose = verbose
                 )
 
         ph.get_peepholes(
@@ -244,5 +244,6 @@ if __name__ == "__main__":
                 batch_size = bs,
                 drillers = drillers,
                 names = ph_names,
-                verbose = verbose,
+                verbose = verbose
                 )
+

@@ -27,8 +27,9 @@ from peepholelib.peepholes.peepholes import Peepholes
 
 # scoring
 from peepholelib.scores.protoclass import conceptogram_protoclass_score as proto_score
-from peepholelib.scores.model_confidence import  model_confidence_score as mconf_score 
-from peepholelib.scores.dmd import DMD_score as dmd_score 
+from peepholelib.scores.model_confidence import  model_confidence_score as mconf_score
+from peepholelib.scores.dmd import DMD_score as dmd_score
+from peepholelib.scores.CAM import CAM_score as cam_score
 
 # plotting
 from peepholelib.plots.confidence import plot_confidence
@@ -48,8 +49,8 @@ if __name__ == "__main__":
     ds_path = Path.cwd()/'../data/datasets'
 
     phs_path = Path.cwd()/'../data/peepholes'
-    phs_name = 'peepholes'
-    avg_name = 'phs_avg'
+    macs_phs_name = 'phs_macs'
+    dmd_phs_name = 'phs_dmd'
 
     plots_path = Path.cwd()/'temp_plots/xp_plots/'
     verbose = True 
@@ -66,31 +67,28 @@ if __name__ == "__main__":
     loaders = [
             'CIFAR100-train',
             'CIFAR100-val',
-            'CIFAR100-test', 
+            'CIFAR100-test',
             'CIFAR100-C-val-c0',
-            'CIFAR100-C-test-c0', 
+            'CIFAR100-C-test-c0',
+            'MNIST-val',
+            'MNIST-test',
+            'Textures-val',
+            'Textures-test',
             ]
 
-    _transforms = { 
-            k: TransformWrap(transform=ds_transform, input_key='image') for k in loaders 
+    _transforms = {
+            k: TransformWrap(transform=ds_transform, input_key='image') for k in loaders
             }
 
     _inference_names = {
             k: ['vgg'] for k in loaders
             }
+    _inference_names['CIFAR100-val'] += ['BIM', 'PGD']
+    _inference_names['CIFAR100-test'] += ['BIM', 'PGD']
 
+    ph_names = {l: macs_phs_name for l in target_layers}
+    dmd_names = {l: dmd_phs_name for l in target_layers}
 
-    ph_names = {
-            'features.26': phs_name,
-            'features.28': phs_name,
-            'classifier.0': phs_name,
-            }
-
-    avg_names = {
-            'features.7': avg_name,
-            'features.14': avg_name,
-            'features.28': avg_name,
-            }
     #--------------------------------
     # Datasets 
     #--------------------------------
@@ -130,7 +128,7 @@ if __name__ == "__main__":
 
         dmd_ph.load_only(
                 loaders = list(ds._dss.keys()),
-                names = avg_names,
+                names = dmd_names,
                 verbose = verbose
                 )
 
@@ -139,12 +137,14 @@ if __name__ == "__main__":
                 datasets = ds,
                 peepholes = ph,
                 proto_key = 'CIFAR100-train-vgg',
+                score_name = 'MACS',
                 verbose = verbose
                 )
-                                        
+
         scores = mconf_score(
                 datasets = ds,
                 append_scores = scores,
+                score_name = 'MSP',
                 verbose = verbose
                 )
 
@@ -154,10 +154,16 @@ if __name__ == "__main__":
                 pos_loader_test = 'CIFAR100-test-vgg',
                 neg_loaders = {
                     'CIFAR100-C-test-c0-vgg': ['CIFAR100-C-val-c0-vgg'],
+                    'MNIST-test-vgg': ['MNIST-val-vgg'],
+                    'Textures-test-vgg': ['Textures-val-vgg'],
+                    'CIFAR100-test-BIM': ['CIFAR100-val-BIM'],
+                    'CIFAR100-test-PGD': ['CIFAR100-val-PGD'],
                     },
                 append_scores = scores,
+                score_name = 'DMD-a',
+                verbose = verbose
                 )
-        
+
         # make plots
         plot_confidence(
                 datasets = ds,
@@ -166,7 +172,6 @@ if __name__ == "__main__":
                 path = plots_path,
                 verbose = verbose
                 )
-
         plot_calibration(
                 datasets = ds,
                 scores = scores,
@@ -181,17 +186,24 @@ if __name__ == "__main__":
                     'Proto-Class': 'CIFAR100-test-vgg',
                     'MSP': 'CIFAR100-test-vgg',
                     'DMD': 'CIFAR100-C-val-c0-vgg',
+                    #'CAM-Q1': 'CIFAR100-test-vgg',
                     },
-                ood_loaders = ['CIFAR100-C-test-c0-vgg'],
+                ood_loaders = [
+                    'CIFAR100-C-test-c0-vgg',
+                    'MNIST-test-vgg',
+                    'Textures-test-vgg',
+                    'CIFAR100-test-BIM',
+                    'CIFAR100-test-PGD',
+                    ],
                 path = plots_path,
                 verbose = verbose
                 )
 
         # plot conceptograms
-        idx = [2, 5]
+        idx = [2, 5, 15, 40, 86, 150]
         plot_conceptogram(
                 path = plots_path,
-                name = 'conceptogram',
+                name = 'conceptogram_macs',
                 datasets = ds,
                 peepholes = ph,
                 loaders = ['CIFAR100-test-vgg'],
@@ -202,3 +214,32 @@ if __name__ == "__main__":
                 scores = scores,
                 verbose = verbose,
                 )
+
+        plot_conceptogram(
+                path = plots_path,
+                name = 'conceptogram_dmd',
+                datasets = ds,
+                peepholes = dmd_ph,
+                loaders = ['CIFAR100-test-vgg'],
+                samples = idx,
+                target_modules = target_layers,
+                classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
+                protoclasses = protoclasses,
+                scores = scores,
+                verbose = verbose,
+                )
+        
+        '''
+        plot_conceptogram(
+                path = plots_path,
+                name = 'conceptogram_cam',
+                datasets = ds,
+                peepholes = cam_ph,
+                loaders = ['CIFAR100-test-vgg'],
+                samples = idx,
+                target_modules = target_layers,
+                classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
+                scores = scores,
+                verbose = verbose,
+                )
+        '''

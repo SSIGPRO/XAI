@@ -4,7 +4,6 @@ sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
 # python stuff
 from time import time
-from functools import partial
 
 # torch stuff
 import torch
@@ -25,7 +24,6 @@ from peepholelib.datasets.functional.transforms import vgg16_transform as ds_tra
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
-from peepholelib.coreVectors.dimReduction.svds.conv2d_toeplitz_svd import Conv2dToeplitzSVD
 from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
 
 # peepholes
@@ -43,10 +41,6 @@ if __name__ == "__main__":
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
     ds_path = Path.cwd()/'../data/datasets'
 
-    # model parameters
-    bs = 512 
-    n_threads = 1
-
     model_path = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
      
@@ -56,11 +50,16 @@ if __name__ == "__main__":
     cvs_name = 'corevectors'
 
     drill_path = Path.cwd()/'../data/drillers'
-    drill_name = 'classifier'
+    drill_name = 'GMM'
 
     phs_path = Path.cwd()/'../data/peepholes'
-    phs_name = 'peepholes'
+    phs_name = 'phs_macs'
     
+    # model / driller parameters
+    n_classes = 100
+    bs = 512 
+    svd_rank = 300
+    n_cluster = 300 
     verbose = True 
     
     # Peepholelib
@@ -71,9 +70,9 @@ if __name__ == "__main__":
             ]
     
     cv_dims = {
-            'features.26': 30,
-            'features.28': 50,
-            'classifier.0': 30,
+            'features.26': 300,
+            'features.28': 300,
+            'classifier.0': 300,
             }
     
     cv_names = {
@@ -81,9 +80,6 @@ if __name__ == "__main__":
             'features.28': cvs_name,
             'classifier.0': cvs_name,
             }
-
-    svd_rank = 300
-    n_cluster = 50 
 
     ph_names = {
             'features.26': phs_name,
@@ -96,7 +92,11 @@ if __name__ == "__main__":
             'CIFAR100-val',
             'CIFAR100-test',  
             'CIFAR100-C-val-c0',
-            'CIFAR100-C-test-c0' 
+            'CIFAR100-C-test-c0',
+            'MNIST-val',
+            'MNIST-test',
+            'Textures-val',
+            'Textures-test',
             ]
 
     _transforms = {
@@ -106,13 +106,12 @@ if __name__ == "__main__":
     _inference_names = {
             k: ['vgg'] for k in loaders
             }
-
-    n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta')) 
+    _inference_names['CIFAR100-val'] += ['BIM', 'PGD']
+    _inference_names['CIFAR100-test'] += ['BIM', 'PGD']
 
     #--------------------------------
     # Model 
     #--------------------------------
-
     model = ModelWrap(
             model = vgg16(),
             target_modules = target_layers,
@@ -134,87 +133,40 @@ if __name__ == "__main__":
     #--------------------------------
     # Datasets 
     #--------------------------------
-    
-    # Assuming we have a parsed dataset in ds_path
-    datasets = ParsedDataset(
-            path = ds_path,
-            )
+    datasets = ParsedDataset(path = ds_path)
 
     #--------------------------------
-    # SVDs 
+    # SVDs
     #--------------------------------
-    t0 = time()
-    with datasets as ds:
-        ds.load_only(
-                loaders = ['CIFAR100-train'],
-                transforms = _transforms,
-                inference_names = _inference_names,
+    svds = {
+            'features.26': Conv2dAvgKernelSVD(
+                path = svds_path,
+                layer = 'features.26',
+                model = model,
+                rank = svd_rank,
+                cv_dim = cv_dims['features.26'],
+                ),
+            'features.28': Conv2dAvgKernelSVD(
+                path = svds_path,
+                layer = 'features.28',
+                model = model,
+                rank = svd_rank,
+                cv_dim = cv_dims['features.28'],
+                ),
+            'classifier.0': LinearSVD(
+                path = svds_path,
+                layer = 'classifier.0',
+                model = model,
+                rank = svd_rank,
+                cv_dim = cv_dims['classifier.0'],
                 verbose = verbose
-                )
-        sample_in = ds._dss['CIFAR100-train-vgg'][0]['image']
+                ),
+            }
 
-        svds = {
-                'features.26': Conv2dToeplitzSVD(
-                    path = svds_path,
-                    layer = 'features.26',
-                    model = model,
-                    rank = svd_rank,
-                    cv_dim = cv_dims['features.26'],
-                    sample_in = sample_in,
-                    ),
-                'features.28': Conv2dAvgKernelSVD(
-                    path = svds_path,
-                    layer = 'features.28',
-                    model = model,
-                    rank = svd_rank,
-                    cv_dim = cv_dims['features.28'],
-                    ),
-                'classifier.0': LinearSVD(
-                    path = svds_path,
-                    layer = 'classifier.0',
-                    model = model,
-                    rank = svd_rank,
-                    cv_dim = cv_dims['classifier.0'],
-                    verbose = verbose
-                    ),
-                }
-    print('time: ', time()-t0)
-
-    #--------------------------------
-    # CoreVectors 
-    #--------------------------------
-    
     corevecs = CoreVectors(
             path = cvs_path,
             model = model,
             )
-    
-    with datasets as ds, corevecs as cv: 
-        ds.load_only(
-                loaders = loaders,
-                transforms = _transforms,
-                inference_names = _inference_names,
-                verbose = verbose
-                )
-
-        # computing the corevectors
-        cv.get_coreVectors(
-                datasets = ds,
-                reducers = svds,
-                save_input = True,
-                save_output = False,
-                names = cv_names,
-                batch_size = bs,
-                n_threads = n_threads,
-                verbose = verbose
-                )
-
-        cv.normalize_corevectors(
-                wrt = 'CIFAR100-train-vgg',
-                batch_size = bs,
-                n_threads = n_threads,
-                verbose=verbose
-                )
 
     #--------------------------------
     # Peepholes
@@ -223,7 +175,7 @@ if __name__ == "__main__":
     for peep_layer in target_layers:
         drillers[peep_layer] = tGMM(
                 path = drill_path,
-                name = f'{drill_name}.GMM.{peep_layer}.{n_classes}.{cv_dims[peep_layer]}.{n_cluster}',
+                name = f'{drill_name}.{peep_layer}.{n_classes}.{cv_dims[peep_layer]}.{n_cluster}',
                 target_module = peep_layer,
                 nl_classifier = n_cluster,
                 nl_model = n_classes,
@@ -241,7 +193,7 @@ if __name__ == "__main__":
             device = device
             )
 
-    # fitting classifiers
+    # fit MRC signatures
     with datasets as ds, corevecs as cv:
         ds.load_only(
                 loaders = loaders,
@@ -266,10 +218,7 @@ if __name__ == "__main__":
                         loader = 'CIFAR100-train-vgg',
                         verbose=verbose
                         )
-                print(f'Fitting time for {drill_key}  = ', time()-t0)
-
-                # save classifiers
-                print(f'Saving classifier for {drill_key}')
+                print(f'  fit time: {time()-t0:.1f}s')
                 driller.save()
 
     with datasets as ds, corevecs as cv, peepholes as ph:
@@ -293,6 +242,5 @@ if __name__ == "__main__":
                 batch_size = bs,
                 drillers = drillers,
                 names = ph_names,
-                n_threads = n_threads,
                 verbose = verbose
                 )

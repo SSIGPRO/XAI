@@ -95,10 +95,10 @@ if __name__ == "__main__":
                 path = cifarc_path,
                 seed = seed
                 ),
-            #'MNIST': MNIST(
-            #    path = mnist_path,
-            #    seed = seed
-            #    ),
+            'MNIST': MNIST(
+                path = mnist_path,
+                seed = seed
+                ),
             'Textures': Textures(
                 path = textures_path,
                 seed = seed
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     _dss_samplers = {
             k: partial(
                 random_subsampling, 
-                perc = 0.1
+                perc = 0.5
                 ) for k in _dss.keys()
             }
 
@@ -120,18 +120,22 @@ if __name__ == "__main__":
             'CIFAR100-C-train-c0',
             'CIFAR100-C-val-c0',
             'CIFAR100-C-test-c0',
-            'CIFAR100-C-train-c1',
-            'CIFAR100-C-val-c1',
-            'CIFAR100-C-test-c1',
-            'CIFAR100-C-train-c2',
-            'CIFAR100-C-val-c2',
-            'CIFAR100-C-test-c2',
-            'CIFAR100-C-train-c3',
-            'CIFAR100-C-val-c3',
-            'CIFAR100-C-test-c3',
-            'CIFAR100-C-train-c4',
-            'CIFAR100-C-val-c4',
-            'CIFAR100-C-test-c4',
+            #'CIFAR100-C-train-c1',
+            #'CIFAR100-C-val-c1',
+            #'CIFAR100-C-test-c1',
+            #'CIFAR100-C-train-c2',
+            #'CIFAR100-C-val-c2',
+            #'CIFAR100-C-test-c2',
+            #'CIFAR100-C-train-c3',
+            #'CIFAR100-C-val-c3',
+            #'CIFAR100-C-test-c3',
+            #'CIFAR100-C-train-c4',
+            #'CIFAR100-C-val-c4',
+            #'CIFAR100-C-test-c4',
+            'MNIST-val',
+            'MNIST-test',
+            'Textures-val',
+            'Textures-test',
             ]
 
     _transforms = {
@@ -139,16 +143,16 @@ if __name__ == "__main__":
             }
 
     atks = {
-            'CW': myCW(
-                model = model,
-                max_steps = 10,
-                ),
+            #'CW': myCW(
+            #    model = model,
+            #    max_steps = 10,
+            #    ),
             'BIM': myBIM(
                 model = model,
                 ),
-            'DF': myDeepFool(
-                model = model,
-                ),
+            #'DF': myDeepFool(
+            #    model = model,
+            #    ),
             'PGD': myPGD(
                 model = model,
                 ),
@@ -176,7 +180,6 @@ if __name__ == "__main__":
                 ds_samplers = _dss_samplers, 
                 keys_to_copy = ['image', 'label'],
                 batch_size = bs,
-                n_threads = 1,
                 verbose = verbose
                 ) 
 
@@ -184,12 +187,14 @@ if __name__ == "__main__":
                 inference_fns = {'vgg': partial(img_cls_inf, model=model)},
                 transforms = _transforms,
                 batch_size = bs,
-                n_threads = 1,
                 verbose = verbose
                 )
 
         ds.parse_inference(
-                loaders = ['CIFAR100-test-vgg'],
+                loaders = [
+                    'CIFAR100-val',
+                    'CIFAR100-test'
+                    ],
                 inference_fns = atks_inf_fns, 
                 transforms = _transforms,
                 batch_size = bs,

@@ -14,9 +14,8 @@ from cuda_selector import auto_cuda
 
 # Model
 from peepholelib.models.model_wrap import ModelWrap
-from peepholelib.models.model_wrap import get_in_activations as act_parser
 
-# dataset
+# datasets
 from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.datasets.functional.transforms import TransformWrap
@@ -27,13 +26,9 @@ from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
 from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 
-# peepholes
-from peepholelib.peepholes.DeepMahalanobisDistance.DMD import DeepMahalanobisDistance as DMD
-from peepholelib.peepholes.peepholes import Peepholes
-
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
-    device = torch.device(auto_cuda('utilization')) if use_cuda else torch.device("cpu")
+    device = torch.device(auto_cuda('memory')) if use_cuda else torch.device("cpu")
     print(f"Using {device} device")
 
     #--------------------------------
@@ -42,25 +37,17 @@ if __name__ == "__main__":
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
     ds_path = Path.cwd()/'../data/datasets'
 
-    model_dir = '/srv/newpenny/XAI/models'
+    bs = 512
+    n_threads = 1
+
+    model_path = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
 
     svds_path = Path.cwd()/'../data/svds'
     cvs_path = Path.cwd()/'../data/corevectors'
     cvs_name = 'corevectors'
 
-    drill_path = Path.cwd()/'../data/drillers'
-    drill_name = 'DMD'
-
-    phs_path = Path.cwd()/'../data/peepholes'
-    phs_name = 'phs_dmd'
-
-    # model / driller parameters
-    n_classes = 100
-    bs = 256 
-    svd_rank = 300
     verbose = True
-
 
     # Peepholelib
     target_layers = [
@@ -70,9 +57,9 @@ if __name__ == "__main__":
             ]
 
     cv_dims = {
-            'features.26': 300,
-            'features.28': 300,
-            'classifier.0': 300,
+            'features.26': 30,
+            'features.28': 50,
+            'classifier.0': 30,
             }
 
     cv_names = {
@@ -81,11 +68,7 @@ if __name__ == "__main__":
             'classifier.0': cvs_name,
             }
 
-    ph_names = {
-            'features.26': phs_name,
-            'features.28': phs_name,
-            'classifier.0': phs_name,
-            }
+    svd_rank = 300
 
     loaders = [
             'CIFAR100-train',
@@ -109,6 +92,8 @@ if __name__ == "__main__":
     _inference_names['CIFAR100-val'] += ['BIM', 'PGD']
     _inference_names['CIFAR100-test'] += ['BIM', 'PGD']
 
+    n_classes = len(Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'))
+
     #--------------------------------
     # Model
     #--------------------------------
@@ -126,12 +111,12 @@ if __name__ == "__main__":
 
     model.load_checkpoint(
             name = model_name,
-            path = model_dir,
+            path = model_path,
             verbose = verbose
             )
 
     #--------------------------------
-    # Dataset
+    # Datasets
     #--------------------------------
     datasets = ParsedDataset(path=ds_path)
 
@@ -163,39 +148,14 @@ if __name__ == "__main__":
                 ),
             }
 
+    #--------------------------------
+    # CoreVectors
+    #--------------------------------
     corevecs = CoreVectors(
             path = cvs_path,
             model = model,
             )
 
-    #--------------------------------
-    # Peepholes
-    #--------------------------------
-    # ATTENTION: for DMD to work with the SVD dim reds, you need to set it to get the input activations, instead of the output ones (default)
-    drillers = {}
-    for peep_layer in target_layers:
-        drillers[peep_layer] = DMD(
-                path = drill_path,
-                name = f'{drill_name}.{peep_layer}',
-                target_module = peep_layer,
-                nl_model = n_classes,
-                n_features = cv_dims[peep_layer],
-                model = model,
-                magnitude = 0.004,
-                reducer = svds[peep_layer],
-                std_transform = [0.229, 0.224, 0.225],
-                act_parser = act_parser, 
-                save_input = True,
-                save_output = False,
-                device = device,
-                )
-
-    peepholes = Peepholes(
-            path = phs_path,
-            device = device
-            )
-
-    # fit drillers
     with datasets as ds, corevecs as cv:
         ds.load_only(
                 loaders = loaders,
@@ -204,45 +164,20 @@ if __name__ == "__main__":
                 verbose = verbose
                 )
 
-        cv.load_only(
-                loaders = list(ds._dss.keys()),
+        cv.get_coreVectors(
+                datasets = ds,
+                reducers = svds,
+                save_input = True,
+                save_output = False,
                 names = cv_names,
-                verbose = True
-                )
-
-        for drill_key, driller in drillers.items():
-            if not driller.load():
-                t0 = time()
-                print(f'Fitting DMD for {drill_key}')
-                driller.fit(
-                        datasets = ds,
-                        corevectors = cv,
-                        loader = 'CIFAR100-train-vgg',
-                        verbose = verbose
-                        )
-                print(f'  fit time: {time()-t0:.1f}s')
-                driller.save()
-
-    with datasets as ds, corevecs as cv, peepholes as ph:
-        ds.load_only(
-                loaders = loaders,
-                transforms = _transforms,
-                inference_names = _inference_names,
+                batch_size = bs,
+                n_threads = n_threads,
                 verbose = verbose
                 )
 
-        cv.load_only(
-                loaders = list(ds._dss.keys()),
-                names = cv_names,
-                verbose = True
-                )
-
-        ph.get_peepholes(
-                datasets = ds,
-                corevectors = cv,
-                target_modules = target_layers,
+        cv.normalize_corevectors(
+                wrt = 'CIFAR100-train-vgg',
                 batch_size = bs,
-                drillers = drillers,
-                names = ph_names,
-                verbose = verbose,
+                n_threads = n_threads,
+                verbose = verbose
                 )
