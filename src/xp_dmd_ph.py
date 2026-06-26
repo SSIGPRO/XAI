@@ -57,35 +57,21 @@ if __name__ == "__main__":
 
     # model / driller parameters
     n_classes = 100
-    bs = 256 
+    bs = 128 
     svd_rank = 300
     verbose = True
 
 
     # Peepholelib
-    target_layers = [
-            'features.26',
-            'features.28',
-            'classifier.0',
-            ]
-
+    target_layers = [f'features.{i}' for i in [7, 14, 21, 28]]
     cv_dims = {
-            'features.26': 300,
+            'features.7': 128,
+            'features.14': 256,
+            'features.21': 300,
             'features.28': 300,
-            'classifier.0': 300,
             }
-
-    cv_names = {
-            'features.26': cvs_name,
-            'features.28': cvs_name,
-            'classifier.0': cvs_name,
-            }
-
-    ph_names = {
-            'features.26': phs_name,
-            'features.28': phs_name,
-            'classifier.0': phs_name,
-            }
+    cv_names = {l: cvs_name for l in target_layers}
+    ph_names = {l: phs_name for l in target_layers}
 
     loaders = [
             'CIFAR100-train',
@@ -138,30 +124,14 @@ if __name__ == "__main__":
     #--------------------------------
     # SVDs
     #--------------------------------
-    svds = {
-            'features.26': Conv2dAvgKernelSVD(
-                path = svds_path,
-                layer = 'features.26',
-                model = model,
-                rank = svd_rank,
-                cv_dim = cv_dims['features.26'],
-                ),
-            'features.28': Conv2dAvgKernelSVD(
-                path = svds_path,
-                layer = 'features.28',
-                model = model,
-                rank = svd_rank,
-                cv_dim = cv_dims['features.28'],
-                ),
-            'classifier.0': LinearSVD(
-                path = svds_path,
-                layer = 'classifier.0',
-                model = model,
-                rank = svd_rank,
-                cv_dim = cv_dims['classifier.0'],
-                verbose = verbose
-                ),
-            }
+    svds = {l: Conv2dAvgKernelSVD(
+        path = svds_path,
+        layer = l,
+        model = model,
+        rank = svd_rank,
+        cv_dim = cv_dims[l],
+        ) for l in target_layers
+        }
 
     corevecs = CoreVectors(
             path = cvs_path,

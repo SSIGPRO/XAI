@@ -39,6 +39,7 @@ if __name__ == "__main__":
 
     bs = 512
     n_threads = 1
+    svd_rank = 300
 
     model_path = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
@@ -50,25 +51,10 @@ if __name__ == "__main__":
     verbose = True
 
     # Peepholelib
-    target_layers = [
-            'features.26',
-            'features.28',
-            'classifier.0',
-            ]
+    target_layers = [f'features.{i}' for i in [7, 14, 21, 28]]
+    cv_dims = {l: svd_rank for l in target_layers}
+    cv_names = {l: cvs_name for l in target_layers}
 
-    cv_dims = {
-            'features.26': 30,
-            'features.28': 50,
-            'classifier.0': 30,
-            }
-
-    cv_names = {
-            'features.26': cvs_name,
-            'features.28': cvs_name,
-            'classifier.0': cvs_name,
-            }
-
-    svd_rank = 300
 
     loaders = [
             'CIFAR100-train',
@@ -123,30 +109,15 @@ if __name__ == "__main__":
     #--------------------------------
     # SVDs
     #--------------------------------
-    svds = {
-            'features.26': Conv2dAvgKernelSVD(
-                path = svds_path,
-                layer = 'features.26',
-                model = model,
-                rank = svd_rank,
-                cv_dim = cv_dims['features.26'],
-                ),
-            'features.28': Conv2dAvgKernelSVD(
-                path = svds_path,
-                layer = 'features.28',
-                model = model,
-                rank = svd_rank,
-                cv_dim = cv_dims['features.28'],
-                ),
-            'classifier.0': LinearSVD(
-                path = svds_path,
-                layer = 'classifier.0',
-                model = model,
-                rank = svd_rank,
-                cv_dim = cv_dims['classifier.0'],
-                verbose = verbose
-                ),
-            }
+
+    svds = {l: Conv2dAvgKernelSVD(
+        path = svds_path,
+        layer = l,
+        model = model,
+        rank = svd_rank,
+        cv_dim = cv_dims[l],
+        ) for l in target_layers
+        }
 
     #--------------------------------
     # CoreVectors

@@ -51,16 +51,13 @@ if __name__ == "__main__":
     phs_path = Path.cwd()/'../data/peepholes'
     macs_phs_name = 'phs_macs'
     dmd_phs_name = 'phs_dmd'
+    cam_phs_name = 'phs_mrc'
 
     plots_path = Path.cwd()/'temp_plots/xp_plots/'
     verbose = True 
     
     # Peepholelib
-    target_layers = [
-            'features.26',
-            'features.28',
-            'classifier.0',
-            ]
+    target_layers = [f'features.{i}' for i in [7, 14, 21, 28]]
     
     n_conceptograms = 2 
 
@@ -86,8 +83,10 @@ if __name__ == "__main__":
     _inference_names['CIFAR100-val'] += ['BIM', 'PGD']
     _inference_names['CIFAR100-test'] += ['BIM', 'PGD']
 
-    ph_names = {l: macs_phs_name for l in target_layers}
+
+    macs_names = {l: macs_phs_name for l in target_layers}
     dmd_names = {l: dmd_phs_name for l in target_layers}
+    cam_names = {l: cam_phs_name for l in target_layers}
 
     #--------------------------------
     # Datasets 
@@ -112,7 +111,12 @@ if __name__ == "__main__":
             device = device
             )
 
-    with ds, ph, dmd_ph:
+    cam_ph = Peepholes(
+            path = phs_path,
+            device = device
+            )
+
+    with ds, ph, dmd_ph, cam_ph:
         ds.load_only(
                 loaders = loaders,
                 transforms = _transforms,
@@ -122,13 +126,19 @@ if __name__ == "__main__":
 
         ph.load_only(
                 loaders = list(ds._dss.keys()),
-                names = ph_names,
+                names = macs_names,
                 verbose = verbose
                 )
 
         dmd_ph.load_only(
                 loaders = list(ds._dss.keys()),
                 names = dmd_names,
+                verbose = verbose
+                )
+
+        cam_ph.load_only(
+                loaders = list(ds._dss.keys()),
+                names = cam_names,
                 verbose = verbose
                 )
 
@@ -163,17 +173,62 @@ if __name__ == "__main__":
                 score_name = 'DMD-a',
                 verbose = verbose
                 )
+        
+        # trying different scores with CAM
+        scores = cam_score(
+                datasets = ds,
+                peepholes = cam_ph,
+                safe_loader_train = 'CIFAR100-val-vgg',
+                safe_loader_test = 'CIFAR100-test-vgg',
+                unsafe_loaders = {
+                    'CIFAR100-C-test-c0-vgg': ['CIFAR100-C-val-c0-vgg'],
+                    'MNIST-test-vgg': ['MNIST-val-vgg'],
+                    'Textures-test-vgg': ['Textures-val-vgg'],
+                    'CIFAR100-test-BIM': ['CIFAR100-val-BIM'],
+                    'CIFAR100-test-PGD': ['CIFAR100-val-PGD'],
+                    },
+                append_scores = scores,
+                score_name = 'CAM',
+                )
+
+        scores, protoclasses2 = proto_score(
+                datasets = ds,
+                peepholes = cam_ph,
+                proto_key = 'CIFAR100-train-vgg',
+                score_name = 'CAM-proto',
+                append_scores = scores,
+                verbose = verbose
+                )
+
+        scores = dmd_score(
+                peepholes = cam_ph,
+                pos_loader_train = 'CIFAR100-val-vgg',
+                pos_loader_test = 'CIFAR100-test-vgg',
+                neg_loaders = {
+                    'CIFAR100-C-test-c0-vgg': ['CIFAR100-C-val-c0-vgg'],
+                    'MNIST-test-vgg': ['MNIST-val-vgg'],
+                    'Textures-test-vgg': ['Textures-val-vgg'],
+                    'CIFAR100-test-BIM': ['CIFAR100-val-BIM'],
+                    'CIFAR100-test-PGD': ['CIFAR100-val-PGD'],
+                    },
+                append_scores = scores,
+                score_name = 'CAM-dmd',
+                verbose = verbose
+                )
 
         # make plots
         plot_confidence(
                 datasets = ds,
+                loaders = ['CIFAR100-test-vgg', 'CIFAR100-C-test-c0-vgg'],
                 scores = scores,
                 max_score = 1.,
                 path = plots_path,
                 verbose = verbose
                 )
+
         plot_calibration(
                 datasets = ds,
+                loaders = ['CIFAR100-test-vgg', 'CIFAR100-C-test-c0-vgg'],
                 scores = scores,
                 calib_bin = 0.1,
                 path = plots_path,
@@ -183,10 +238,12 @@ if __name__ == "__main__":
         plot_ood(
                 scores = scores,
                 id_loaders = {
-                    'Proto-Class': 'CIFAR100-test-vgg',
+                    'MACS': 'CIFAR100-test-vgg',
                     'MSP': 'CIFAR100-test-vgg',
-                    'DMD': 'CIFAR100-C-val-c0-vgg',
-                    #'CAM-Q1': 'CIFAR100-test-vgg',
+                    'DMD-a': 'CIFAR100-C-val-c0-vgg',
+                    'CAM': 'CIFAR100-C-val-c0-vgg',
+                    'CAM-proto': 'CIFAR100-test-vgg',
+                    'CAM-dmd': 'CIFAR100-C-val-c0-vgg',
                     },
                 ood_loaders = [
                     'CIFAR100-C-test-c0-vgg',
@@ -203,7 +260,7 @@ if __name__ == "__main__":
         idx = [2, 5, 15, 40, 86, 150]
         plot_conceptogram(
                 path = plots_path,
-                name = 'conceptogram_macs',
+                name = 'macs',
                 datasets = ds,
                 peepholes = ph,
                 loaders = ['CIFAR100-test-vgg'],
@@ -217,29 +274,28 @@ if __name__ == "__main__":
 
         plot_conceptogram(
                 path = plots_path,
-                name = 'conceptogram_dmd',
+                name = 'dmd',
                 datasets = ds,
                 peepholes = dmd_ph,
                 loaders = ['CIFAR100-test-vgg'],
                 samples = idx,
                 target_modules = target_layers,
                 classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
-                protoclasses = protoclasses,
+                #protoclasses = protoclasses,
                 scores = scores,
                 verbose = verbose,
                 )
         
-        '''
         plot_conceptogram(
                 path = plots_path,
-                name = 'conceptogram_cam',
+                name = 'cam',
                 datasets = ds,
                 peepholes = cam_ph,
                 loaders = ['CIFAR100-test-vgg'],
                 samples = idx,
                 target_modules = target_layers,
                 classes = Cifar100.get_classes(meta_path = Path(cifar_path)/'cifar-100-python/meta'),
+                protoclasses = protoclasses2,
                 scores = scores,
                 verbose = verbose,
                 )
-        '''
