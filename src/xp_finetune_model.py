@@ -72,7 +72,7 @@ if __name__ == "__main__":
 
     model.update_output(output_layer=output_layer, to_n_classes=n_classes)
 
-    model.prepend_normalizer(mean=means[name_dataset], std= stds[name_dataset])
+    model.set_normalizer(mean=means[name_dataset], std= stds[name_dataset])
 
     layers_to_train = [
             'model.layer3.0.conv1',
@@ -151,19 +151,33 @@ if __name__ == "__main__":
     #----------------------------
 
     bs = 2**4
-    iterations = 2**2 
+    iterations = 2**2
     num_epochs = 20
 
-    ## DataLoader
+    ## Dataset / DataLoader
 
-    dl_kwargs = dict(
+    datasets = {
+            'train': dataset.__dataset__[f'{name_dataset}-train'],
+            'val': dataset.__dataset__[f'{name_dataset}-val'],
+            'test': dataset.__dataset__[f'{name_dataset}-test'],
+            }
+
+    common_dl_kwargs = dict(
             collate_fn = default_collate,
             num_workers = n_threads,
             pin_memory = device.type == "cuda",
             persistent_workers=n_threads > 0,
     )
     if n_threads > 0:
-        dl_kwargs["prefetch_factor"] = 2
+        common_dl_kwargs["prefetch_factor"] = 2
+
+    dataloader_kwargs = {
+            'train': dict(batch_size = bs, shuffle = True, **common_dl_kwargs),
+            'val': dict(batch_size = bs, shuffle = False, **common_dl_kwargs),
+            'test': dict(batch_size = bs, shuffle = False, **common_dl_kwargs),
+            }
+
+    iterations_kwargs = {'train': iterations, 'val': iterations, 'test': 'full'}
 
     ## Optimizer & Scheduler
     trainable_params = model.get_trainable_parameters(
@@ -190,14 +204,10 @@ if __name__ == "__main__":
             model = model,
             path = tune_dir,
             name = tune_name,
-            dataset = dataset,
-            train_key = f'{name_dataset}-train',
-            val_key = f'{name_dataset}-val',
-            test_key = f'{name_dataset}-test',
-            batch_size = bs,
-            dataloader_kwargs = dl_kwargs,
+            datasets = datasets,
+            dataloader_kwargs = dataloader_kwargs,
+            iterations = iterations_kwargs,
             max_epochs = 10,
-            iterations = iterations,
             optimizer = optimizer,
             scheduler = scheduler,
             save_every = 5,
@@ -241,14 +251,10 @@ if __name__ == "__main__":
             path = tune_dir,
             model = model,
             name = tune_name,
-            dataset = dataset,
-            train_key = f'{name_dataset}-train',
-            val_key = f'{name_dataset}-val',
-            test_key = f'{name_dataset}-test',
-            batch_size = bs,
-            dataloader_kwargs = dl_kwargs,
+            datasets = datasets,
+            dataloader_kwargs = dataloader_kwargs,
+            iterations = iterations_kwargs,
             max_epochs = 20,
-            iterations = iterations,
             optimizer = optimizer,
             scheduler = scheduler,
             save_every = 5,
@@ -285,14 +291,10 @@ if __name__ == "__main__":
             model = model,
             path = tune_dir,
             name = tune_name,
-            dataset = dataset,
-            train_key = f'{name_dataset}-train',
-            val_key = f'{name_dataset}-val',
-            test_key = f'{name_dataset}-test',
-            batch_size = bs,
-            dataloader_kwargs = dl_kwargs,
+            datasets = datasets,
+            dataloader_kwargs = dataloader_kwargs,
+            iterations = iterations_kwargs,
             max_epochs = 30,
-            iterations = iterations,
             optimizer = optimizer,
             scheduler = scheduler,
             early_stopping_patience = 2,
