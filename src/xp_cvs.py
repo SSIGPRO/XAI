@@ -24,7 +24,6 @@ from peepholelib.datasets.functional.transforms import vgg16_transform as ds_tra
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
-from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -37,7 +36,7 @@ if __name__ == "__main__":
     cifar_path = '/srv/newpenny/dataset/CIFAR100'
     ds_path = Path.cwd()/'../data/datasets'
 
-    bs = 512
+    bs = 256 
     n_threads = 1
     svd_rank = 300
 

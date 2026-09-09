@@ -4,7 +4,6 @@ sys.path.insert(0, (Path.home()/'repos/peepholelib').as_posix())
 
 # python stuff
 from functools import partial
-from matplotlib import pyplot as plt
 
 # torch stuff
 import torch
@@ -26,12 +25,10 @@ from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.datasets.functional.inference_fns import img_classification_full as img_cls_inf, img_classification_atks as img_cls_atk_inf 
 from peepholelib.datasets.functional.transforms import TransformWrap 
 from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform 
-from peepholelib.datasets.functional.samplers import random_subsampling 
+from peepholelib.datasets.functional.samplers import balanced_subsampling as b_subs, random_subsampling as r_subs
 
 # ATK dataset
 from peepholelib.adv_atk.BIM import myBIM
-from peepholelib.adv_atk.CW import myCW
-from peepholelib.adv_atk.DeepFool import myDeepFool
 from peepholelib.adv_atk.PGD import myPGD
 
 if __name__ == "__main__":
@@ -54,6 +51,10 @@ if __name__ == "__main__":
     
     bs = 2**8
     n_threads = 1
+
+    # samples kept from each split by the subsamplers
+    n_samples_train = 500
+    n_samples_test = 100
 
     model_dir = '/srv/newpenny/XAI/models'
     model_name = 'LM_model=vgg16_dataset=CIFAR100_augment=True_optim=SGD_scheduler=LROnPlateau.pth'
@@ -106,11 +107,29 @@ if __name__ == "__main__":
 
             }
 
+    # the samplers take a number of samples per split (int or dict), instead of a fraction
     _dss_samplers = {
-            k: partial(
-                random_subsampling, 
-                perc = 0.5
-                ) for k in _dss.keys()
+            'CIFAR100': partial(
+                b_subs,
+                n_classes = n_classes,
+                n_samples = {
+                    'CIFAR100-train': n_samples_train,
+                    'CIFAR100-val': n_samples_test,
+                    'CIFAR100-test': n_samples_test,
+                    }
+                ),
+            'CIFARC': partial(
+                r_subs,
+                n_samples = n_samples_test
+                ),
+            'MNIST': partial(
+                r_subs,
+                n_samples = n_samples_test
+                ),
+            'Textures': partial(
+                r_subs,
+                n_samples = n_samples_test
+                ),
             }
 
     loaders = [
@@ -120,18 +139,6 @@ if __name__ == "__main__":
             'CIFAR100-C-train-c0',
             'CIFAR100-C-val-c0',
             'CIFAR100-C-test-c0',
-            #'CIFAR100-C-train-c1',
-            #'CIFAR100-C-val-c1',
-            #'CIFAR100-C-test-c1',
-            #'CIFAR100-C-train-c2',
-            #'CIFAR100-C-val-c2',
-            #'CIFAR100-C-test-c2',
-            #'CIFAR100-C-train-c3',
-            #'CIFAR100-C-val-c3',
-            #'CIFAR100-C-test-c3',
-            #'CIFAR100-C-train-c4',
-            #'CIFAR100-C-val-c4',
-            #'CIFAR100-C-test-c4',
             'MNIST-val',
             'MNIST-test',
             'Textures-val',
@@ -143,16 +150,9 @@ if __name__ == "__main__":
             }
 
     atks = {
-            #'CW': myCW(
-            #    model = model,
-            #    max_steps = 10,
-            #    ),
             'BIM': myBIM(
                 model = model,
                 ),
-            #'DF': myDeepFool(
-            #    model = model,
-            #    ),
             'PGD': myPGD(
                 model = model,
                 ),
@@ -177,16 +177,18 @@ if __name__ == "__main__":
     with dataset as ds:
         ds.parse_dataset(
                 dataset_wraps = _dss,
-                ds_samplers = _dss_samplers, 
+                ds_samplers = _dss_samplers,
                 keys_to_copy = ['image', 'label'],
                 batch_size = bs,
+                n_threads = n_threads,
                 verbose = verbose
-                ) 
+                )
 
         ds.parse_inference(
                 inference_fns = {'vgg': partial(img_cls_inf, model=model)},
                 transforms = _transforms,
                 batch_size = bs,
+                n_threads = n_threads,
                 verbose = verbose
                 )
 
@@ -195,9 +197,10 @@ if __name__ == "__main__":
                     'CIFAR100-val',
                     'CIFAR100-test'
                     ],
-                inference_fns = atks_inf_fns, 
+                inference_fns = atks_inf_fns,
                 transforms = _transforms,
                 batch_size = bs,
-                verbose = verbose 
+                n_threads = n_threads,
+                verbose = verbose
                 )
 
