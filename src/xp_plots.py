@@ -203,7 +203,7 @@ if __name__ == "__main__":
                     fit_key = fit_key,
                     verbose = verbose
                     )
-        macs(
+        macs.compute(
                 datasets = ds,
                 peepholes = ph,
                 loaders = score_loaders,
@@ -211,7 +211,7 @@ if __name__ == "__main__":
                 )
 
         msp = ModelOutputScore(path=scores_path, type='MSP')
-        msp(
+        msp.compute(
                 datasets = ds,
                 loaders = score_loaders,
                 verbose = verbose
@@ -228,7 +228,7 @@ if __name__ == "__main__":
                     n_threads = n_threads,
                     verbose = verbose
                     )
-        vim(
+        vim.compute(
                 model = model,
                 datasets = ds,
                 output_layer = output_layer,
@@ -246,14 +246,14 @@ if __name__ == "__main__":
                     neg_loaders = neg_loaders,
                     verbose = verbose
                     )
-        dmd(
+        dmd.compute(
                 peepholes = dmd_ph,
                 pos_loader_test = pos_loader_test,
                 verbose = verbose
                 )
 
         cam_lin = CAMLinScore(path=scores_path, name='CAM-lin')
-        cam_lin(
+        cam_lin.compute(
                 datasets = ds,
                 peepholes = cam_ph,
                 loaders = score_loaders,
@@ -269,7 +269,7 @@ if __name__ == "__main__":
                     neg_loaders = neg_loaders,
                     verbose = verbose
                     )
-        cam_exp(
+        cam_exp.compute(
                 datasets = ds,
                 peepholes = cam_ph,
                 pos_loader_test = pos_loader_test,
