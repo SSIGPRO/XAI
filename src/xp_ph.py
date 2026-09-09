@@ -16,14 +16,12 @@ from cuda_selector import auto_cuda
 from peepholelib.models.model_wrap import ModelWrap 
 
 # datasets
-from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset
-from peepholelib.datasets.functional.transforms import TransformWrap 
-from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform 
+from peepholelib.datasets.functional.transforms import TransformWrap
+from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform
 
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
-from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
 
 # peepholes
@@ -57,10 +55,11 @@ if __name__ == "__main__":
     
     # model / driller parameters
     n_classes = 100
-    bs = 512 
+    bs = 512
+    n_threads = 1
     svd_rank = 300
-    n_cluster = 300 
-    verbose = True 
+    n_cluster = 300
+    verbose = True
     
     # Peepholelib
     target_layers = [f'features.{i}' for i in [7, 14, 21, 28]]
@@ -209,9 +208,9 @@ if __name__ == "__main__":
         ph.get_peepholes(
                 datasets = ds,
                 corevectors = cv,
-                target_modules = target_layers,
-                batch_size = bs,
                 drillers = drillers,
                 names = ph_names,
+                batch_size = bs,
+                n_threads = n_threads,
                 verbose = verbose
                 )
