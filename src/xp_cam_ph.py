@@ -23,7 +23,6 @@ from peepholelib.datasets.functional.transforms import vgg16_transform as ds_tra
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
-from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 
 # peepholes
 from peepholelib.peepholes.peepholes import Peepholes
@@ -57,6 +56,7 @@ if __name__ == "__main__":
     n_classes = 100
     svd_rank = 300
     bs = 512
+    n_threads = 1
     Q = 1   # number of MRC sub-ranges
     verbose = True
 
@@ -209,10 +209,10 @@ if __name__ == "__main__":
         ph.get_peepholes(
                 datasets = ds,
                 corevectors = cv,
-                target_modules = target_layers,
-                batch_size = bs,
                 drillers = drillers,
                 names = ph_names,
+                batch_size = bs,
+                n_threads = n_threads,
                 verbose = verbose
                 )
 

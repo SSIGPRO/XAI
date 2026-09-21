@@ -1,2 +1,4 @@
 *__pycache__*
 locks/*.lock
+temp_plots/*
+temp_results/*

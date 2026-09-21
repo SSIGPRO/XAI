@@ -17,7 +17,6 @@ from peepholelib.models.model_wrap import ModelWrap
 from peepholelib.models.model_wrap import get_in_activations as act_parser
 
 # dataset
-from peepholelib.datasets.cifar100 import Cifar100
 from peepholelib.datasets.parsedDataset import ParsedDataset
 from peepholelib.datasets.functional.transforms import TransformWrap
 from peepholelib.datasets.functional.transforms import vgg16_transform as ds_transform
@@ -25,7 +24,6 @@ from peepholelib.datasets.functional.transforms import vgg16_transform as ds_tra
 # corevecs
 from peepholelib.coreVectors.coreVectors import CoreVectors
 from peepholelib.coreVectors.dimReduction.svds.conv2d_avg_kernel_svd import Conv2dAvgKernelSVD
-from peepholelib.coreVectors.dimReduction.svds.linear_svd import LinearSVD
 
 # peepholes
 from peepholelib.peepholes.DeepMahalanobisDistance.DMD import DeepMahalanobisDistance as DMD
@@ -57,7 +55,8 @@ if __name__ == "__main__":
 
     # model / driller parameters
     n_classes = 100
-    bs = 128 
+    bs = 64 
+    n_threads = 1
     svd_rank = 300
     verbose = True
 
@@ -210,9 +209,9 @@ if __name__ == "__main__":
         ph.get_peepholes(
                 datasets = ds,
                 corevectors = cv,
-                target_modules = target_layers,
-                batch_size = bs,
                 drillers = drillers,
                 names = ph_names,
+                batch_size = bs,
+                n_threads = n_threads,
                 verbose = verbose,
                 )
